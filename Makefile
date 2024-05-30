@@ -1,6 +1,6 @@
 ### GO tools
 tools:
-	cd tools && go mod tidy && go mod vendor && go mod verify && go generate -tags tools
+	cd tools && go mod vendor && go mod tidy && go mod verify && go generate -tags tools
 .PHONY: tools
 
 vendor:
