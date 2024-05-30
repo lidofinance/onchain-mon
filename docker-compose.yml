@@ -1,0 +1,14 @@
+version: '3.7'
+
+services:
+  main:
+    container_name: finding_forwarder
+    build: ./
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - '8080:8080'
+networks:
+  postgres:
+     driver: bridge
