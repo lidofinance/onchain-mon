@@ -5,8 +5,8 @@
 //go:generate go build -o ../bin/mockery github.com/vektra/mockery/v2
 //go:generate go build -o ../bin/goimports golang.org/x/tools/cmd/goimports
 //go:generate go build -tags 'postgres' -o ../bin/migrate github.com/golang-migrate/migrate/v4/cmd/migrate
-
-//go:generate go build -o ../bin/ifacemaker github.com/vburenin/ifacemaker
+//go:generate go build -o ../bin/swagger  github.com/go-swagger/go-swagger/cmd/swagger
+//go:generate go build -o ../bin/swag  github.com/swaggo/swag/cmd/swag
 
 // Package tools contains go:generate commands for all project tools with versions stored in local go.mod file
 // See https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
@@ -17,8 +17,9 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/cmd/migrate"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
-	_ "github.com/vburenin/ifacemaker"
 	_ "github.com/vektra/mockery/v2"
 
+	_ "github.com/go-swagger/go-swagger/cmd/swagger"
+	_ "github.com/swaggo/swag/cmd/swag"
 	_ "golang.org/x/tools/cmd/goimports"
 )

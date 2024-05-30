@@ -4,7 +4,7 @@ tools:
 .PHONY: tools
 
 vendor:
-	go mod vendor && go mod tidy && go mod verify
+	go mod tidy && go mod vendor &&  go mod verify
 .PHONY: vendor
 
 build:
@@ -28,3 +28,14 @@ full-lint: imports fmt vet lint
 
 full-lint: imports fmt vet lint
 .PHONY: full-lint
+
+swagger-gen:
+	rm -rf generated/forta && \
+	bin/swagger generate server \
+		-f ./brief/forta-webhook/swagger.yml \
+		-m generated/forta/models \
+		--exclude-main \
+		--skip-support \
+		--skip-operations
+
+.PHONY: swagger-gen

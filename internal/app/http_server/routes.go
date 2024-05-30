@@ -1,16 +1,14 @@
 package server
 
 import (
-	"net/http"
-
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	_ "github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/internal/http/handlers/alerts"
 	"github.com/lidofinance/finding-forwarder/internal/http/handlers/health"
-	userexample "github.com/lidofinance/finding-forwarder/internal/http/handlers/user_example"
 )
 
 func (a *App) RegisterRoutes(r chi.Router) {
@@ -20,7 +18,9 @@ func (a *App) RegisterRoutes(r chi.Router) {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", health.New().Handler)
-	r.Method(http.MethodGet, "/metrics", promhttp.Handler())
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
-	r.Get("/example", userexample.New(a.Logger, a.usecase.User).Handler)
+	alertsH := alerts.New(a.Logger)
+
+	r.Post("/alerts", alertsH.Handler)
 }
