@@ -4,17 +4,23 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-redis/redis"
+
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/utils/deps"
 )
 
 type handler struct {
-	log deps.Logger
+	log            deps.Logger
+	redisClient    *redis.Client
+	redisQueueName string
 }
 
-func New(log deps.Logger) *handler {
+func New(log deps.Logger, redisClient *redis.Client, redisQueueName string) *handler {
 	return &handler{
-		log: log,
+		log:            log,
+		redisClient:    redisClient,
+		redisQueueName: redisQueueName,
 	}
 }
 
@@ -30,6 +36,11 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	out, _ := json.Marshal(payload)
+	if err := h.redisClient.LPush(h.redisQueueName, "some data").Err(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	h.log.Info(string(out))
 
 	bb, _ := json.Marshal(payload)

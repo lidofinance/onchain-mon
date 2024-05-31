@@ -11,7 +11,7 @@ func New() *handler {
 	return &handler{}
 }
 
-func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) Handler(w http.ResponseWriter, _ *http.Request) {
 	type resp struct {
 		Status string `json:"status"`
 	}

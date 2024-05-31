@@ -40,7 +40,7 @@ Burnt: 17,698.36 × 1e18
 ethereum:mainnet
 Forta explorer`
 
-func Test_SendMessage(t *testing.T) {
+func Test_usecase_SendMessage1(t *testing.T) {
 	cfg, envErr := env.Read("../../../../.env")
 	if envErr != nil {
 		fmt.Println("Read env error:", envErr.Error())
@@ -48,12 +48,11 @@ func Test_SendMessage(t *testing.T) {
 	}
 
 	type fields struct {
-		botToken   string
+		webhookURL string
 		httpClient http.Client
 	}
 	type args struct {
 		ctx     context.Context
-		chatID  string
 		message string
 	}
 	tests := []struct {
@@ -63,14 +62,13 @@ func Test_SendMessage(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Send_Test_Message_to_telegram",
+			name: "Success",
 			fields: fields{
-				botToken:   cfg.AppConfig.TelegramBotToken,
+				webhookURL: cfg.AppConfig.DiscordWebHookURL,
 				httpClient: http.Client{},
 			},
 			args: args{
-				ctx:     context.TODO(),
-				chatID:  cfg.AppConfig.TelegramChatID,
+				ctx:     context.Background(),
 				message: Name + "\n\n" + Description,
 			},
 			wantErr: false,
@@ -79,10 +77,10 @@ func Test_SendMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			u := &usecase{
-				botToken:   tt.fields.botToken,
+				webhookURL: tt.fields.webhookURL,
 				httpClient: tt.fields.httpClient,
 			}
-			if err := u.SendMessage(tt.args.ctx, tt.args.chatID, tt.args.message); (err != nil) != tt.wantErr {
+			if err := u.SendMessage(tt.args.ctx, tt.args.message); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

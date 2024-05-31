@@ -1,21 +1,4 @@
 linters-settings:
-  depguard:
-    # old configuration. TODO(ldez): must be removed
-    list-type: denylist
-    packages:
-      # logging is allowed only by logutils.Log, logrus
-      # is allowed to use only in logutils package
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
-    # new configuration
-    rules:
-      logger:
-        deny:
-          # logging is allowed only by logutils.Log,
-          # logrus is allowed to use only in logutils package.
-          - pkg: "github.com/sirupsen/logrus"
-            desc: logging is allowed only by logutils.Log
   dupl:
     threshold: 100
   funlen:
@@ -44,7 +27,7 @@ linters-settings:
         replacement: 'any'
   goimports:
     local-prefixes: github.com/golangci/golangci-lint
-  gomnd:
+  mnd:
     # don't include the "operation" and "assign"
     checks:
       - argument
@@ -60,7 +43,7 @@ linters-settings:
       - strings.SplitN
 
   govet:
-    check-shadowing: true
+    check-shadow: true
     settings:
       printf:
         funcs:
@@ -86,7 +69,7 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - depguard
+    - gomodguard
     - dogsled
     - dupl
     - errcheck
@@ -98,7 +81,7 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
+    - mnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -158,7 +141,7 @@ issues:
 
 run:
   timeout: 5m
-  skip-dirs:
+  exclude-dirs:
     - test/testdata_etc # test files
     - internal/cache # extracted from Go code
     - internal/renameio # extracted from Go code

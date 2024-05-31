@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
-	"github.com/lidofinance/finding-forwarder/internal/pkg/telegram"
 	"net/http"
 	"net/url"
+
+	"github.com/lidofinance/finding-forwarder/internal/pkg/telegram"
 )
 
 type usecase struct {
@@ -19,12 +21,16 @@ func New(botToken string, httpClient http.Client) telegram.Usecase {
 	}
 }
 
-func (u *usecase) SendMessage(chatID string, message string) error {
-	request := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, chatID, url.QueryEscape(message))
-
-	resp, err := u.httpClient.Get(request)
+func (u *usecase) SendMessage(ctx context.Context, chatID, message string) error {
+	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, chatID, url.QueryEscape(message))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {
-		return fmt.Errorf("could not send request: %v", err)
+		return fmt.Errorf("could not create request: %w", err)
+	}
+
+	resp, err := u.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("could not send request: %w", err)
 	}
 	defer resp.Body.Close()
 

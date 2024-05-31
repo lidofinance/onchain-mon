@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/go-redis/redis"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
@@ -19,16 +21,18 @@ const (
 )
 
 type App struct {
-	Logger  *logrus.Logger
-	Metrics *metrics.Store
-	usecase *usecase
+	Logger      *logrus.Logger
+	Metrics     *metrics.Store
+	usecase     *usecase
+	RedisClient *redis.Client
 }
 
-func New(logger *logrus.Logger, metrics *metrics.Store, usecase *usecase) *App {
+func New(logger *logrus.Logger, promStore *metrics.Store, usecase *usecase, redisClient *redis.Client) *App {
 	return &App{
-		Logger:  logger,
-		Metrics: metrics,
-		usecase: usecase,
+		Logger:      logger,
+		Metrics:     promStore,
+		usecase:     usecase,
+		RedisClient: redisClient,
 	}
 }
 
