@@ -23,7 +23,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	cfg, envErr := env.Read()
+	cfg, envErr := env.Read("")
 	if envErr != nil {
 		fmt.Println("Read env error:", envErr.Error())
 		return
@@ -40,7 +40,7 @@ func main() {
 	r := chi.NewRouter()
 	metrics := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.Name, cfg.AppConfig.Env)
 
-	usecase := server.Usecase()
+	usecase := server.Usecase(&cfg.AppConfig)
 
 	app := server.New(log, metrics, usecase)
 

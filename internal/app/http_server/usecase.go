@@ -1,17 +1,19 @@
 package server
 
 import (
-	"github.com/lidofinance/finding-forwarder/internal/pkg/users"
-	usersUsecase "github.com/lidofinance/finding-forwarder/internal/pkg/users/usecase"
+	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/finding-forwarder/internal/pkg/telegram"
+	usersUsecase "github.com/lidofinance/finding-forwarder/internal/pkg/telegram/usecase"
+	"net/http"
 )
 
 type usecase struct {
-	User users.Usecase
+	User telegram.Usecase
 }
 
 // nolint
-func Usecase() *usecase {
+func Usecase(cfg *env.AppConfig) *usecase {
 	return &usecase{
-		User: usersUsecase.New(),
+		User: usersUsecase.New(cfg.TelegramBotToken, http.Client{}),
 	}
 }

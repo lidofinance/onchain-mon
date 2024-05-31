@@ -11,12 +11,14 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Name      string
-	Env       string
-	URL       string
-	Port      uint
-	LogFormat string
-	LogLevel  string
+	Name             string
+	Env              string
+	URL              string
+	Port             uint
+	LogFormat        string
+	LogLevel         string
+	TelegramBotToken string
+	TelegramChatID   string
 }
 
 var (
@@ -25,13 +27,18 @@ var (
 	onceDefaultClient sync.Once
 )
 
-func Read() (*Config, error) {
+func Read(configPath string) (*Config, error) {
 	var err error
 
 	onceDefaultClient.Do(func() {
 		viper.SetConfigType("env")
-		viper.AddConfigPath(".")
-		viper.SetConfigFile(".env")
+
+		if len(configPath) != 0 {
+			viper.SetConfigFile(configPath)
+		} else {
+			viper.AddConfigPath(".")
+			viper.SetConfigFile(".env")
+		}
 
 		viper.AutomaticEnv()
 		if viperErr := viper.ReadInConfig(); err != nil {
@@ -43,12 +50,14 @@ func Read() (*Config, error) {
 
 		cfg = Config{
 			AppConfig: AppConfig{
-				Name:      viper.GetString("APP_NAME"),
-				Env:       viper.GetString("ENV"),
-				URL:       viper.GetString("app.url"),
-				Port:      viper.GetUint("PORT"),
-				LogFormat: viper.GetString("LOG_FORMAT"),
-				LogLevel:  viper.GetString("LOG_LEVEL"),
+				Name:             viper.GetString("APP_NAME"),
+				Env:              viper.GetString("ENV"),
+				URL:              viper.GetString("app.url"),
+				Port:             viper.GetUint("PORT"),
+				LogFormat:        viper.GetString("LOG_FORMAT"),
+				LogLevel:         viper.GetString("LOG_LEVEL"),
+				TelegramBotToken: viper.GetString("TELEGRAM_BOT_TOKEN"),
+				TelegramChatID:   viper.GetString("TELEGRAM_CHAT_ID"),
 			},
 		}
 	})
