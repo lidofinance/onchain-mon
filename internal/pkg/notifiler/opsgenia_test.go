@@ -1,16 +1,15 @@
-package usecase
+package notifiler
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
-const Name = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
-const Description = `
+const NameCritical = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
+const DescriptionCritical = `
 Total supply of bridged wstETH is greater than balanceOf L1 bridge side!
 L2 total supply: 1105.48
 L1 balanceOf: 1080.11
@@ -18,16 +17,16 @@ L1 balanceOf: 1080.11
 ETH: 19811516
 ZkSync: 33308621`
 
-func Test_usecase_SendMessage(t *testing.T) {
-	cfg, envErr := env.Read("../../../../.env")
+func Test_opsGenia_SendMessage(t *testing.T) {
+	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
-		fmt.Println("Read env error:", envErr.Error())
+		t.Errorf("Read env error: %s", envErr.Error())
 		return
 	}
 
 	type fields struct {
 		opsGenieKey string
-		httpClient  http.Client
+		httpClient  *http.Client
 	}
 	type args struct {
 		ctx         context.Context
@@ -45,12 +44,12 @@ func Test_usecase_SendMessage(t *testing.T) {
 			name: "Success",
 			fields: fields{
 				opsGenieKey: cfg.AppConfig.OpsGeniaAPIKey,
-				httpClient:  http.Client{},
+				httpClient:  &http.Client{},
 			},
 			args: args{
 				ctx:         context.TODO(),
-				message:     Name,
-				description: Description,
+				message:     NameCritical,
+				description: DescriptionCritical,
 				priority:    "P4",
 			},
 			wantErr: false,
@@ -58,7 +57,7 @@ func Test_usecase_SendMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := &usecase{
+			u := &opsGenia{
 				opsGenieKey: tt.fields.opsGenieKey,
 				httpClient:  tt.fields.httpClient,
 			}

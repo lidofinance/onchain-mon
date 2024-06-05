@@ -2,25 +2,30 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	server "github.com/lidofinance/finding-forwarder/internal/app/http_server"
+	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
+
+	"github.com/lidofinance/finding-forwarder/internal/app/server"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	redisConnector "github.com/lidofinance/finding-forwarder/internal/connectors/redis"
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	defer stop()
+	g, gCtx := errgroup.WithContext(ctx)
 
 	cfg, envErr := env.Read("")
 	if envErr != nil {
@@ -34,24 +39,43 @@ func main() {
 		return
 	}
 
-	red := redisConnector.New(&cfg.AppConfig)
+	natsClient, natsErr := nc.New(&cfg.AppConfig)
+	if natsErr != nil {
+		fmt.Println("Could not connect to nats error:", natsErr.Error())
+		return
+	}
+	defer natsClient.Close()
+
+	js, jetStreamErr := jetstream.New(natsClient)
+	if jetStreamErr != nil {
+		fmt.Println("Could not connect to jetStream error:", jetStreamErr.Error())
+		return
+	}
+	s, createStreamErr := js.CreateStream(gCtx, jetstream.StreamConfig{
+		Name:     cfg.AppConfig.NatsStreamName,
+		Subjects: []string{fmt.Sprintf(`%s.*`, cfg.AppConfig.NatsStreamName)},
+	})
+
+	if createStreamErr != nil && !errors.Is(createStreamErr, nats.ErrStreamNameAlreadyInUse) {
+		fmt.Println("Could not create FINDINGS stream error:", createStreamErr.Error())
+		return
+	}
 
 	log.Info(fmt.Sprintf(`started %s application`, cfg.AppConfig.Name))
 
 	r := chi.NewRouter()
 	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.Name, cfg.AppConfig.Env)
 
-	usecase := server.Usecase(&cfg.AppConfig)
-
-	app := server.New(log, promStore, usecase, red)
+	services := server.NewServices(&cfg.AppConfig)
+	app := server.New(&cfg.AppConfig, log, promStore, &services, js)
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterRoutes(r)
 
-	g, gCtx := errgroup.WithContext(ctx)
+	alertWorker := server.NewWorker(log, s, services.Telegram, services.OpsGenia, services.Discord)
 
+	alertWorker.Run(ctx, g)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
-	// someDaemon(gCtx, g, red)
 
 	if err := g.Wait(); err != nil {
 		log.Error(err)
@@ -59,39 +83,3 @@ func main() {
 
 	fmt.Println(`Main done`)
 }
-
-/*func someDaemon(gCtx context.Context, g *errgroup.Group, redisClient *redis.Client) {
-	g.Go(func() error {
-		for {
-			select {
-			case <-time.After(1 * time.Second):
-
-				// Get the message
-				body, err := redisClient.LIndex(gCtx, topic, - 1).Bytes()
-				iferr ! =nil && !errors.Is(err, redis.Nil) {
-				return err
-				}
-				// No message, sleep for a while
-				if errors.Is(err, redis.Nil) {
-					time.Sleep(time.Second)
-					continue
-				}
-				// Process the message
-				err = h(&Msg{
-					Topic: topic,
-					Body:  body,
-				})
-				iferr ! =nil {
-				continue
-			}
-				// If the processing succeeds, delete the message
-				iferr := q.client.RPop(ctx, topic).Err(); err ! =nil {
-				return err
-			}
-
-			case <-gCtx.Done():
-				return nil
-			}
-		}
-	})
-}*/

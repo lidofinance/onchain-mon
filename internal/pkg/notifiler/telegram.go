@@ -1,28 +1,33 @@
-package usecase
+package notifiler
 
 import (
 	"context"
 	"fmt"
 	"net/http"
 	"net/url"
-
-	"github.com/lidofinance/finding-forwarder/internal/pkg/telegram"
 )
 
-type usecase struct {
+type telegram struct {
 	botToken   string
-	httpClient http.Client
+	chatID     string
+	httpClient *http.Client
 }
 
-func New(botToken string, httpClient http.Client) telegram.Usecase {
-	return &usecase{
+//go:generate ./../../../bin/mockery --name Telegram
+type Telegram interface {
+	SendMessage(ctx context.Context, message string) error
+}
+
+func NewTelegram(botToken, chatID string, httpClient *http.Client) Telegram {
+	return &telegram{
 		botToken:   botToken,
+		chatID:     chatID,
 		httpClient: httpClient,
 	}
 }
 
-func (u *usecase) SendMessage(ctx context.Context, chatID, message string) error {
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, chatID, url.QueryEscape(message))
+func (u *telegram) SendMessage(ctx context.Context, message string) error {
+	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("could not create request: %w", err)

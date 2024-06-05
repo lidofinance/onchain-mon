@@ -1,4 +1,4 @@
-package usecase
+package notifiler
 
 import (
 	"bytes"
@@ -6,23 +6,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/lidofinance/finding-forwarder/internal/pkg/opsgenia"
 )
 
-type usecase struct {
+type opsGenia struct {
 	opsGenieKey string
-	httpClient  http.Client
+	httpClient  *http.Client
 }
 
-func New(opsGenieKey string, httpClient http.Client) opsgenia.Usecase {
-	return &usecase{
+//go:generate ./../../../bin/mockery --name OpsGenia
+type OpsGenia interface {
+	SendMessage(ctx context.Context, message, description, priority string) error
+}
+
+func NewOpsGenia(opsGenieKey string, httpClient *http.Client) OpsGenia {
+	return &opsGenia{
 		opsGenieKey: opsGenieKey,
 		httpClient:  httpClient,
 	}
 }
 
-func (u *usecase) SendMessage(ctx context.Context, message, description, priority string) error {
+func (u *opsGenia) SendMessage(ctx context.Context, message, description, priority string) error {
 	type AlertPayload struct {
 		Message     string `json:"message"`
 		Description string `json:"description,omitempty"`

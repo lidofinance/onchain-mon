@@ -1,8 +1,7 @@
-package usecase
+package notifiler
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -41,15 +40,15 @@ ethereum:mainnet
 Forta explorer`
 
 func Test_usecase_SendMessage1(t *testing.T) {
-	cfg, envErr := env.Read("../../../../.env")
+	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
-		fmt.Println("Read env error:", envErr.Error())
+		t.Errorf("Read env error: %s", envErr.Error())
 		return
 	}
 
 	type fields struct {
 		webhookURL string
-		httpClient http.Client
+		httpClient *http.Client
 	}
 	type args struct {
 		ctx     context.Context
@@ -65,7 +64,7 @@ func Test_usecase_SendMessage1(t *testing.T) {
 			name: "Success",
 			fields: fields{
 				webhookURL: cfg.AppConfig.DiscordWebHookURL,
-				httpClient: http.Client{},
+				httpClient: &http.Client{},
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -76,7 +75,7 @@ func Test_usecase_SendMessage1(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := &usecase{
+			u := &discord{
 				webhookURL: tt.fields.webhookURL,
 				httpClient: tt.fields.httpClient,
 			}

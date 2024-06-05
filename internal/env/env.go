@@ -22,10 +22,8 @@ type AppConfig struct {
 	OpsGeniaAPIKey    string
 	DiscordWebHookURL string
 
-	RedisURL       string
-	RedisPassword  string
-	RedisDB        int
-	RedisQueueName string
+	NatsDefaultURL string
+	NatsStreamName string
 }
 
 var (
@@ -64,11 +62,8 @@ func Read(configPath string) (*Config, error) {
 				TelegramChatID:    viper.GetString("TELEGRAM_CHAT_ID"),
 				OpsGeniaAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
-
-				RedisURL:       viper.GetString("REDIS_URL"),
-				RedisPassword:  viper.GetString("REDIS_PASSWORD"),
-				RedisDB:        viper.GetInt("REDIS_DB"),
-				RedisQueueName: viper.GetString("REDIS_QUEUE_NAME"),
+				NatsDefaultURL:    viper.GetString("NATS_DEFAULT_URL"),
+				NatsStreamName:    "FINDINGS",
 			},
 		}
 	})

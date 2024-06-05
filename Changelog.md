@@ -1,3 +1,7 @@
+## 05.06.2024
+1. Added Nats
+2. Added workers for sending alert to telegram, discord and, opsGenia
+
 ## 31.05.2024
 1. Added method for sending messages into telegram chat
 2. Added method for sending messages into discord chat

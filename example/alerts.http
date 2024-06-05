@@ -7,7 +7,7 @@ Content-Type: application/json
       "hash": "0xe9cfda18f167de5cdd63c101e38ec0d4cb0a1c2dea80921ecc4405c2b010855f",
       "createdAt": "2022-03-01T12:24:33.379756298Z",
       "alertId": "OZ-GNOSIS-EVENTS",
-      "name": "Transfer Event",
+      "name": "[INFO] ℹ️ Lido: Token rebased",
       "protocol": "ethereum",
       "description": "Detected Transfer event",
       "findingType": "UNKNOWN_TYPE",

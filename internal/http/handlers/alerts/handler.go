@@ -2,25 +2,26 @@ package alerts
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
-	"github.com/go-redis/redis"
+	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/utils/deps"
 )
 
 type handler struct {
-	log            deps.Logger
-	redisClient    *redis.Client
-	redisQueueName string
+	log        deps.Logger
+	jetStream  jetstream.JetStream
+	streamName string
 }
 
-func New(log deps.Logger, redisClient *redis.Client, redisQueueName string) *handler {
+func New(log deps.Logger, stream jetstream.JetStream, streamName string) *handler {
 	return &handler{
-		log:            log,
-		redisClient:    redisClient,
-		redisQueueName: redisQueueName,
+		log:        log,
+		jetStream:  stream,
+		streamName: streamName,
 	}
 }
 
@@ -32,17 +33,16 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	for _, alert := range payload.Alerts {
+		bb, _ := alert.MarshalBinary()
 
-	out, _ := json.Marshal(payload)
-	if err := h.redisClient.LPush(h.redisQueueName, "some data").Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		// TODO in future we have to set up queue for correct alert routing by teams
+		_, publishErr := h.jetStream.PublishAsync(fmt.Sprintf(`%s.new`, h.streamName), bb)
+		if publishErr != nil {
+			// TODO metircs alert
+			h.log.Error(fmt.Errorf(`could not publish alert to JetStream: error %w`, publishErr))
+		}
 	}
 
-	h.log.Info(string(out))
-
-	bb, _ := json.Marshal(payload)
-	_, _ = w.Write(bb)
+	_, _ = w.Write([]byte("OK"))
 }
