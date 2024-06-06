@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nats-io/nats.go/jetstream"
+	"github.com/nats-io/nats.go"
 
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/utils/deps"
@@ -13,20 +13,20 @@ import (
 
 type handler struct {
 	log        deps.Logger
-	jetStream  jetstream.JetStream
+	natsClient *nats.Conn
 	streamName string
 }
 
-func New(log deps.Logger, stream jetstream.JetStream, streamName string) *handler {
+func New(log deps.Logger, natsClient *nats.Conn, streamName string) *handler {
 	return &handler{
 		log:        log,
-		jetStream:  stream,
+		natsClient: natsClient,
 		streamName: streamName,
 	}
 }
 
 func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
-	var payload *models.AlertBatch
+	var payload models.AlertBatch
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -37,8 +37,7 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 		bb, _ := alert.MarshalBinary()
 
 		// TODO in future we have to set up queue for correct alert routing by teams
-		_, publishErr := h.jetStream.PublishAsync(fmt.Sprintf(`%s.new`, h.streamName), bb)
-		if publishErr != nil {
+		if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.new`, h.streamName), bb); publishErr != nil {
 			// TODO metircs alert
 			h.log.Error(fmt.Errorf(`could not publish alert to JetStream: error %w`, publishErr))
 		}
