@@ -118,16 +118,27 @@ func (w *worker) Run(ctx context.Context, g *errgroup.Group) {
 					if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
 						w.log.Errorf(`Broken message: %s`, alertErr.Error())
 
+						msg.Term()
+						return
+					}
+
+					// TODO P2 - AlertSeverityCRITICAL
+					// P3 AlertSeverityHTGH
+					opsGeniaPriority := ""
+					if alert.Severity == models.AlertSeverityCRITICAL {
+						opsGeniaPriority = "P2"
+					}
+
+					if alert.Severity == models.AlertSeverityHIGH {
+						opsGeniaPriority = "P3"
+					}
+
+					if opsGeniaPriority == "" {
 						msg.Ack()
 						return
 					}
 
-					if alert.Severity != models.AlertSeverityCRITICAL {
-						msg.Ack()
-						return
-					}
-
-					if sendErr := w.opsGenia.SendMessage(ctx, alert.Name, alert.Description, "P0"); sendErr != nil {
+					if sendErr := w.opsGenia.SendMessage(ctx, alert.Name, alert.Description, alert.AlertID, opsGeniaPriority); sendErr != nil {
 						w.log.Errorf(`Could not send finding to OpsGenia: %s`, sendErr.Error())
 						msg.Nak()
 						return

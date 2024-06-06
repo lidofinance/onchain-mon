@@ -32,6 +32,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 		ctx         context.Context
 		message     string
 		description string
+		alias       string
 		priority    string
 	}
 	tests := []struct {
@@ -50,7 +51,8 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				ctx:         context.TODO(),
 				message:     NameCritical,
 				description: DescriptionCritical,
-				priority:    "P4",
+				alias:       "ZkSyncBridgeBalanceMismatch",
+				priority:    "P2",
 			},
 			wantErr: false,
 		},
@@ -61,7 +63,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				opsGenieKey: tt.fields.opsGenieKey,
 				httpClient:  tt.fields.httpClient,
 			}
-			if err := u.SendMessage(tt.args.ctx, tt.args.message, tt.args.description, tt.args.priority); (err != nil) != tt.wantErr {
+			if err := u.SendMessage(tt.args.ctx, tt.args.message, tt.args.description, tt.args.alias, tt.args.priority); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

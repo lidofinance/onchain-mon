@@ -23,6 +23,7 @@ services:
     env_file:
       - .env
     environment:
+      - READ_ENV_FROM_SHELL=true
       - ENV=${ENV}
       - APP_NAME=${APP_NAME}
       - PORT=${PORT}

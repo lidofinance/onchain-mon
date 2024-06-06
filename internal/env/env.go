@@ -46,10 +46,14 @@ func Read(configPath string) (*Config, error) {
 		}
 
 		viper.AutomaticEnv()
-		/*if viperErr := viper.ReadInConfig(); viperErr != nil && !errors.Is(viperErr, viper.ConfigFileNotFoundError) {
-			err = viperErr
-			return
-		}*/
+
+		readEnvFromShell := viper.GetBool("READ_ENV_FROM_SHELL")
+		if readEnvFromShell == false {
+			if viperErr := viper.ReadInConfig(); viperErr != nil {
+				err = viperErr
+				return
+			}
+		}
 
 		cfg = Config{
 			AppConfig: AppConfig{

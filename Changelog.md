@@ -1,3 +1,6 @@
+## 06.06.2024
+1. Added sending alertAlias to OpsGenia
+
 ## 05.06.2024
 1. Added Nats
 2. Added workers for sending alert to telegram, discord and, opsGenia

@@ -15,7 +15,7 @@ type opsGenia struct {
 
 //go:generate ./../../../bin/mockery --name OpsGenia
 type OpsGenia interface {
-	SendMessage(ctx context.Context, message, description, priority string) error
+	SendMessage(ctx context.Context, message, description, alias, priority string) error
 }
 
 func NewOpsGenia(opsGenieKey string, httpClient *http.Client) OpsGenia {
@@ -25,16 +25,18 @@ func NewOpsGenia(opsGenieKey string, httpClient *http.Client) OpsGenia {
 	}
 }
 
-func (u *opsGenia) SendMessage(ctx context.Context, message, description, priority string) error {
+func (u *opsGenia) SendMessage(ctx context.Context, message, description, alias, priority string) error {
 	type AlertPayload struct {
-		Message     string `json:"message"`
+		Message     string `json:"message"` //
 		Description string `json:"description,omitempty"`
 		Priority    string `json:"priority,omitempty"`
+		Alias       string `json:"alias,omitempty"`
 	}
 
 	payload := AlertPayload{
 		Message:     message,
 		Description: description,
+		Alias:       alias,
 		Priority:    priority,
 	}
 
