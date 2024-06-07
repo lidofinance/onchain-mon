@@ -51,6 +51,7 @@ func main() {
 		fmt.Println("Could not connect to jetStream error:", jetStreamErr.Error())
 		return
 	}
+
 	s, createStreamErr := js.CreateStream(gCtx, jetstream.StreamConfig{
 		Name:     cfg.AppConfig.NatsStreamName,
 		Subjects: []string{fmt.Sprintf(`%s.*`, cfg.AppConfig.NatsStreamName)},
@@ -67,14 +68,17 @@ func main() {
 	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	services := server.NewServices(&cfg.AppConfig)
-	app := server.New(&cfg.AppConfig, log, promStore, &services, js)
+	app := server.New(&cfg.AppConfig, log, promStore, &services, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterRoutes(r)
 
 	alertWorker := server.NewWorker(log, s, services.Telegram, services.OpsGenia, services.Discord)
+	if wrkErr := alertWorker.Run(gCtx, g); wrkErr != nil {
+		fmt.Println("Could not start alertWorker error:", wrkErr.Error())
+		return
+	}
 
-	alertWorker.Run(ctx, g)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
 	if err := g.Wait(); err != nil {

@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var re = regexp.MustCompile(`/-|\ /g`)
+var re = regexp.MustCompile(`[ -]`)
 
 type Store struct {
 	Prometheus *prometheus.Registry

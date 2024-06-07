@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/nats-io/nats.go"
 
@@ -26,22 +27,45 @@ func New(log deps.Logger, natsClient *nats.Conn, streamName string) *handler {
 }
 
 func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
-	var payload models.AlertBatch
+	contentBytes := make([]byte, r.ContentLength)
+	if _, err := r.Body.Read(contentBytes); err != nil {
+		if err.Error() != "EOF" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	defer func() {
+		r.Body.Close()
+		contentBytes = nil
+	}()
 
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	var payload models.AlertBatch
+	if err := payload.UnmarshalBinary(contentBytes); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	wg := &sync.WaitGroup{}
 	for _, alert := range payload.Alerts {
-		bb, _ := alert.MarshalBinary()
+		wg.Add(1)
+		go func(finding *models.Alert) {
+			defer wg.Done()
 
-		// TODO in future we have to set up queue for correct alert routing by teams
-		if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.new`, h.streamName), bb); publishErr != nil {
-			// TODO metircs alert
-			h.log.Error(fmt.Errorf(`could not publish alert to JetStream: error %w`, publishErr))
-		}
+			bb, err := json.Marshal(finding)
+			if err != nil {
+				h.log.Error(fmt.Errorf("could not marshal alert: %w", err))
+				return
+			}
+
+			// TODO in future we have to set up queue for correct alert routing by teams
+			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.new`, h.streamName), bb); publishErr != nil {
+				// TODO metircs alert
+				h.log.Error(fmt.Errorf(`could not publish alert to JetStream: error %w`, publishErr))
+			}
+		}(alert)
 	}
+
+	wg.Wait()
 
 	_, _ = w.Write([]byte("OK"))
 }

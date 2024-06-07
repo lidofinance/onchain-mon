@@ -1,3 +1,10 @@
+## 07.06.2024
+1. Optimized nats consumer worker
+2. Optimized alert handlers
+3. Added pprof profile handler
+4. Added forta-local-config.yaml
+5. Fixed crush for wrong app-name for prometheus prefix metric name
+
 ## 06.06.2024
 1. Added sending alertAlias to OpsGenia
 2. Fix alert handler

@@ -2,10 +2,10 @@ package server
 
 import (
 	"net/http"
-
-	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
+	"time"
 
 	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
 )
 
 type Services struct {
@@ -15,10 +15,22 @@ type Services struct {
 }
 
 func NewServices(cfg *env.AppConfig) Services {
-	httpClient := &http.Client{}
-	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpClient)
-	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient)
-	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient)
+	transport := &http.Transport{
+		MaxIdleConns:          30,
+		MaxIdleConnsPerHost:   4,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpCleint := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
+	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpCleint)
+	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpCleint)
+	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpCleint)
 
 	return Services{
 		Telegram: telegram,

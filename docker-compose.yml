@@ -1,9 +1,13 @@
 version: '3.8'
+x-logging: &default-logging
+  options:
+    max-size: "50m"
+    max-file: "10"
 
 services:
-  nats:
+  service-forta-nats:
     image: nats:2.10.16-alpine3.19
-    container_name: nats
+    container_name: forta-nats
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -14,8 +18,31 @@ services:
     volumes:
       - ./nats/data:/data
 
+  service-forta-json-rpc:
+    container_name: forta-json-rpc
+    logging: *default-logging
+    image: forta-network/forta-node:latest
+    command: /forta-node json-rpc
+    ports:
+      - 8545:8545
+    volumes:
+      - ./forta-local-config.yml:/.forta/config.yml
+    depends_on:
+      - service-forta-nats
+
+  service-forta-scanner:
+    container_name: forta-scanner
+    logging: *default-logging
+    image: forta-network/forta-node:latest
+    command: /forta-node scanner
+    volumes:
+      - ./forta-local-config.yml:/.forta/config.yml
+    depends_on:
+      - service-forta-nats
+      - service-forta-json-rpc
+
   main:
-    container_name: finding_forwarder
+    container_name: finding-forwarder
     build: ./
     restart: always
     command:
@@ -37,5 +64,3 @@ services:
       - BOT_CONTAINERS==${BOT_CONTAINERS}
     ports:
       - '8080:8080'
-    depends_on:
-      - nats

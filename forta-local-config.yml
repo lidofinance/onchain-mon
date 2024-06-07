@@ -1,0 +1,16 @@
+chainId: 1
+
+scan:
+  jsonRpc:
+    url: https://eth.drpc.org
+
+localMode:
+  enable: true
+  logToStdout: true
+  privateKeyHex: 984d28fde238c32d06420db29b7277f5fd24c61954d2da491bf7d1ef19996bd0
+  # webhookUrl: http://127.0.0.1:8080/alerts
+  webhookUrl: http://finding-forwarder:8080/alerts
+  standalone:
+    enable: true
+    botContainers:
+      - host.docker.internal
