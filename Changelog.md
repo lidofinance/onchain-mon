@@ -4,6 +4,7 @@
 3. Added pprof profile handler
 4. Added forta-local-config.yaml
 5. Fixed crush for wrong app-name for prometheus prefix metric name
+6. Updated dependencies
 
 ## 06.06.2024
 1. Added sending alertAlias to OpsGenia

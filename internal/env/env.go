@@ -1,6 +1,7 @@
 package env
 
 import (
+	"regexp"
 	"sync"
 
 	"github.com/spf13/viper"
@@ -24,6 +25,7 @@ type AppConfig struct {
 
 	NatsDefaultURL string
 	NatsStreamName string
+	MetricsPrefix  string
 }
 
 var (
@@ -55,6 +57,8 @@ func Read(configPath string) (*Config, error) {
 			}
 		}
 
+		var re = regexp.MustCompile(`[ -]`)
+
 		cfg = Config{
 			AppConfig: AppConfig{
 				Name:              viper.GetString("APP_NAME"),
@@ -68,6 +72,7 @@ func Read(configPath string) (*Config, error) {
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
 				NatsDefaultURL:    viper.GetString("NATS_DEFAULT_URL"),
 				NatsStreamName:    "FINDINGS",
+				MetricsPrefix:     re.ReplaceAllString(viper.GetString("APP_NAME"), `_`) + `_`,
 			},
 		}
 	})

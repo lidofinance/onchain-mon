@@ -65,7 +65,7 @@ func main() {
 	log.Info(fmt.Sprintf(`started %s application`, cfg.AppConfig.Name))
 
 	r := chi.NewRouter()
-	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.Name, cfg.AppConfig.Env)
+	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	services := server.NewServices(&cfg.AppConfig)
 	app := server.New(&cfg.AppConfig, log, promStore, &services, js, natsClient)

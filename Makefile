@@ -26,6 +26,11 @@ fix-lint:
 lint:
 	bin/golangci-lint run --config=.golangci.yml ./cmd... ./internal/...
 
+outdated-deps:
+	go list -u -m -json -mod=readonly all
+.PHONY: outdated-deps
+
+
 .PHONY: full-lint
 full-lint: imports fmt vet lint
 

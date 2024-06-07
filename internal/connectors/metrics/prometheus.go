@@ -2,24 +2,21 @@ package metrics
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
-
-var re = regexp.MustCompile(`[ -]`)
 
 type Store struct {
 	Prometheus *prometheus.Registry
 	BuildInfo  prometheus.Counter
 }
 
-func New(promRegistry *prometheus.Registry, appName, env string) *Store {
+func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store {
 	store := &Store{
 		Prometheus: promRegistry,
 		BuildInfo: promauto.NewCounter(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_metric_build_info", re.ReplaceAllString(appName, `_`)),
+			Name: fmt.Sprintf("%s_metric_build_info", prefix),
 			Help: "Build information",
 			ConstLabels: prometheus.Labels{
 				"name": appName,
