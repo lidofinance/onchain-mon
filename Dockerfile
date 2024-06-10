@@ -2,16 +2,17 @@
 FROM golang:1.22.3-alpine as builder
 
 WORKDIR /go/src/app
-
 COPY . .
 
 RUN go build -o ./bin/main ./cmd/service
 
 # Run stage
-FROM alpine:latest
+FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates
+WORKDIR /app
+RUN apk add --no-cache ca-certificates
 
-WORKDIR /root/
+COPY --from=builder /go/src/app/bin .
 
-COPY --from=builder /go/src/app/bin ./bin
+USER nobody
+CMD ["/app/main"]
