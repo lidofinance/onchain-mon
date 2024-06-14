@@ -30,6 +30,8 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 	contentBytes := make([]byte, r.ContentLength)
 	if _, err := r.Body.Read(contentBytes); err != nil {
 		if err.Error() != "EOF" {
+			h.log.Error(fmt.Errorf("could not read contentBytes: %w", err))
+
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -41,6 +43,8 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 
 	var payload models.AlertBatch
 	if err := payload.UnmarshalBinary(contentBytes); err != nil {
+		h.log.Error(fmt.Errorf("could not unmarshal content: %w", err))
+
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
