@@ -3,6 +3,7 @@ package alerts
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 
@@ -26,26 +27,33 @@ func New(log deps.Logger, natsClient *nats.Conn, streamName string) *handler {
 	}
 }
 
-func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
-	contentBytes := make([]byte, r.ContentLength)
-	if _, err := r.Body.Read(contentBytes); err != nil {
-		if err.Error() != "EOF" {
-			h.log.Error(fmt.Errorf("could not read contentBytes: %w", err))
+type SendAlertsBadRequest struct {
+	Payload *SendAlertsBadRequestBody
+}
 
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+type SendAlertsBadRequestBody struct {
+	Reason string `json:"reason,omitempty"`
+}
+
+type SendAlertsOK struct{}
+
+func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		h.log.Error(fmt.Errorf("could not read body: %w", err))
+
+		BadRequest(w, `could not read body`)
+		return
 	}
-	defer func() {
-		r.Body.Close()
-		contentBytes = nil
-	}()
 
 	var payload models.AlertBatch
-	if err := payload.UnmarshalBinary(contentBytes); err != nil {
+	if err := payload.UnmarshalBinary(body); err != nil {
 		h.log.Error(fmt.Errorf("could not unmarshal content: %w", err))
 
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		BadRequest(w, `could not unmarshal content`)
 		return
 	}
 
@@ -71,5 +79,20 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 
 	wg.Wait()
 
-	_, _ = w.Write([]byte("OK"))
+	bb, _ := json.Marshal(SendAlertsOK{})
+	_, _ = w.Write(bb)
+}
+
+func BadRequest(w http.ResponseWriter, reason string) {
+	w.WriteHeader(http.StatusBadRequest)
+
+	resp := &SendAlertsBadRequest{
+		Payload: &SendAlertsBadRequestBody{
+			// Reason: `could not read body`,
+			Reason: reason,
+		},
+	}
+
+	bb, _ := json.Marshal(resp)
+	_, _ = w.Write(bb)
 }
