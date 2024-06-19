@@ -1,5 +1,6 @@
 ## 19.06.2024
 1. Moved from logrus to default slog logger
+2. Split up worker and service from one binary app
 
 ## 17.06.2024
 1. Added reconnect feature for nats client

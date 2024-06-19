@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
@@ -46,7 +48,17 @@ func main() {
 		return
 	}
 
-	log.Info(fmt.Sprintf(`started %s`, cfg.AppConfig.Name))
+	s, createStreamErr := js.CreateStream(gCtx, jetstream.StreamConfig{
+		Name:     cfg.AppConfig.NatsStreamName,
+		Subjects: []string{fmt.Sprintf(`%s.*`, cfg.AppConfig.NatsStreamName)},
+	})
+
+	if createStreamErr != nil && !errors.Is(createStreamErr, nats.ErrStreamNameAlreadyInUse) {
+		fmt.Println("Could not create FINDINGS stream error:", createStreamErr.Error())
+		return
+	}
+
+	log.Info(fmt.Sprintf(`started %s worker`, cfg.AppConfig.Name))
 
 	r := chi.NewRouter()
 	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
@@ -55,7 +67,13 @@ func main() {
 	app := server.New(&cfg.AppConfig, log, promStore, &services, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
-	app.RegisterHttpRoutes(r)
+	app.RegisterWorkerRoutes(r)
+
+	alertWorker := server.NewWorker(log, s, services.Telegram, services.OpsGenia, services.Discord)
+	if wrkErr := alertWorker.Run(gCtx, g); wrkErr != nil {
+		fmt.Println("Could not start alertWorker error:", wrkErr.Error())
+		return
+	}
 
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 

@@ -5,6 +5,7 @@ WORKDIR /go/src/app
 COPY . .
 
 RUN go build -o ./bin/main ./cmd/service
+RUN go build -o ./bin/worker ./cmd/worker
 
 # Run stage
 FROM alpine:3.20

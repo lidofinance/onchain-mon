@@ -71,22 +71,39 @@ func (a *App) RunHTTPServer(ctx context.Context, g *errgroup.Group, appPort uint
 	})
 }
 
-func (a *App) RegisterRoutes(r chi.Router) {
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+func (a *App) RegisterHttpRoutes(r chi.Router) {
+	a.RegisterMiddleware(r)
 
 	alertsH := alerts.New(a.Logger, a.natsClient, a.env.NatsStreamName)
 	r.Post("/alerts", alertsH.Handler)
 
-	r.Get("/health", health.New().Handler)
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	a.RegisterInfraRoutes(r)
+	a.RegisterPprofRoutes(r)
+}
 
+func (a *App) RegisterWorkerRoutes(r chi.Router) {
+	a.RegisterMiddleware(r)
+	a.RegisterInfraRoutes(r)
+	a.RegisterPprofRoutes(r)
+}
+
+func (a *App) RegisterMiddleware(r chi.Router) {
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+}
+
+func (a *App) RegisterPprofRoutes(r chi.Router) {
 	r.HandleFunc("/debug/pprof/", pprof.Index)
 	r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	r.HandleFunc("/debug/pprof/{action}", pprof.Index)
+}
+
+func (a *App) RegisterInfraRoutes(r chi.Router) {
+	r.Get("/health", health.New().Handler)
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 }

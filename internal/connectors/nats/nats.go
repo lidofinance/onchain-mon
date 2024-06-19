@@ -23,7 +23,7 @@ func New(cfg *env.AppConfig, logger *slog.Logger) (*nats.Conn, error) {
 		natsClient, err = nats.Connect(cfg.NatsDefaultURL,
 			nats.ReconnectWait(2*time.Second),
 			nats.DisconnectErrHandler(func(_ *nats.Conn, _ error) {
-				logger.Error("Nats client got disconnected!")
+				logger.Warn("Nats client got disconnected!")
 			}),
 			nats.ReconnectHandler(func(nc *nats.Conn) {
 				logger.Info(fmt.Sprintf("Nats client got got reconnected to %v!", nc.ConnectedUrl()))
