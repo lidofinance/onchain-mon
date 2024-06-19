@@ -1,42 +1,29 @@
 package logger
 
 import (
+	"log/slog"
 	"os"
-	"sync"
-
-	"github.com/sirupsen/logrus"
+	"strings"
 
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
-var (
-	logger            *logrus.Logger
-	onceDefaultClient sync.Once
-)
+func New(cfg *env.AppConfig) *slog.Logger {
+	logLevel := slog.LevelInfo
+	switch strings.ToUpper(cfg.LogLevel) {
+	case "DEBUG":
+		logLevel = slog.LevelDebug
+	case "INFO":
+		logLevel = slog.LevelInfo
+	case "WARN":
+		logLevel = slog.LevelWarn
+	case "ERROR":
+		logLevel = slog.LevelError
+	}
 
-func New(cfg *env.AppConfig) (*logrus.Logger, error) {
-	var (
-		err error
-	)
+	if cfg.LogFormat == "json" {
+		return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	}
 
-	onceDefaultClient.Do(func() {
-		logger = logrus.StandardLogger()
-
-		logLevel, levelErr := logrus.ParseLevel(cfg.LogLevel)
-		if levelErr != nil {
-			err = levelErr
-			return
-		}
-
-		logger.SetLevel(logLevel)
-		logger.SetFormatter(&logrus.TextFormatter{})
-
-		if cfg.LogFormat == "json" {
-			logger.SetFormatter(&logrus.JSONFormatter{})
-		}
-
-		logger.SetOutput(os.Stdout)
-	})
-
-	return logger, err
+	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 }

@@ -4,22 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 
 	"github.com/nats-io/nats.go"
 
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-	"github.com/lidofinance/finding-forwarder/internal/utils/deps"
 )
 
 type handler struct {
-	log        deps.Logger
+	log        *slog.Logger
 	natsClient *nats.Conn
 	streamName string
 }
 
-func New(log deps.Logger, natsClient *nats.Conn, streamName string) *handler {
+func New(log *slog.Logger, natsClient *nats.Conn, streamName string) *handler {
 	return &handler{
 		log:        log,
 		natsClient: natsClient,
@@ -43,17 +43,19 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
-		h.log.Error(fmt.Errorf("could not read body: %w", err))
+		reason := `Could not read body`
+		h.log.Error(fmt.Sprintf("%s: %v", reason, err))
 
-		BadRequest(w, `could not read body`)
+		BadRequest(w, reason)
 		return
 	}
 
 	var payload models.AlertBatch
-	if err := payload.UnmarshalBinary(body); err != nil {
-		h.log.Error(fmt.Errorf("could not unmarshal content: %w", err))
+	if alertUnmarshalErr := payload.UnmarshalBinary(body); alertUnmarshalErr != nil {
+		reason := `Could not unmarshal content`
+		h.log.Error(fmt.Sprintf("%s: %s", reason, alertUnmarshalErr))
 
-		BadRequest(w, `could not unmarshal content`)
+		BadRequest(w, reason)
 		return
 	}
 
@@ -63,16 +65,16 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 		go func(finding *models.Alert) {
 			defer wg.Done()
 
-			bb, err := json.Marshal(finding)
-			if err != nil {
-				h.log.Error(fmt.Errorf("could not marshal alert: %w", err))
+			bb, findingErr := json.Marshal(finding)
+			if findingErr != nil {
+				h.log.Error(fmt.Sprintf("Could not marshal finding: %v", findingErr))
 				return
 			}
 
 			// TODO in future we have to set up queue for correct alert routing by teams
 			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.new`, h.streamName), bb); publishErr != nil {
 				// TODO metircs alert
-				h.log.Error(fmt.Errorf(`could not publish alert to JetStream: error %w`, publishErr))
+				h.log.Error(fmt.Sprintf("could not publish alert to JetStream: error: %v", publishErr))
 			}
 		}(alert)
 	}

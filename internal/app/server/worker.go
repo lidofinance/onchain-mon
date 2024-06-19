@@ -3,24 +3,24 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/nats-io/nats.go/jetstream"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
-	"github.com/lidofinance/finding-forwarder/internal/utils/deps"
 )
 
 type worker struct {
-	log       deps.Logger
+	log       *slog.Logger
 	jetStream jetstream.Stream
 	telegram  notifiler.Telegram
 	opsGenia  notifiler.OpsGenia
 	discord   notifiler.Discord
 }
 
-func NewWorker(log deps.Logger, jetStream jetstream.Stream,
+func NewWorker(log *slog.Logger, jetStream jetstream.Stream,
 	telegram notifiler.Telegram, opsGenia notifiler.OpsGenia,
 	discord notifiler.Discord) *worker {
 	return &worker{
@@ -86,8 +86,9 @@ func (w *worker) Run(ctx context.Context, g *errgroup.Group) error {
 
 func (w *worker) handleMessage(ctx context.Context, msg jetstream.Msg, sendMessage func(ctx context.Context, message string) error) {
 	alert := new(models.Alert)
+
 	if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
-		w.log.Errorf(`Broken message: %s`, alertErr.Error())
+		w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
 		w.terminateMessage(msg)
 		return
 	}
@@ -96,7 +97,7 @@ func (w *worker) handleMessage(ctx context.Context, msg jetstream.Msg, sendMessa
 	}()
 
 	if sendErr := sendMessage(ctx, fmt.Sprintf("%s\n\n%s", alert.Name, alert.Description)); sendErr != nil {
-		w.log.Errorf(`Could not send finding: %s`, sendErr.Error())
+		w.log.Error(fmt.Sprintf(`Could not send finding: %v`, sendErr))
 		w.nackMessage(msg)
 		return
 	}
@@ -107,7 +108,7 @@ func (w *worker) handleMessage(ctx context.Context, msg jetstream.Msg, sendMessa
 func (w *worker) handleOpsGeniaMessage(ctx context.Context, msg jetstream.Msg) {
 	var alert models.Alert
 	if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
-		w.log.Errorf(`Broken message: %s`, alertErr.Error())
+		w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
 		w.terminateMessage(msg)
 		return
 	}
@@ -126,7 +127,7 @@ func (w *worker) handleOpsGeniaMessage(ctx context.Context, msg jetstream.Msg) {
 	}
 
 	if sendErr := w.opsGenia.SendMessage(ctx, alert.Name, alert.Description, alert.AlertID, opsGeniaPriority); sendErr != nil {
-		w.log.Errorf(`Could not send finding to OpsGenia: %s`, sendErr.Error())
+		w.log.Error(fmt.Sprintf(`Could not send finding to OpsGenia: %s`, sendErr.Error()))
 		w.nackMessage(msg)
 		return
 	}
@@ -136,18 +137,18 @@ func (w *worker) handleOpsGeniaMessage(ctx context.Context, msg jetstream.Msg) {
 
 func (w *worker) terminateMessage(msg jetstream.Msg) {
 	if termErr := msg.Term(); termErr != nil {
-		w.log.Errorf(`Could not term msg: %s`, termErr.Error())
+		w.log.Error(fmt.Sprintf(`Could not term msg: %v`, termErr))
 	}
 }
 
 func (w *worker) nackMessage(msg jetstream.Msg) {
 	if nackErr := msg.Nak(); nackErr != nil {
-		w.log.Errorf(`Could not nack msg: %s`, nackErr.Error())
+		w.log.Error(fmt.Sprintf(`Could not nack msg: %v`, nackErr))
 	}
 }
 
 func (w *worker) ackMessage(msg jetstream.Msg) {
 	if ackErr := msg.Ack(); ackErr != nil {
-		w.log.Errorf(`Could not ack msg: %s`, ackErr.Error())
+		w.log.Error(fmt.Sprintf(`Could not ack msg: %v`, ackErr))
 	}
 }

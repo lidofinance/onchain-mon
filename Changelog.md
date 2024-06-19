@@ -1,3 +1,6 @@
+## 19.06.2024
+1. Moved from logrus to default slog logger
+
 ## 17.06.2024
 1. Added reconnect feature for nats client
 2. Added swagger 200, 400 responses for /alert handler

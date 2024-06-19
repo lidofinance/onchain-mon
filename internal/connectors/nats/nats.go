@@ -2,6 +2,7 @@ package nats
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -15,20 +16,20 @@ var (
 	onceDefaultClient sync.Once
 )
 
-func New(cfg *env.AppConfig) (*nats.Conn, error) {
+func New(cfg *env.AppConfig, logger *slog.Logger) (*nats.Conn, error) {
 	var err error
 
 	onceDefaultClient.Do(func() {
 		natsClient, err = nats.Connect(cfg.NatsDefaultURL,
 			nats.ReconnectWait(2*time.Second),
-			nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-				fmt.Printf("Nats client got disconnected!\n")
+			nats.DisconnectErrHandler(func(_ *nats.Conn, _ error) {
+				logger.Error("Nats client got disconnected!")
 			}),
 			nats.ReconnectHandler(func(nc *nats.Conn) {
-				fmt.Printf("Nats client got got reconnected to %v!\n", nc.ConnectedUrl())
+				logger.Info(fmt.Sprintf("Nats client got got reconnected to %v!", nc.ConnectedUrl()))
 			}),
-			nats.ClosedHandler(func(nc *nats.Conn) {
-				fmt.Printf("Nats connection closed\n")
+			nats.ClosedHandler(func(_ *nats.Conn) {
+				logger.Info("Nats connection closed")
 			}))
 	})
 

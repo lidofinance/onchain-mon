@@ -23,14 +23,14 @@ func NewServices(cfg *env.AppConfig) Services {
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
-	httpCleint := &http.Client{
+	httpClient := &http.Client{
 		Transport: transport,
 		Timeout:   10 * time.Second,
 	}
 
-	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpCleint)
-	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpCleint)
-	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpCleint)
+	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpClient)
+	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient)
+	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient)
 
 	return Services{
 		Telegram: telegram,

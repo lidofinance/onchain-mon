@@ -23,16 +23,18 @@ imports:
 fix-lint:
 	bin/golangci-lint run --config=.golangci.yml --fix ./cmd... ./internal/...
 
+.PHONY: format
+format: imports fmt vet fix-lint
+
+.PHONY: lint
 lint:
 	bin/golangci-lint run --config=.golangci.yml ./cmd... ./internal/...
+
 
 outdated-deps:
 	go list -u -m -json -mod=readonly all
 .PHONY: outdated-deps
 
-
-.PHONY: full-lint
-full-lint: imports fmt vet lint
 
 .PHONY: swagger-gen
 swagger-gen:

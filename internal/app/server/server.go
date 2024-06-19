@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/pprof"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/env"
@@ -30,14 +30,14 @@ const (
 
 type App struct {
 	env        *env.AppConfig
-	Logger     *logrus.Logger
+	Logger     *slog.Logger
 	Metrics    *metrics.Store
 	Services   *Services
 	JetStream  jetstream.JetStream
 	natsClient *nats.Conn
 }
 
-func New(config *env.AppConfig, logger *logrus.Logger,
+func New(config *env.AppConfig, logger *slog.Logger,
 	promStore *metrics.Store, services *Services,
 	jetClient jetstream.JetStream, natsClient *nats.Conn,
 ) *App {

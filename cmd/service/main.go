@@ -33,13 +33,9 @@ func main() {
 		return
 	}
 
-	log, logErr := logger.New(&cfg.AppConfig)
-	if logErr != nil {
-		fmt.Println("Logger error:", logErr.Error())
-		return
-	}
+	log := logger.New(&cfg.AppConfig)
 
-	natsClient, natsErr := nc.New(&cfg.AppConfig)
+	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
 		fmt.Println("Could not connect to nats error:", natsErr.Error())
 		return
@@ -82,7 +78,7 @@ func main() {
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
 	if err := g.Wait(); err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 	}
 
 	fmt.Println(`Main done`)
