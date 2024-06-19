@@ -6,21 +6,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
 type discord struct {
 	webhookURL string
 	httpClient *http.Client
+	metrics    *metrics.Store
 }
 
 type Discord interface {
 	SendMessage(ctx context.Context, message string) error
 }
 
-func NewDiscord(webhookURL string, httpClient *http.Client) Discord {
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store) Discord {
 	return &discord{
 		webhookURL: webhookURL,
 		httpClient: httpClient,
+		metrics:    metricsStore,
 	}
 }
 
@@ -45,11 +52,16 @@ func (d *discord) SendMessage(ctx context.Context, message string) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
+	start := time.Now()
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send Discord request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		resp.Body.Close()
+		duration := time.Since(start).Seconds()
+		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: `discord`}).Observe(duration)
+	}()
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("received from Discord non-204 response code: %v", resp.Status)

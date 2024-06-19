@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
@@ -24,9 +28,13 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 		return
 	}
 
+	promRegistry := prometheus.NewRegistry()
+	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
 	type fields struct {
-		opsGenieKey string
-		httpClient  *http.Client
+		opsGenieKey  string
+		httpClient   *http.Client
+		metricsStore *metrics.Store
 	}
 	type args struct {
 		ctx         context.Context
@@ -44,8 +52,9 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 		{
 			name: "Success",
 			fields: fields{
-				opsGenieKey: cfg.AppConfig.OpsGeniaAPIKey,
-				httpClient:  &http.Client{},
+				opsGenieKey:  cfg.AppConfig.OpsGeniaAPIKey,
+				httpClient:   &http.Client{},
+				metricsStore: metricsStore,
 			},
 			args: args{
 				ctx:         context.TODO(),
@@ -62,6 +71,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 			u := &opsGenia{
 				opsGenieKey: tt.fields.opsGenieKey,
 				httpClient:  tt.fields.httpClient,
+				metrics:     metricsStore,
 			}
 			if err := u.SendMessage(tt.args.ctx, tt.args.message, tt.args.description, tt.args.alias, tt.args.priority); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)

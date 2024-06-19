@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/lidofinance/finding-forwarder/internal/app/worker"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -61,15 +63,16 @@ func main() {
 	log.Info(fmt.Sprintf(`started %s worker`, cfg.AppConfig.Name))
 
 	r := chi.NewRouter()
-	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+	promRegistry := prometheus.NewRegistry()
+	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
-	services := server.NewServices(&cfg.AppConfig)
-	app := server.New(&cfg.AppConfig, log, promStore, &services, js, natsClient)
+	services := server.NewServices(&cfg.AppConfig, metricsStore)
+	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
 
-	alertWorker := server.NewWorker(log, s, services.Telegram, services.OpsGenia, services.Discord)
+	alertWorker := worker.NewWorker(log, metricsStore, s, services.Telegram, services.OpsGenia, services.Discord)
 	if wrkErr := alertWorker.Run(gCtx, g); wrkErr != nil {
 		fmt.Println("Could not start alertWorker error:", wrkErr.Error())
 		return

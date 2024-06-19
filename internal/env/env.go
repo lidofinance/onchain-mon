@@ -72,7 +72,7 @@ func Read(configPath string) (*Config, error) {
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
 				NatsDefaultURL:    viper.GetString("NATS_DEFAULT_URL"),
 				NatsStreamName:    "FINDINGS",
-				MetricsPrefix:     re.ReplaceAllString(viper.GetString("APP_NAME"), `_`) + `_`,
+				MetricsPrefix:     re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
 			},
 		}
 	})

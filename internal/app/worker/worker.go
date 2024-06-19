@@ -1,30 +1,41 @@
-package server
+package worker
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 
-	"github.com/nats-io/nats.go/jetstream"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
 )
 
 type worker struct {
 	log       *slog.Logger
+	metrics   *metrics.Store
 	jetStream jetstream.Stream
 	telegram  notifiler.Telegram
 	opsGenia  notifiler.OpsGenia
 	discord   notifiler.Discord
 }
 
-func NewWorker(log *slog.Logger, jetStream jetstream.Stream,
+const (
+	Telegram  = `Telegram`
+	Discrod   = `Discrod`
+	OpsGeniea = `OpsGeniea`
+)
+
+func NewWorker(log *slog.Logger, metricsStore *metrics.Store, jetStream jetstream.Stream,
 	telegram notifiler.Telegram, opsGenia notifiler.OpsGenia,
 	discord notifiler.Discord) *worker {
 	return &worker{
 		log:       log,
+		metrics:   metricsStore,
 		jetStream: jetStream,
 		telegram:  telegram,
 		opsGenia:  opsGenia,
@@ -42,13 +53,13 @@ func (w *worker) Run(ctx context.Context, g *errgroup.Group) error {
 		{
 			name: "Dicorder",
 			handler: func(msg jetstream.Msg) {
-				w.handleMessage(ctx, msg, w.discord.SendMessage)
+				w.handleMessage(ctx, Discrod, msg, w.discord.SendMessage)
 			},
 		},
 		{
 			name: "Telegramer",
 			handler: func(msg jetstream.Msg) {
-				w.handleMessage(ctx, msg, w.telegram.SendMessage)
+				w.handleMessage(ctx, Telegram, msg, w.telegram.SendMessage)
 			},
 		},
 		{
@@ -84,11 +95,16 @@ func (w *worker) Run(ctx context.Context, g *errgroup.Group) error {
 	return nil
 }
 
-func (w *worker) handleMessage(ctx context.Context, msg jetstream.Msg, sendMessage func(ctx context.Context, message string) error) {
+func (w *worker) handleMessage(
+	ctx context.Context, provider string,
+	msg jetstream.Msg,
+	sendMessageFn func(ctx context.Context, message string) error,
+) {
 	alert := new(models.Alert)
 
 	if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
 		w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
+		w.metrics.SentAlerts.With(prometheus.Labels{"provider": provider, metrics.Status: metrics.StatusFail}).Inc()
 		w.terminateMessage(msg)
 		return
 	}
@@ -96,18 +112,21 @@ func (w *worker) handleMessage(ctx context.Context, msg jetstream.Msg, sendMessa
 		alert = nil
 	}()
 
-	if sendErr := sendMessage(ctx, fmt.Sprintf("%s\n\n%s", alert.Name, alert.Description)); sendErr != nil {
+	if sendErr := sendMessageFn(ctx, fmt.Sprintf("%s\n\n%s", alert.Name, alert.Description)); sendErr != nil {
 		w.log.Error(fmt.Sprintf(`Could not send finding: %v`, sendErr))
+		w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: provider, metrics.Status: metrics.StatusFail}).Inc()
 		w.nackMessage(msg)
 		return
 	}
 
+	w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: provider, metrics.Status: metrics.StatusOk}).Inc()
 	w.ackMessage(msg)
 }
 
 func (w *worker) handleOpsGeniaMessage(ctx context.Context, msg jetstream.Msg) {
 	var alert models.Alert
 	if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
+		w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: OpsGeniea, metrics.Status: metrics.StatusFail}).Inc()
 		w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
 		w.terminateMessage(msg)
 		return
@@ -122,16 +141,19 @@ func (w *worker) handleOpsGeniaMessage(ctx context.Context, msg jetstream.Msg) {
 	}
 
 	if opsGeniaPriority == "" {
+		w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: OpsGeniea, metrics.Status: metrics.StatusOk}).Inc()
 		w.ackMessage(msg)
 		return
 	}
 
 	if sendErr := w.opsGenia.SendMessage(ctx, alert.Name, alert.Description, alert.AlertID, opsGeniaPriority); sendErr != nil {
+		w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: OpsGeniea, metrics.Status: metrics.StatusFail}).Inc()
 		w.log.Error(fmt.Sprintf(`Could not send finding to OpsGenia: %s`, sendErr.Error()))
 		w.nackMessage(msg)
 		return
 	}
 
+	w.metrics.SentAlerts.With(prometheus.Labels{"provider": OpsGeniea, metrics.Status: metrics.StatusOk}).Inc()
 	w.ackMessage(msg)
 }
 

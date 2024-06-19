@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/http/pprof"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -32,20 +31,18 @@ type App struct {
 	env        *env.AppConfig
 	Logger     *slog.Logger
 	Metrics    *metrics.Store
-	Services   *Services
 	JetStream  jetstream.JetStream
 	natsClient *nats.Conn
 }
 
 func New(config *env.AppConfig, logger *slog.Logger,
-	promStore *metrics.Store, services *Services,
+	promStore *metrics.Store,
 	jetClient jetstream.JetStream, natsClient *nats.Conn,
 ) *App {
 	return &App{
 		env:        config,
 		Logger:     logger,
 		Metrics:    promStore,
-		Services:   services,
 		JetStream:  jetClient,
 		natsClient: natsClient,
 	}
@@ -71,10 +68,10 @@ func (a *App) RunHTTPServer(ctx context.Context, g *errgroup.Group, appPort uint
 	})
 }
 
-func (a *App) RegisterHttpRoutes(r chi.Router) {
+func (a *App) RegisterHTTPRoutes(r chi.Router) {
 	a.RegisterMiddleware(r)
 
-	alertsH := alerts.New(a.Logger, a.natsClient, a.env.NatsStreamName)
+	alertsH := alerts.New(a.Logger, a.Metrics, a.natsClient, a.env.NatsStreamName)
 	r.Post("/alerts", alertsH.Handler)
 
 	a.RegisterInfraRoutes(r)
@@ -88,19 +85,17 @@ func (a *App) RegisterWorkerRoutes(r chi.Router) {
 }
 
 func (a *App) RegisterMiddleware(r chi.Router) {
+	r.Use(middleware.Logger)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	const httpTimeout = 60 * time.Second
+	r.Use(middleware.Timeout(httpTimeout))
 }
 
 func (a *App) RegisterPprofRoutes(r chi.Router) {
-	r.HandleFunc("/debug/pprof/", pprof.Index)
-	r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	r.HandleFunc("/debug/pprof/{action}", pprof.Index)
+	r.Mount("/debug", middleware.Profiler())
 }
 
 func (a *App) RegisterInfraRoutes(r chi.Router) {

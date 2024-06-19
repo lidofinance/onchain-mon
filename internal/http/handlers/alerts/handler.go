@@ -7,6 +7,11 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 
 	"github.com/nats-io/nats.go"
 
@@ -16,12 +21,14 @@ import (
 type handler struct {
 	log        *slog.Logger
 	natsClient *nats.Conn
+	metrics    *metrics.Store
 	streamName string
 }
 
-func New(log *slog.Logger, natsClient *nats.Conn, streamName string) *handler {
+func New(log *slog.Logger, metricsStore *metrics.Store, natsClient *nats.Conn, streamName string) *handler {
 	return &handler{
 		log:        log,
+		metrics:    metricsStore,
 		natsClient: natsClient,
 		streamName: streamName,
 	}
@@ -45,6 +52,7 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		reason := `Could not read body`
 		h.log.Error(fmt.Sprintf("%s: %v", reason, err))
+		h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 
 		BadRequest(w, reason)
 		return
@@ -53,6 +61,7 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 	var payload models.AlertBatch
 	if alertUnmarshalErr := payload.UnmarshalBinary(body); alertUnmarshalErr != nil {
 		reason := `Could not unmarshal content`
+		h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 		h.log.Error(fmt.Sprintf("%s: %s", reason, alertUnmarshalErr))
 
 		BadRequest(w, reason)
@@ -67,15 +76,26 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 
 			bb, findingErr := json.Marshal(finding)
 			if findingErr != nil {
+				h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+
 				h.log.Error(fmt.Sprintf("Could not marshal finding: %v", findingErr))
 				return
 			}
 
 			// TODO in future we have to set up queue for correct alert routing by teams
-			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.new`, h.streamName), bb); publishErr != nil {
-				// TODO metircs alert
+			start := time.Now()
+			defer func() {
+				duration := time.Since(start).Seconds()
+				h.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: h.natsClient.ConnectedUrl()}).Observe(duration)
+			}()
+
+			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.protocol`, h.streamName), bb); publishErr != nil {
+				h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+
 				h.log.Error(fmt.Sprintf("could not publish alert to JetStream: error: %v", publishErr))
 			}
+
+			h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
 		}(alert)
 	}
 
@@ -90,7 +110,6 @@ func BadRequest(w http.ResponseWriter, reason string) {
 
 	resp := &SendAlertsBadRequest{
 		Payload: &SendAlertsBadRequestBody{
-			// Reason: `could not read body`,
 			Reason: reason,
 		},
 	}

@@ -51,11 +51,10 @@ func main() {
 	r := chi.NewRouter()
 	promStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
-	services := server.NewServices(&cfg.AppConfig)
-	app := server.New(&cfg.AppConfig, log, promStore, &services, js, natsClient)
+	app := server.New(&cfg.AppConfig, log, promStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
-	app.RegisterHttpRoutes(r)
+	app.RegisterHTTPRoutes(r)
 
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 

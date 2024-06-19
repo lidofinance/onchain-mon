@@ -6,11 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
 type opsGenia struct {
 	opsGenieKey string
 	httpClient  *http.Client
+	metrics     *metrics.Store
 }
 
 //go:generate ./../../../bin/mockery --name OpsGenia
@@ -18,10 +24,11 @@ type OpsGenia interface {
 	SendMessage(ctx context.Context, message, description, alias, priority string) error
 }
 
-func NewOpsGenia(opsGenieKey string, httpClient *http.Client) OpsGenia {
+func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store) OpsGenia {
 	return &opsGenia{
 		opsGenieKey: opsGenieKey,
 		httpClient:  httpClient,
+		metrics:     metricsStore,
 	}
 }
 
@@ -56,11 +63,16 @@ func (u *opsGenia) SendMessage(ctx context.Context, message, description, alias,
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "GenieKey "+u.opsGenieKey)
 
+	start := time.Now()
 	resp, err := u.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send OpsGenia request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		resp.Body.Close()
+		duration := time.Since(start).Seconds()
+		u.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: `opsgenie`}).Observe(duration)
+	}()
 
 	if resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("received from OpsGenia non-202 response code: %v", resp.Status)

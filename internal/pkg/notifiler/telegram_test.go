@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
@@ -15,10 +19,14 @@ func Test_SendMessage(t *testing.T) {
 		return
 	}
 
+	promRegistry := prometheus.NewRegistry()
+	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
 	type fields struct {
-		botToken   string
-		chatID     string
-		httpClient *http.Client
+		botToken     string
+		chatID       string
+		httpClient   *http.Client
+		metricsStore *metrics.Store
 	}
 	type args struct {
 		ctx     context.Context
@@ -33,9 +41,10 @@ func Test_SendMessage(t *testing.T) {
 		{
 			name: "Send_Test_Message_to_telegram",
 			fields: fields{
-				botToken:   cfg.AppConfig.TelegramBotToken,
-				chatID:     cfg.AppConfig.TelegramChatID,
-				httpClient: &http.Client{},
+				botToken:     cfg.AppConfig.TelegramBotToken,
+				chatID:       cfg.AppConfig.TelegramChatID,
+				httpClient:   &http.Client{},
+				metricsStore: metricsStore,
 			},
 			args: args{
 				ctx:     context.TODO(),
@@ -48,7 +57,9 @@ func Test_SendMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			u := &telegram{
 				botToken:   tt.fields.botToken,
+				chatID:     tt.fields.chatID,
 				httpClient: tt.fields.httpClient,
+				metrics:    metricsStore,
 			}
 			if err := u.SendMessage(tt.args.ctx, tt.args.message); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
