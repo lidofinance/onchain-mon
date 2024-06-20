@@ -1,6 +1,7 @@
 ## 20.06.2024
 1. Added version, commit to metric_build
 2. Update dependencies
+3. Update dependencies in tools
 
 ## 19.06.2024
 1. Moved from logrus to default slog logger

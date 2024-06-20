@@ -5,7 +5,7 @@ tools:
 
 .PHONY: vendor
 vendor:
-	go mod tidy && go mod vendor &&  go mod verify
+	go mod tidy && go mod vendor && go mod verify
 
 build:
 	go build -o ./bin/service ./cmd/service
