@@ -104,7 +104,7 @@ func (w *worker) handleMessage(
 
 	if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
 		w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
-		w.metrics.SentAlerts.With(prometheus.Labels{"provider": provider, metrics.Status: metrics.StatusFail}).Inc()
+		w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: provider, metrics.Status: metrics.StatusFail}).Inc()
 		w.terminateMessage(msg)
 		return
 	}
@@ -153,7 +153,7 @@ func (w *worker) handleOpsGeniaMessage(ctx context.Context, msg jetstream.Msg) {
 		return
 	}
 
-	w.metrics.SentAlerts.With(prometheus.Labels{"provider": OpsGeniea, metrics.Status: metrics.StatusOk}).Inc()
+	w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: OpsGeniea, metrics.Status: metrics.StatusOk}).Inc()
 	w.ackMessage(msg)
 }
 
