@@ -1,3 +1,6 @@
+## 20.06.2024
+1. Added version, commit to metric_build
+
 ## 19.06.2024
 1. Moved from logrus to default slog logger
 2. Split up worker and service from one binary app

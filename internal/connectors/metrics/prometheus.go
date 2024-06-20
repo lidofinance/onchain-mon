@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -21,6 +22,8 @@ const Channel = `channel`
 const StatusOk = `Ok`
 const StatusFail = `Fail`
 
+var Commit string
+
 func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store {
 	store := &Store{
 		Prometheus: promRegistry,
@@ -28,8 +31,10 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			Name: fmt.Sprintf("%s_metric_build_info", prefix),
 			Help: "Build information",
 			ConstLabels: prometheus.Labels{
-				"name": appName,
-				"env":  env,
+				"name":    appName,
+				"env":     env,
+				"commit":  Commit,
+				"version": runtime.Version(),
 			},
 		}),
 		PublishedAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
