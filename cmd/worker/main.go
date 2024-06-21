@@ -7,8 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/lidofinance/finding-forwarder/internal/app/worker"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nats-io/nats.go"
@@ -16,12 +15,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
-
 	"github.com/lidofinance/finding-forwarder/internal/app/server"
+	"github.com/lidofinance/finding-forwarder/internal/app/worker"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
 	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
+	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
 func main() {
@@ -50,16 +51,6 @@ func main() {
 		return
 	}
 
-	s, createStreamErr := js.CreateStream(gCtx, jetstream.StreamConfig{
-		Name:     cfg.AppConfig.NatsStreamName,
-		Subjects: []string{fmt.Sprintf(`%s.*`, cfg.AppConfig.NatsStreamName)},
-	})
-
-	if createStreamErr != nil && !errors.Is(createStreamErr, nats.ErrStreamNameAlreadyInUse) {
-		fmt.Println("Could not create FINDINGS stream error:", createStreamErr.Error())
-		return
-	}
-
 	log.Info(fmt.Sprintf(`started %s worker`, cfg.AppConfig.Name))
 
 	r := chi.NewRouter()
@@ -72,9 +63,54 @@ func main() {
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
 
-	alertWorker := worker.NewWorker(log, metricsStore, s, services.Telegram, services.OpsGenia, services.Discord)
-	if wrkErr := alertWorker.Run(gCtx, g); wrkErr != nil {
-		fmt.Println("Could not start alertWorker error:", wrkErr.Error())
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, `Dicorder`)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, `Telegramer`)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, `OpsGeniaer`)
+	_ = js.DeleteStream(ctx, cfg.AppConfig.NatsStreamName)
+
+	protocolSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, teams.Protocol)
+	fallbackSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, registry.FallBackTeam)
+
+	commonStreamName := fmt.Sprintf(`%s_STREAM`, cfg.AppConfig.NatsStreamName)
+
+	stream, createStreamErr := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:    commonStreamName,
+		Discard: jetstream.DiscardOld,
+		MaxAge:  10 * time.Minute,
+		Subjects: []string{
+			protocolSubject,
+			fallbackSubject,
+		},
+	})
+
+	if createStreamErr != nil && !errors.Is(createStreamErr, nats.ErrStreamNameAlreadyInUse) {
+		fmt.Printf("could not create %s stream error: %v\n", commonStreamName, createStreamErr)
+		return
+	}
+
+	protocolWorker := worker.NewWorker(
+		protocolSubject,
+		stream, log, metricsStore,
+		worker.WithTelegram(services.Telegram, `LidoDbgAlerts`),
+		worker.WithDiscord(services.Discord, `DebugDiscord`),
+		worker.WithOpsGenia(services.OpsGenia, `BlackBoxOpsGenia`),
+	)
+
+	fallbackWorker := worker.NewWorker(
+		fallbackSubject,
+		stream, log, metricsStore,
+		worker.WithTelegram(services.Telegram, `fLidoDbgAlerts`),
+		worker.WithDiscord(services.Discord, `fDebugDiscord`),
+		worker.WithOpsGenia(services.OpsGenia, `fBlackBoxOpsGenia`),
+	)
+
+	if wrkErr := protocolWorker.Run(gCtx, g); wrkErr != nil {
+		fmt.Println("Could not start protocolWorker error:", wrkErr.Error())
+		return
+	}
+
+	if wrkErr := fallbackWorker.Run(gCtx, g); wrkErr != nil {
+		fmt.Println("Could not start fallbackWorker error:", wrkErr.Error())
 		return
 	}
 

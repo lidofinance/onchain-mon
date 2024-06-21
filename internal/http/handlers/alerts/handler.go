@@ -9,13 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-
-	"github.com/nats-io/nats.go"
-
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
 )
 
 type handler struct {
@@ -74,6 +73,11 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 		go func(finding *models.Alert) {
 			defer wg.Done()
 
+			subQueue := registry.FallBackTeam
+			if team, ok := registry.CodeOwners[alert.Source.Bot.ID]; ok {
+				subQueue = team
+			}
+
 			bb, findingErr := json.Marshal(finding)
 			if findingErr != nil {
 				h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
@@ -82,14 +86,13 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// TODO in future we have to set up queue for correct alert routing by teams
 			start := time.Now()
 			defer func() {
 				duration := time.Since(start).Seconds()
 				h.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: h.natsClient.ConnectedUrl()}).Observe(duration)
 			}()
 
-			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.protocol`, h.streamName), bb); publishErr != nil {
+			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.%s`, h.streamName, subQueue), bb); publishErr != nil {
 				h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 
 				h.log.Error(fmt.Sprintf("could not publish alert to JetStream: error: %v", publishErr))

@@ -1,3 +1,6 @@
+## 21.06.2024
+1. Added worker for each team
+
 ## 20.06.2024
 1. Added version, commit to metric_build
 2. Update dependencies

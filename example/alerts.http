@@ -7,11 +7,11 @@ Content-Type: application/json
       "hash": "0xe9cfda18f167de5cdd63c101e38ec0d4cb0a1c2dea80921ecc4405c2b010855f",
       "createdAt": "2022-03-01T12:24:33.379756298Z",
       "alertId": "OZ-GNOSIS-EVENTS",
-      "name": "[INFO] ℹ️ Sergey's White workstation",
+      "name": "ethereum-steth-1",
       "protocol": "ethereum",
-      "description": "Manual finding",
+      "description": "Manual CRITICAL finding",
       "findingType": "UNKNOWN_TYPE",
-      "severity": "CRITICAL",
+      "severity": "LOW",
       "metadata": {
         "contractAddress": "0x98883145049dec03c00cb7708cbc938058802520",
         "operator": "0x1fFa3471A45C22B1284fE5a251eD74F40580a1E3"
@@ -23,7 +23,7 @@ Content-Type: application/json
       "source": {
         "transactionHash": "0x7040dd33cbfd3e9d880da80cb5f3697a717fc329abd0251f3dcd51599ab67b0a",
         "bot": {
-          "id": "0x17381ae942ee1fe141d0652e9dad7d001761552f906fb1684b2812603de31049",
+          "id": "lido-on-polygon",
           "reference": "QmU6L9Zo5rweF6QZLhLfwAAFUFRMF3uFdSnMiJzENXr37R",
           "image": "bafybeibrigevnhic4befnkqbaagzgxqtdyv2fdgcbqwxe7ees3hw6fymme@sha256:9ca1547e130a6264bb1b4ad6b10f17cabf404957f23d457a30046b9afdf29fc8"
         },
