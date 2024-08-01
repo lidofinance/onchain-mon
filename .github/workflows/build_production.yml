@@ -1,4 +1,5 @@
-name: Build and Push to Dockerhub
+---
+name: Build and release production image
 
 on:
   push:
@@ -6,7 +7,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: finding-forwarder
+  IMAGE_NAME: forta-finding-forwarder
   IMAGE_TAG: stable
 
 jobs:

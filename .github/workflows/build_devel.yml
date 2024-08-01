@@ -1,13 +1,13 @@
-name: Build and Push to Dockerhub
+---
+name: Build and release devel image
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - devel
 
 env:
-  IMAGE_NAME: finding-forwarder
+  IMAGE_NAME: forta-finding-forwarder
   IMAGE_TAG: latest
 
 jobs:
