@@ -23,6 +23,11 @@ type AppConfig struct {
 	OpsGeniaAPIKey    string
 	DiscordWebHookURL string
 
+	DevOpsTelegramBotToken  string
+	DevOpsTelegramChatID    string
+	DevOpsOpsGeniaAPIKey    string
+	DevOpsDiscordWebHookURL string
+
 	NatsDefaultURL string
 	NatsStreamName string
 	MetricsPrefix  string
@@ -61,18 +66,25 @@ func Read(configPath string) (*Config, error) {
 
 		cfg = Config{
 			AppConfig: AppConfig{
-				Name:              viper.GetString("APP_NAME"),
-				Env:               viper.GetString("ENV"),
-				Port:              viper.GetUint("PORT"),
-				LogFormat:         viper.GetString("LOG_FORMAT"),
-				LogLevel:          viper.GetString("LOG_LEVEL"),
+				Name:      viper.GetString("APP_NAME"),
+				Env:       viper.GetString("ENV"),
+				Port:      viper.GetUint("PORT"),
+				LogFormat: viper.GetString("LOG_FORMAT"),
+				LogLevel:  viper.GetString("LOG_LEVEL"),
+
 				TelegramBotToken:  viper.GetString("TELEGRAM_BOT_TOKEN"),
 				TelegramChatID:    viper.GetString("TELEGRAM_CHAT_ID"),
 				OpsGeniaAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
-				NatsDefaultURL:    viper.GetString("NATS_DEFAULT_URL"),
-				NatsStreamName:    "FINDINGS",
-				MetricsPrefix:     re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
+
+				DevOpsTelegramBotToken:  viper.GetString("DEVOPS_TELEGRAM_BOT_TOKEN"),
+				DevOpsTelegramChatID:    viper.GetString("DEVOPS_TELEGRAM_CHAT_ID"),
+				DevOpsOpsGeniaAPIKey:    viper.GetString("DEVOPS_OPSGENIE_API_KEY"),
+				DevOpsDiscordWebHookURL: viper.GetString("DEVOPS_DISCORD_WEBHOOK_URL"),
+
+				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
+				NatsStreamName: "FINDINGS",
+				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
 			},
 		}
 	})

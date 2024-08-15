@@ -63,12 +63,36 @@ func main() {
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
 
-	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, `Dicorder`)
-	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, `Telegramer`)
-	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, `OpsGeniaer`)
+	// common
+	discorderConsumer := `Dicorder`
+	telegrammerConsumer := `Telegrammer`
+	opsGeniaConsumer := `OpsGeniaer`
+
+	// protocol
+	protocolDiscorderConsumer := `ProtocolDiscorder`
+	protocolTelegrammerConsumer := `ProtocolTelegrammer`
+	protocolOpsGeniaConsumer := `ProtocolOpsGeniaer`
+
+	// devOps
+	devOpsDiscorderConsumer := `DevOpsDiscorder`
+	devOpsTelegrammerConsumer := `DevOpsDicorder`
+
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, discorderConsumer)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, telegrammerConsumer)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, opsGeniaConsumer)
+
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, protocolDiscorderConsumer)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, protocolTelegrammerConsumer)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, protocolOpsGeniaConsumer)
+
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, devOpsDiscorderConsumer)
+	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, devOpsTelegrammerConsumer)
+
 	_ = js.DeleteStream(ctx, cfg.AppConfig.NatsStreamName)
 
 	protocolSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, teams.Protocol)
+	devOpsSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, teams.DevOps)
+
 	fallbackSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, registry.FallBackTeam)
 
 	commonStreamName := fmt.Sprintf(`%s_STREAM`, cfg.AppConfig.NatsStreamName)
@@ -79,6 +103,7 @@ func main() {
 		MaxAge:  10 * time.Minute,
 		Subjects: []string{
 			protocolSubject,
+			devOpsSubject,
 			fallbackSubject,
 		},
 	})
@@ -91,21 +116,34 @@ func main() {
 	protocolWorker := worker.NewWorker(
 		protocolSubject,
 		stream, log, metricsStore,
-		worker.WithTelegram(services.Telegram, `LidoDbgAlerts`),
-		worker.WithDiscord(services.Discord, `DebugDiscord`),
-		worker.WithOpsGenia(services.OpsGenia, `BlackBoxOpsGenia`),
+		worker.WithTelegram(services.Telegram, protocolTelegrammerConsumer),
+		worker.WithDiscord(services.Discord, protocolDiscorderConsumer),
+		worker.WithOpsGenia(services.OpsGenia, protocolOpsGeniaConsumer),
+	)
+
+	devOpsWorker := worker.NewWorker(
+		devOpsSubject,
+		stream, log, metricsStore,
+		worker.WithTelegram(services.DevOpsTelegram, devOpsTelegrammerConsumer),
+		worker.WithDiscord(services.DevOpsDiscord, devOpsDiscorderConsumer),
+		// worker.WithOpsGenia(services.OpsGenia, `BlackBoxOpsGenia`),
 	)
 
 	fallbackWorker := worker.NewWorker(
 		fallbackSubject,
 		stream, log, metricsStore,
-		worker.WithTelegram(services.Telegram, `fLidoDbgAlerts`),
-		worker.WithDiscord(services.Discord, `fDebugDiscord`),
-		worker.WithOpsGenia(services.OpsGenia, `fBlackBoxOpsGenia`),
+		worker.WithTelegram(services.Telegram, telegrammerConsumer),
+		worker.WithDiscord(services.Discord, discorderConsumer),
+		worker.WithOpsGenia(services.OpsGenia, opsGeniaConsumer),
 	)
 
 	if wrkErr := protocolWorker.Run(gCtx, g); wrkErr != nil {
 		fmt.Println("Could not start protocolWorker error:", wrkErr.Error())
+		return
+	}
+
+	if devWkrErr := devOpsWorker.Run(gCtx, g); devWkrErr != nil {
+		fmt.Println("Could not start devOps error:", devWkrErr.Error())
 		return
 	}
 

@@ -14,6 +14,9 @@ type Services struct {
 	Telegram notifiler.Telegram
 	Discord  notifiler.Discord
 	OpsGenia notifiler.OpsGenia
+
+	DevOpsTelegram notifiler.Telegram
+	DevOpsDiscord  notifiler.Discord
 }
 
 func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
@@ -31,12 +34,18 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 	}
 
 	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpClient, metricsStore)
+	devOpsTelegram := notifiler.NewTelegram(cfg.DevOpsTelegramBotToken, cfg.DevOpsTelegramChatID, httpClient, metricsStore)
+
 	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore)
+	devOpsDiscord := notifiler.NewDiscord(cfg.DevOpsDiscordWebHookURL, httpClient, metricsStore)
+
 	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient, metricsStore)
 
 	return Services{
-		Telegram: telegram,
-		Discord:  discord,
-		OpsGenia: opsGenia,
+		Telegram:       telegram,
+		Discord:        discord,
+		OpsGenia:       opsGenia,
+		DevOpsTelegram: devOpsTelegram,
+		DevOpsDiscord:  devOpsDiscord,
 	}
 }

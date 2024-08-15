@@ -7,4 +7,5 @@ const (
 	Governance = `governance`
 	ValSet     = `valset`
 	Analytics  = `Analytics`
+	DevOps     = `DevOps`
 )

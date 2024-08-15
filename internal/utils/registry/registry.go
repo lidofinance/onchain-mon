@@ -7,7 +7,6 @@ const FallBackTeam = `default`
 var CodeOwners = map[string]string{
 	"ethereum-huge-tx":   teams.Analytics,
 	"ethereum-steth":     teams.Protocol,
-	"storage-watcher":    teams.Protocol,
 	"l2-bridge-arbitrum": teams.Protocol,
 	"l2-bridge-balance":  teams.Protocol,
 	"l2-bridge-ethereum": teams.Protocol,
@@ -30,5 +29,6 @@ var CodeOwners = map[string]string{
 	"voting-watcher":      teams.Governance,
 
 	"ethereum-validators-set": teams.ValSet,
+	"devops-test-bot":         teams.DevOps,
 	`host.docker.internal`:    FallBackTeam,
 }
