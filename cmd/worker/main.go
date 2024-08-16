@@ -64,7 +64,7 @@ func main() {
 	app.RegisterWorkerRoutes(r)
 
 	// common
-	discorderConsumer := `Dicorder`
+	discorderConsumer := `Discorder`
 	telegrammerConsumer := `Telegrammer`
 	opsGeniaConsumer := `OpsGeniaer`
 
