@@ -17,17 +17,19 @@ type discord struct {
 	webhookURL string
 	httpClient *http.Client
 	metrics    *metrics.Store
+	source     string
 }
 
 type Discord interface {
 	SendMessage(ctx context.Context, message string) error
 }
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store) Discord {
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string) Discord {
 	return &discord{
 		webhookURL: webhookURL,
 		httpClient: httpClient,
 		metrics:    metricsStore,
+		source:     source,
 	}
 }
 
@@ -37,7 +39,7 @@ func (d *discord) SendMessage(ctx context.Context, message string) error {
 	}
 
 	payload := MessagePayload{
-		Content: message,
+		Content: fmt.Sprintf("%s \nSource: %s", message, d.source),
 	}
 
 	payloadBytes, err := json.Marshal(payload)

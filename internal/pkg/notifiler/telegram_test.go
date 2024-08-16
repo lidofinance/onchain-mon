@@ -60,6 +60,7 @@ func Test_SendMessage(t *testing.T) {
 				chatID:     tt.fields.chatID,
 				httpClient: tt.fields.httpClient,
 				metrics:    metricsStore,
+				source:     `local`,
 			}
 			if err := u.SendMessage(tt.args.ctx, tt.args.message); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)

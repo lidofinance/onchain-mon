@@ -33,13 +33,13 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 		Timeout:   10 * time.Second,
 	}
 
-	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpClient, metricsStore)
-	devOpsTelegram := notifiler.NewTelegram(cfg.DevOpsTelegramBotToken, cfg.DevOpsTelegramChatID, httpClient, metricsStore)
+	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpClient, metricsStore, cfg.Source)
+	devOpsTelegram := notifiler.NewTelegram(cfg.DevOpsTelegramBotToken, cfg.DevOpsTelegramChatID, httpClient, metricsStore, cfg.Source)
 
-	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore)
-	devOpsDiscord := notifiler.NewDiscord(cfg.DevOpsDiscordWebHookURL, httpClient, metricsStore)
+	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore, cfg.Source)
+	devOpsDiscord := notifiler.NewDiscord(cfg.DevOpsDiscordWebHookURL, httpClient, metricsStore, cfg.Source)
 
-	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient, metricsStore)
+	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
 
 	return Services{
 		Telegram:       telegram,

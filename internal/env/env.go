@@ -13,6 +13,7 @@ type Config struct {
 
 type AppConfig struct {
 	Name              string
+	Source            string
 	Env               string
 	URL               string
 	Port              uint
@@ -67,6 +68,7 @@ func Read(configPath string) (*Config, error) {
 		cfg = Config{
 			AppConfig: AppConfig{
 				Name:      viper.GetString("APP_NAME"),
+				Source:    viper.GetString("SOURCE"),
 				Env:       viper.GetString("ENV"),
 				Port:      viper.GetUint("PORT"),
 				LogFormat: viper.GetString("LOG_FORMAT"),
