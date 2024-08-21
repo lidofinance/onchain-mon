@@ -46,7 +46,7 @@ services:
     build: ./
     restart: always
     command:
-      - ./bin/main
+      - ./main
     env_file:
       - .env
     environment:

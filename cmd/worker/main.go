@@ -54,8 +54,7 @@ func main() {
 	log.Info(fmt.Sprintf(`started %s worker`, cfg.AppConfig.Name))
 
 	r := chi.NewRouter()
-	promRegistry := prometheus.NewRegistry()
-	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	services := server.NewServices(&cfg.AppConfig, metricsStore)
 	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
@@ -92,7 +91,6 @@ func main() {
 
 	protocolSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, teams.Protocol)
 	devOpsSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, teams.DevOps)
-
 	fallbackSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, registry.FallBackTeam)
 
 	commonStreamName := fmt.Sprintf(`%s_STREAM`, cfg.AppConfig.NatsStreamName)
