@@ -41,12 +41,12 @@ services:
       - service-forta-nats
       - service-forta-json-rpc
 
-  main:
-    container_name: finding-forwarder
+  forwarder-server:
+    container_name: finding-forwarder-server
     build: ./
     restart: always
     command:
-      - ./bin/main
+      - ./main
     env_file:
       - .env
     environment:
@@ -61,6 +61,30 @@ services:
       - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
-      - BOT_CONTAINERS==${BOT_CONTAINERS}
+      - BOT_CONTAINERS=${BOT_CONTAINERS}
     ports:
       - '8080:8080'
+
+  forwarder-worker:
+    container_name: finding-forwarder-worker
+    build: ./
+    restart: always
+    command:
+      - ./worker
+    env_file:
+      - .env
+    environment:
+      - READ_ENV_FROM_SHELL=true
+      - ENV=${ENV}
+      - APP_NAME=${APP_NAME}
+      - PORT=${PORT}
+      - LOG_FORMAT=${LOG_FORMAT}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
+      - BOT_CONTAINERS=${BOT_CONTAINERS}
+    ports:
+      - '8081:8080'

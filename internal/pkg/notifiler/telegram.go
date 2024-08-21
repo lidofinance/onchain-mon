@@ -17,6 +17,7 @@ type telegram struct {
 	chatID     string
 	httpClient *http.Client
 	metrics    *metrics.Store
+	source     string
 }
 
 //go:generate ./../../../bin/mockery --name Telegram
@@ -24,16 +25,19 @@ type Telegram interface {
 	SendMessage(ctx context.Context, message string) error
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store) Telegram {
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string) Telegram {
 	return &telegram{
 		botToken:   botToken,
 		chatID:     chatID,
 		httpClient: httpClient,
 		metrics:    metricsStore,
+		source:     source,
 	}
 }
 
-func (u *telegram) SendMessage(ctx context.Context, message string) error {
+func (u *telegram) SendMessage(ctx context.Context, content string) error {
+	message := fmt.Sprintf("%s \nSource: %s", content, u.source)
+
 	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {

@@ -72,6 +72,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				opsGenieKey: tt.fields.opsGenieKey,
 				httpClient:  tt.fields.httpClient,
 				metrics:     metricsStore,
+				source:      `local`,
 			}
 			if err := u.SendMessage(tt.args.ctx, tt.args.message, tt.args.description, tt.args.alias, tt.args.priority); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
