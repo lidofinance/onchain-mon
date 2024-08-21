@@ -64,7 +64,7 @@ func main() {
 	app.RegisterWorkerRoutes(r)
 
 	// common
-	discorderConsumer := `Dicorder`
+	discorderConsumer := `Discorder`
 	telegrammerConsumer := `Telegrammer`
 	opsGeniaConsumer := `OpsGeniaer`
 
@@ -75,7 +75,7 @@ func main() {
 
 	// devOps
 	devOpsDiscorderConsumer := `DevOpsDiscorder`
-	devOpsTelegrammerConsumer := `DevOpsDicorder`
+	devOpsTelegrammerConsumer := `DevOpsDiscorder`
 
 	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, discorderConsumer)
 	_ = js.DeleteConsumer(ctx, cfg.AppConfig.NatsStreamName, telegrammerConsumer)
