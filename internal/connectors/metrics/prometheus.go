@@ -46,9 +46,9 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			Help: "The total number of set findings",
 		}, []string{Channel, Status}),
 		SummaryHandlers: promauto.NewSummaryVec(prometheus.SummaryOpts{
-			Name:       fmt.Sprintf("%s_request_processing_seconds", prefix),
-			Help:       "Time spent processing request to notification channel",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+			Name: fmt.Sprintf("%s_request_processing_seconds", prefix),
+			Help: "Time spent processing request to notification channel",
+			// Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		}, []string{Channel}),
 	}
 
