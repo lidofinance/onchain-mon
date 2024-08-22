@@ -14,3 +14,4 @@ localMode:
     enable: true
     botContainers:
       - host.docker.internal
+      - ethereum-steth

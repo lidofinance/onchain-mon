@@ -40,6 +40,7 @@ services:
     depends_on:
       - service-forta-nats
       - service-forta-json-rpc
+      - service-ethereum-steth
 
   forwarder-server:
     container_name: finding-forwarder-server
@@ -88,3 +89,19 @@ services:
       - BOT_CONTAINERS=${BOT_CONTAINERS}
     ports:
       - '8081:8080'
+
+  service-ethereum-steth:
+    container_name: ethereum-steth
+    logging: *default-logging
+    image: monitoring/steth:latest
+    restart: unless-stopped
+    environment:
+      - APP_NAME=ethereum-steth
+      - INSTANCE=forta-local-host
+      - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
+      - USE_FORTA_RPC_URL=false
+      - NODE_ENV=production
+    depends_on:
+      - service-forta-json-rpc
+    ports:
+      - '3000:3000'
