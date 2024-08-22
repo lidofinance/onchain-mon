@@ -1,3 +1,8 @@
+## 22.06.2024
+1. Added DevOps independent consumer
+2. Updated readme.md
+3. Changed ```request_processing_seconds``` metric type from summary to histogram
+
 ## 21.06.2024
 1. Added worker for each team
 
