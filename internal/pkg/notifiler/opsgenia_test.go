@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
@@ -37,11 +39,8 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 		metricsStore *metrics.Store
 	}
 	type args struct {
-		ctx         context.Context
-		message     string
-		description string
-		alias       string
-		priority    string
+		ctx   context.Context
+		alert models.Alert
 	}
 	tests := []struct {
 		name    string
@@ -57,11 +56,13 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				metricsStore: metricsStore,
 			},
 			args: args{
-				ctx:         context.TODO(),
-				message:     NameCritical,
-				description: DescriptionCritical,
-				alias:       "ZkSyncBridgeBalanceMismatch",
-				priority:    "P2",
+				ctx: context.TODO(),
+				alert: models.Alert{
+					Name:        NameCritical,
+					Description: DescriptionCritical,
+					AlertID:     `TEST-OPSGENIA-ALERT-ID`,
+					Severity:    models.AlertSeverityHIGH,
+				},
 			},
 			wantErr: false,
 		},
@@ -74,7 +75,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				metrics:     metricsStore,
 				source:      `local`,
 			}
-			if err := u.SendMessage(tt.args.ctx, tt.args.message, tt.args.description, tt.args.alias, tt.args.priority); (err != nil) != tt.wantErr {
+			if err := u.SendFinding(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

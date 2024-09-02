@@ -12,22 +12,19 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Name              string
-	Source            string
-	Env               string
-	URL               string
-	Port              uint
-	LogFormat         string
-	LogLevel          string
-	TelegramBotToken  string
-	TelegramChatID    string
-	OpsGeniaAPIKey    string
-	DiscordWebHookURL string
-
-	DevOpsTelegramBotToken  string
-	DevOpsTelegramChatID    string
-	DevOpsOpsGeniaAPIKey    string
-	DevOpsDiscordWebHookURL string
+	Name                  string
+	Source                string
+	Env                   string
+	URL                   string
+	Port                  uint
+	LogFormat             string
+	LogLevel              string
+	TelegramBotToken      string
+	TelegramErrorsChatID  string
+	TelegramUpdatesChatID string
+	TelegramAlertsChatID  string
+	OpsGeniaAPIKey        string
+	DiscordWebHookURL     string
 
 	NatsDefaultURL string
 	NatsStreamName string
@@ -74,15 +71,13 @@ func Read(configPath string) (*Config, error) {
 				LogFormat: viper.GetString("LOG_FORMAT"),
 				LogLevel:  viper.GetString("LOG_LEVEL"),
 
-				TelegramBotToken:  viper.GetString("TELEGRAM_BOT_TOKEN"),
-				TelegramChatID:    viper.GetString("TELEGRAM_CHAT_ID"),
+				TelegramBotToken:      viper.GetString("TELEGRAM_BOT_TOKEN"),
+				TelegramErrorsChatID:  viper.GetString("TELEGRAM_ERRORS_CHAT_ID"),
+				TelegramUpdatesChatID: viper.GetString("TELEGRAM_UPDATES_CHAT_ID"),
+				TelegramAlertsChatID:  viper.GetString("TELEGRAM_ALERTS_CHAT_ID"),
+
 				OpsGeniaAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
-
-				DevOpsTelegramBotToken:  viper.GetString("DEVOPS_TELEGRAM_BOT_TOKEN"),
-				DevOpsTelegramChatID:    viper.GetString("DEVOPS_TELEGRAM_CHAT_ID"),
-				DevOpsOpsGeniaAPIKey:    viper.GetString("DEVOPS_OPSGENIE_API_KEY"),
-				DevOpsDiscordWebHookURL: viper.GetString("DEVOPS_DISCORD_WEBHOOK_URL"),
 
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				NatsStreamName: "FINDINGS",
