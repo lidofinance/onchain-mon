@@ -32,6 +32,8 @@ type AppConfig struct {
 	NatsDefaultURL string
 	NatsStreamName string
 	MetricsPrefix  string
+
+	JsonRpcURL string
 }
 
 var (
@@ -87,6 +89,7 @@ func Read(configPath string) (*Config, error) {
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				NatsStreamName: "FINDINGS",
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
+				JsonRpcURL:     viper.GetString("JSON_RPC_URL"),
 			},
 		}
 	})
