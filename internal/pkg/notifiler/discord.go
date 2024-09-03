@@ -10,6 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -20,11 +21,11 @@ type discord struct {
 	source     string
 }
 
-type Discord interface {
-	SendMessage(ctx context.Context, message string) error
+type MessagePayload struct {
+	Content string `json:"content"`
 }
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string) Discord {
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string) *discord {
 	return &discord{
 		webhookURL: webhookURL,
 		httpClient: httpClient,
@@ -33,13 +34,11 @@ func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metric
 	}
 }
 
-func (d *discord) SendMessage(ctx context.Context, message string) error {
-	type MessagePayload struct {
-		Content string `json:"content"`
-	}
+func (d *discord) SendFinding(ctx context.Context, alert *models.Alert) error {
+	message := fmt.Sprintf("%s\n\n%s\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, d.source)
 
 	payload := MessagePayload{
-		Content: fmt.Sprintf("%s \nSource: %s", message, d.source),
+		Content: message,
 	}
 
 	payloadBytes, err := json.Marshal(payload)

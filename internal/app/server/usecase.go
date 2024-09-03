@@ -5,18 +5,16 @@ import (
 	"time"
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-
 	"github.com/lidofinance/finding-forwarder/internal/env"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
 )
 
 type Services struct {
-	Telegram notifiler.Telegram
-	Discord  notifiler.Discord
-	OpsGenia notifiler.OpsGenia
-
-	DevOpsTelegram notifiler.Telegram
-	DevOpsDiscord  notifiler.Discord
+	OnChainAlertsTelegram  notifiler.FindingSender
+	OnChainUpdatesTelegram notifiler.FindingSender
+	ErrorsTelegram         notifiler.FindingSender
+	Discord                notifiler.FindingSender
+	OpsGenia               notifiler.FindingSender
 }
 
 func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
@@ -33,19 +31,18 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 		Timeout:   10 * time.Second,
 	}
 
-	telegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID, httpClient, metricsStore, cfg.Source)
-	devOpsTelegram := notifiler.NewTelegram(cfg.DevOpsTelegramBotToken, cfg.DevOpsTelegramChatID, httpClient, metricsStore, cfg.Source)
+	alertsTelegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramAlertsChatID, httpClient, metricsStore, cfg.Source)
+	updatesTelegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramUpdatesChatID, httpClient, metricsStore, cfg.Source)
+	errorsTelegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramErrorsChatID, httpClient, metricsStore, cfg.Source)
 
 	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore, cfg.Source)
-	devOpsDiscord := notifiler.NewDiscord(cfg.DevOpsDiscordWebHookURL, httpClient, metricsStore, cfg.Source)
-
 	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
 
 	return Services{
-		Telegram:       telegram,
-		Discord:        discord,
-		OpsGenia:       opsGenia,
-		DevOpsTelegram: devOpsTelegram,
-		DevOpsDiscord:  devOpsDiscord,
+		OnChainAlertsTelegram:  alertsTelegram,
+		OnChainUpdatesTelegram: updatesTelegram,
+		ErrorsTelegram:         errorsTelegram,
+		Discord:                discord,
+		OpsGenia:               opsGenia,
 	}
 }

@@ -1,6 +1,9 @@
 package registry
 
-import "github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
+import (
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
+)
 
 const FallBackTeam = `default`
 
@@ -10,7 +13,7 @@ var CodeOwners = map[string]string{
 	"l2-bridge-arbitrum": teams.Protocol,
 	"l2-bridge-balance":  teams.Protocol,
 	"l2-bridge-ethereum": teams.Protocol,
-	"l2-bridge-optimism": teams.Protocol,
+	"l2-optimism":        teams.Protocol,
 	"l2-bridge-base":     teams.Protocol,
 	"l2-bridge-zksync":   teams.Protocol,
 	"l2-bridge-mantle":   teams.Protocol,
@@ -31,4 +34,30 @@ var CodeOwners = map[string]string{
 	"ethereum-validators-set": teams.ValSet,
 	"devops-test-bot":         teams.DevOps,
 	`host.docker.internal`:    FallBackTeam,
+}
+
+type AlertMapping = map[string]bool
+
+var OnChainErrors = AlertMapping{
+	models.AlertSeverityUNKNOWN: true,
+}
+
+var OnChainUpdates = AlertMapping{
+	models.AlertSeverityINFO:   true,
+	models.AlertSeverityLOW:    true,
+	models.AlertSeverityMEDIUM: true,
+}
+
+var OnChainAlerts = AlertMapping{
+	models.AlertSeverityHIGH:     true,
+	models.AlertSeverityCRITICAL: true,
+}
+
+var FallBackAlerts = AlertMapping{
+	models.AlertSeverityUNKNOWN:  true,
+	models.AlertSeverityINFO:     true,
+	models.AlertSeverityLOW:      true,
+	models.AlertSeverityMEDIUM:   true,
+	models.AlertSeverityHIGH:     true,
+	models.AlertSeverityCRITICAL: true,
 }

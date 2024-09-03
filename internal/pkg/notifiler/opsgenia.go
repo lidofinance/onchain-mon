@@ -10,8 +10,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
+
+type AlertPayload struct {
+	Message     string `json:"message"`
+	Description string `json:"description,omitempty"`
+	Priority    string `json:"priority,omitempty"`
+	Alias       string `json:"alias,omitempty"`
+}
 
 type opsGenia struct {
 	opsGenieKey string
@@ -20,12 +28,7 @@ type opsGenia struct {
 	source      string
 }
 
-//go:generate ./../../../bin/mockery --name OpsGenia
-type OpsGenia interface {
-	SendMessage(ctx context.Context, message, description, alias, priority string) error
-}
-
-func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) OpsGenia {
+func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) *opsGenia {
 	return &opsGenia{
 		opsGenieKey: opsGenieKey,
 		httpClient:  httpClient,
@@ -34,21 +37,27 @@ func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 	}
 }
 
-func (u *opsGenia) SendMessage(ctx context.Context, findingName, findingDescription, alias, priority string) error {
-	type AlertPayload struct {
-		Message     string `json:"message"`
-		Description string `json:"description,omitempty"`
-		Priority    string `json:"priority,omitempty"`
-		Alias       string `json:"alias,omitempty"`
+func (u *opsGenia) SendFinding(ctx context.Context, alert *models.Alert) error {
+	opsGeniaPriority := ""
+	switch alert.Severity {
+	case models.AlertSeverityCRITICAL:
+		opsGeniaPriority = "P2"
+	case models.AlertSeverityHIGH:
+		opsGeniaPriority = "P3"
 	}
 
-	message := fmt.Sprintf("%s \nSource: %s", findingDescription, u.source)
+	// Send only P2 or P3 alerts
+	if opsGeniaPriority == "" {
+		return nil
+	}
+
+	message := fmt.Sprintf("%s\n\nAlertId:%s\nSource: %s", alert.Description, alert.AlertID, u.source)
 
 	payload := AlertPayload{
-		Message:     findingName,
+		Message:     alert.Name,
 		Description: message,
-		Alias:       alias,
-		Priority:    priority,
+		Alias:       alert.AlertID,
+		Priority:    opsGeniaPriority,
 	}
 
 	payloadBytes, err := json.Marshal(payload)

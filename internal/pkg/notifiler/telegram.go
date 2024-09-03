@@ -9,6 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -20,12 +21,7 @@ type telegram struct {
 	source     string
 }
 
-//go:generate ./../../../bin/mockery --name Telegram
-type Telegram interface {
-	SendMessage(ctx context.Context, message string) error
-}
-
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string) Telegram {
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string) *telegram {
 	return &telegram{
 		botToken:   botToken,
 		chatID:     chatID,
@@ -35,8 +31,8 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 	}
 }
 
-func (u *telegram) SendMessage(ctx context.Context, content string) error {
-	message := fmt.Sprintf("%s \nSource: %s", content, u.source)
+func (u *telegram) SendFinding(ctx context.Context, alert *models.Alert) error {
+	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, u.source)
 
 	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
