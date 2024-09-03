@@ -9,7 +9,7 @@ Content-Type: application/json
       "alertId": "OZ-GNOSIS-EVENTS",
       "name": "ethereum-steth-1",
       "protocol": "ethereum",
-      "description": "Manual CRITICAL finding",
+      "description": "Manual HIGH finding",
       "findingType": "UNKNOWN_TYPE",
       "severity": "HIGH",
       "metadata": {

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
@@ -39,11 +41,9 @@ Used buffer: 20,179.47 ETH
 
 Shares
 Burnt: 17,698.36 × 1e18
+`
 
-ethereum:mainnet
-Forta explorer`
-
-func Test_usecase_SendMessage1(t *testing.T) {
+func Test_usecase_SendFinding(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
@@ -58,8 +58,8 @@ func Test_usecase_SendMessage1(t *testing.T) {
 		metricsStore *metrics.Store
 	}
 	type args struct {
-		ctx     context.Context
-		message string
+		ctx   context.Context
+		alert models.Alert
 	}
 	tests := []struct {
 		name    string
@@ -75,8 +75,13 @@ func Test_usecase_SendMessage1(t *testing.T) {
 				metricsStore: metricsStore,
 			},
 			args: args{
-				ctx:     context.Background(),
-				message: Name + "\n\n" + Description,
+				ctx: context.Background(),
+				alert: models.Alert{
+					Name:        Name,
+					Description: Description,
+					Severity:    models.AlertSeverityLOW,
+					AlertID:     `Test-Alert-ID`,
+				},
 			},
 			wantErr: false,
 		},
@@ -89,7 +94,7 @@ func Test_usecase_SendMessage1(t *testing.T) {
 				metrics:    metricsStore,
 				source:     `local`,
 			}
-			if err := u.SendMessage(tt.args.ctx, tt.args.message); (err != nil) != tt.wantErr {
+			if err := u.SendFinding(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

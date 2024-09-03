@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
@@ -12,7 +14,7 @@ import (
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
-func Test_SendMessage(t *testing.T) {
+func Test_SendFinfing(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
@@ -29,8 +31,8 @@ func Test_SendMessage(t *testing.T) {
 		metricsStore *metrics.Store
 	}
 	type args struct {
-		ctx     context.Context
-		message string
+		ctx   context.Context
+		alert models.Alert
 	}
 	tests := []struct {
 		name    string
@@ -42,13 +44,18 @@ func Test_SendMessage(t *testing.T) {
 			name: "Send_Test_Message_to_telegram",
 			fields: fields{
 				botToken:     cfg.AppConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.TelegramChatID,
+				chatID:       cfg.AppConfig.TelegramErrorsChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
 			args: args{
-				ctx:     context.TODO(),
-				message: Name + "\n\n" + Description,
+				ctx: context.TODO(),
+				alert: models.Alert{
+					Name:        `Telegram test alert`,
+					Description: `Telegram test alert`,
+					Severity:    models.AlertSeverityMEDIUM,
+					AlertID:     `telegram-chat-id`,
+				},
 			},
 			wantErr: false,
 		},
@@ -62,7 +69,7 @@ func Test_SendMessage(t *testing.T) {
 				metrics:    metricsStore,
 				source:     `local`,
 			}
-			if err := u.SendMessage(tt.args.ctx, tt.args.message); (err != nil) != tt.wantErr {
+			if err := u.SendFinding(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
