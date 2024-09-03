@@ -43,7 +43,7 @@ Shares
 Burnt: 17,698.36 × 1e18
 `
 
-func Test_usecase_SendFinnding(t *testing.T) {
+func Test_usecase_SendFinding(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
