@@ -12,6 +12,7 @@ type Store struct {
 	Prometheus      *prometheus.Registry
 	BuildInfo       prometheus.Counter
 	PublishedAlerts *prometheus.CounterVec
+	PublishedBlocks *prometheus.CounterVec
 	SentAlerts      *prometheus.CounterVec
 	SummaryHandlers *prometheus.HistogramVec
 }
@@ -41,6 +42,10 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			Name: fmt.Sprintf("%s_finding_published_total", prefix),
 			Help: "The total number of published findings",
 		}, []string{Status}),
+		PublishedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_blocks_published_total", prefix),
+			Help: "The total number of published blocks",
+		}, []string{Status}),
 		SentAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_finding_sent_total", prefix),
 			Help: "The total number of set findings",
@@ -55,6 +60,7 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 	store.Prometheus.MustRegister(
 		store.BuildInfo,
 		store.PublishedAlerts,
+		store.PublishedBlocks,
 		store.SentAlerts,
 		store.SummaryHandlers,
 	)
