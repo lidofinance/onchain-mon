@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
 	"github.com/lidofinance/finding-forwarder/internal/app/server"
 	"github.com/lidofinance/finding-forwarder/internal/app/worker"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
@@ -22,7 +24,6 @@ import (
 	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
 	"github.com/lidofinance/finding-forwarder/internal/env"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
-	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
 func main() {
@@ -62,24 +63,35 @@ func main() {
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
 
-	protocolSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, teams.Protocol)
-	fallbackSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.NatsStreamName, registry.FallBackTeam)
+	protocolNatsSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FindingTopic, teams.Protocol)
 
-	commonStreamName := fmt.Sprintf(`%s_STREAM`, cfg.AppConfig.NatsStreamName)
+	protocolFortaSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FortaAlertsTopic, teams.Protocol)
+	fallbackFortaSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FortaAlertsTopic, registry.FallBackTeam)
 
-	stream, createStreamErr := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:    commonStreamName,
+	natsStreamName := `NatsStream`
+	fortaStreamName := `FortaStream`
+
+	natStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:    natsStreamName,
 		Discard: jetstream.DiscardOld,
 		MaxAge:  10 * time.Minute,
 		Subjects: []string{
-			protocolSubject,
-			fallbackSubject,
-			// When you want to set up notifications for your team, you have to add your subject
+			protocolNatsSubject,
 		},
 	})
 
-	if createStreamErr != nil && !errors.Is(createStreamErr, nats.ErrStreamNameAlreadyInUse) {
-		fmt.Printf("could not create %s stream error: %v\n", commonStreamName, createStreamErr)
+	fortaStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:    fortaStreamName,
+		Discard: jetstream.DiscardOld,
+		MaxAge:  10 * time.Minute,
+		Subjects: []string{
+			protocolFortaSubject,
+			fallbackFortaSubject,
+		},
+	})
+
+	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		fmt.Printf("could not create %s stream error: %v\n", natsStreamName, err)
 		return
 	}
 
@@ -89,31 +101,52 @@ func main() {
 		OpsGenie = `OpsGenie`
 	)
 
-	protocolWorker := worker.NewWorker(
-		protocolSubject,
-		stream, log, metricsStore,
-		worker.WithConsumer(services.OnChainAlertsTelegram, `OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
-		worker.WithConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
-		worker.WithConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
-		worker.WithConsumer(services.Discord, `Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
-		worker.WithConsumer(services.OpsGenia, `Protocol_OpGenia_Consumer`, registry.OnChainAlerts, OpsGenie),
+	protocolWorker := worker.NewFindingWorker(
+		protocolNatsSubject,
+		natStream, log, metricsStore,
+		worker.WithFindingConsumer(services.OnChainAlertsTelegram, `OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
+		worker.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
+		worker.WithFindingConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
+		worker.WithFindingConsumer(services.Discord, `Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
+		worker.WithFindingConsumer(services.OpsGenia, `Protocol_OpGenia_Consumer`, registry.OnChainAlerts, OpsGenie),
 	)
 
-	fallbackWorker := worker.NewWorker(
-		fallbackSubject,
-		stream, log, metricsStore,
-		worker.WithConsumer(services.Discord, `Fallback_Discord_Consumer`, registry.FallBackAlerts, Discord),
+	protocolFortaWorker := worker.NewAlertWorker(
+		protocolFortaSubject,
+		fortaStream, log, metricsStore,
+		worker.WithAlertConsumer(services.OnChainAlertsTelegram, `Forta_OnChainAlerts_Telegram_Consumer`, registry.AlertOnChainAlerts, Telegram),
+		worker.WithAlertConsumer(services.OnChainUpdatesTelegram, `Forta_OnChainUpdates_Telegram_Consumer`, registry.AlertOnChainUpdates, Telegram),
+		worker.WithAlertConsumer(services.ErrorsTelegram, `Forta_Protocol_Errors_Telegram_Consumer`, registry.AlertOnChainErrors, Telegram),
+		worker.WithAlertConsumer(services.Discord, `Forta_Protocol_Discord_Consumer`, registry.AlertFallBackAlerts, Discord),
+		worker.WithAlertConsumer(services.OpsGenia, `Forta_Protocol_OpGenia_Consumer`, registry.AlertOnChainAlerts, OpsGenie),
 	)
 
-	if wrkErr := protocolWorker.Run(gCtx, g); wrkErr != nil {
-		fmt.Println("Could not start protocolWorker error:", wrkErr.Error())
+	fallbackFortaWorker := worker.NewAlertWorker(
+		fallbackFortaSubject,
+		fortaStream, log, metricsStore,
+		worker.WithAlertConsumer(services.Discord, `FortaFallback_Discord_Consumer`, registry.AlertFallBackAlerts, Discord),
+	)
+
+	feederWrk := feeder.New(log, services.ChainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
+
+	// Listen findings from Nats
+	if err := protocolWorker.Run(gCtx, g); err != nil {
+		fmt.Println("Could not start protocolWorker error:", err.Error())
 		return
 	}
 
-	if wrkErr := fallbackWorker.Run(gCtx, g); wrkErr != nil {
-		fmt.Println("Could not start fallbackWorker error:", wrkErr.Error())
+	// Listen alerts from Forta group software
+	if err := protocolFortaWorker.Run(gCtx, g); err != nil {
+		fmt.Println("Could not start protocolFortaWorker error:", err.Error())
 		return
 	}
+
+	if wrkErr := fallbackFortaWorker.Run(gCtx, g); wrkErr != nil {
+		fmt.Println("Could not start fallbackFortaWorker error:", wrkErr.Error())
+		return
+	}
+
+	feederWrk.Run(gCtx, g)
 
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 

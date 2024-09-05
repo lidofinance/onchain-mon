@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+option go_package = "./;proto";
+
+message Finding {
+  enum Severity {
+    UNKNOWN = 0;
+    INFO = 1;
+    LOW = 2;
+    MEDIUM = 3;
+    HIGH = 4;
+    CRITICAL = 5;
+  }
+
+  enum FindingType {
+    UNKNOWN_TYPE = 0;
+    EXPLOIT = 1;
+    SUSPICIOUS = 2;
+    DEGRADED = 3;
+    INFORMATION = 4;
+    SCAM = 5;
+  }
+
+  string protocol = 1;
+  Severity severity = 2;
+  map<string, string> metadata = 3;
+  FindingType type = 4;
+  string alertId = 5;
+  string name = 6;
+  string description = 7;
+  reserved 8;
+  bool private = 9;
+  repeated string addresses = 10;
+  map<string, double> indicators = 11;
+  repeated Label labels = 12;
+  repeated string relatedAlerts = 13;
+  string uniqueKey = 14;
+  Source source = 15;
+  string timestamp = 16;
+}
+
+message Label {
+  enum EntityType {
+    UNKNOWN_ENTITY_TYPE = 0;
+    ADDRESS = 1;
+    TRANSACTION = 2;
+    BLOCK = 3;
+    URL = 4;
+  }
+
+  EntityType entityType = 1;
+  string entity = 2;
+  reserved 3;
+  float confidence = 4;
+  reserved 5;
+  bool remove = 6;
+  string label = 7;
+  repeated string metadata = 8;
+  string uniqueKey = 9;
+}
+
+message Source {
+  message TransactionSource {
+    uint64 chainId = 1;
+    string hash = 2;
+  }
+
+  message BlockSource {
+    uint64 chainId = 1;
+    string hash = 2;
+    uint64 number = 3;
+  }
+
+  message URLSource {
+    string url = 1;
+  }
+
+  message ChainSource {
+    uint64 chainId = 1;
+  }
+
+  message AlertSource {
+    string id = 1;
+  }
+
+  message CustomSource {
+    string name = 1;
+    string value = 2;
+  }
+
+  repeated TransactionSource transactions = 1;
+  repeated BlockSource blocks = 2;
+  repeated URLSource urls = 3;
+  repeated ChainSource chains = 4;
+  repeated AlertSource alerts = 5;
+  repeated CustomSource customSources = 6;
+}

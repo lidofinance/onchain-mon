@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -34,9 +35,19 @@ func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metric
 	}
 }
 
-func (d *discord) SendFinding(ctx context.Context, alert *models.Alert) error {
+func (d *discord) SendFinding(ctx context.Context, alert *proto.Finding) error {
+	message := fmt.Sprintf("%s\n\n%s\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertId, d.source)
+
+	return d.send(ctx, message)
+}
+
+func (d *discord) SendAlert(ctx context.Context, alert *models.Alert) error {
 	message := fmt.Sprintf("%s\n\n%s\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, d.source)
 
+	return d.send(ctx, message)
+}
+
+func (d *discord) send(ctx context.Context, message string) error {
 	payload := MessagePayload{
 		Content: message,
 	}

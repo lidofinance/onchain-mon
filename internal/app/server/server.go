@@ -71,7 +71,7 @@ func (a *App) RunHTTPServer(ctx context.Context, g *errgroup.Group, appPort uint
 func (a *App) RegisterHTTPRoutes(r chi.Router) {
 	a.RegisterMiddleware(r)
 
-	alertsH := alerts.New(a.Logger, a.Metrics, a.natsClient, a.env.NatsStreamName)
+	alertsH := alerts.New(a.Logger, a.Metrics, a.natsClient, a.env.FortaAlertsTopic)
 	r.Post("/alerts", alertsH.Handler)
 
 	a.RegisterInfraRoutes(r)

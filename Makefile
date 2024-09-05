@@ -45,6 +45,14 @@ swagger-gen:
 		--skip-support \
 		--skip-operations
 
+generate-proto:
+	@mkdir -p ./generated/proto
+	protoc --go_out=./generated/proto \
+	       --go-grpc_out=./generated/proto \
+           brief/proto/*.proto
+
 generate-databus-objects:
 	bin/jsonschema -p databus -o generated/databaus/block.dto.go ./brief/databus/block.dto.json
 .PHONY: generate-databus-objects
+
+.PHONY: generate-proto

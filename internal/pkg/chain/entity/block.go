@@ -29,12 +29,12 @@ type EthBlock struct {
 	Transactions          []string `json:"transactions"`
 }
 
-func (e *EthBlock) GetNumber() uint64 {
-	value, _ := strconv.ParseUint(e.Number, 0, 64)
+func (e *EthBlock) GetNumber() int64 {
+	value, _ := strconv.ParseInt(e.Number, 0, 64)
 	return value
 }
 
-func (e *EthBlock) GetTimestamp() uint64 {
-	value, _ := strconv.ParseUint(e.Timestamp, 0, 32)
+func (e *EthBlock) GetTimestamp() int64 {
+	value, _ := strconv.ParseInt(e.Timestamp, 0, 32)
 	return value
 }

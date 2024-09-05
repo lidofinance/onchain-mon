@@ -13,7 +13,7 @@ type BlockReceipt struct {
 	Logs              []Log  `json:"logs"`
 	LogsBloom         string `json:"logsBloom"`
 	Status            string `json:"status"`
-	To                string `json:"to"`
+	To                string `json:"to,omitempty"`
 	TransactionHash   string `json:"transactionHash"`
 	TransactionIndex  string `json:"transactionIndex"`
 	Type              string `json:"type"`

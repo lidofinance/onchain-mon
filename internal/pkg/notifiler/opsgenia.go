@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -37,7 +38,33 @@ func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 	}
 }
 
-func (u *opsGenia) SendFinding(ctx context.Context, alert *models.Alert) error {
+func (u *opsGenia) SendFinding(ctx context.Context, alert *proto.Finding) error {
+	opsGeniaPriority := ""
+	switch alert.Severity {
+	case proto.Finding_CRITICAL:
+		opsGeniaPriority = "P2"
+	case proto.Finding_HIGH:
+		opsGeniaPriority = "P3"
+	}
+
+	// Send only P2 or P3 alerts
+	if opsGeniaPriority == "" {
+		return nil
+	}
+
+	message := fmt.Sprintf("%s\n\nAlertId:%s\nSource: %s", alert.Description, alert.GetAlertId(), u.source)
+
+	payload := AlertPayload{
+		Message:     alert.Name,
+		Description: message,
+		Alias:       alert.GetAlertId(),
+		Priority:    opsGeniaPriority,
+	}
+
+	return u.send(ctx, payload)
+}
+
+func (u *opsGenia) SendAlert(ctx context.Context, alert *models.Alert) error {
 	opsGeniaPriority := ""
 	switch alert.Severity {
 	case models.AlertSeverityCRITICAL:
@@ -60,6 +87,10 @@ func (u *opsGenia) SendFinding(ctx context.Context, alert *models.Alert) error {
 		Priority:    opsGeniaPriority,
 	}
 
+	return u.send(ctx, payload)
+}
+
+func (u *opsGenia) send(ctx context.Context, payload AlertPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("could not marshal OpsGenia payload: %w", err)

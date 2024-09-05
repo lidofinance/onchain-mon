@@ -101,7 +101,26 @@ services:
       - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
       - USE_FORTA_RPC_URL=false
       - NODE_ENV=production
+      - NATS_SERVER_URL=http://forta-nats:4222
+    depends_on:
+      - service-forta-json-rpc
+      - service-forta-nats
+    ports:
+      - '3001:3000'
+
+  service-l2-bridge-arbitrum:
+    container_name: l2-bridge-arbitrum
+    logging: *default-logging
+    image: monitoring/l2-bridge-arbitrum:latest
+    restart: unless-stopped
+    environment:
+      - APP_NAME=l2-bridge-arbitrum
+      - INSTANCE=forta-local-host
+      - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
+      - ARBITRUM_RPC_URL=https://arbitrum-one.blastapi.io/<you_api_ley>
+      - USE_FORTA_RPC_URL=false
+      - NODE_ENV=production
     depends_on:
       - service-forta-json-rpc
     ports:
-      - '3000:3000'
+      - '3002:3000'
