@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BlockDto",
+  "type": "object",
+  "properties": {
+    "number": {
+      "type": "integer"
+    },
+    "timestamp": {
+      "type": "integer"
+    },
+    "parentHash": {
+      "type": "string"
+    },
+    "hash": {
+      "type": "string"
+    },
+    "receipts": {
+      "title": "Receipts",
+      "type": "array",
+      "items": {
+        "title": "Receipt",
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          },
+          "logs": {
+            "title": "Logs",
+            "type": "array",
+            "items": {
+              "title": "Log",
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "topics": {
+                  "title": "Topics",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "data": {
+                  "type": "string"
+                },
+                "blockNumber": {
+                  "type": "integer"
+                },
+                "transactionHash": {
+                  "type": "string"
+                },
+                "transactionIndex": {
+                  "type": "integer"
+                },
+                "blockHash": {
+                  "type": "string"
+                },
+                "logIndex": {
+                  "type": "integer"
+                },
+                "removed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "address",
+                "topics",
+                "data",
+                "blockNumber",
+                "transactionHash",
+                "transactionIndex",
+                "blockHash",
+                "logIndex",
+                "removed"
+              ]
+            }
+          }
+        },
+        "required": ["logs"]
+      }
+    }
+  },
+  "required": ["number", "timestamp", "hash", "parentHash", "receipts"]
+}

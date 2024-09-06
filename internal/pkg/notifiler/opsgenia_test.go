@@ -75,7 +75,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				metrics:     metricsStore,
 				source:      `local`,
 			}
-			if err := u.SendFinding(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
+			if err := u.SendAlert(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

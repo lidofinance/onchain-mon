@@ -18,18 +18,18 @@ import (
 )
 
 type handler struct {
-	log        *slog.Logger
-	natsClient *nats.Conn
-	metrics    *metrics.Store
-	streamName string
+	log              *slog.Logger
+	natsClient       *nats.Conn
+	metrics          *metrics.Store
+	fortaAlertsTopic string
 }
 
-func New(log *slog.Logger, metricsStore *metrics.Store, natsClient *nats.Conn, streamName string) *handler {
+func New(log *slog.Logger, metricsStore *metrics.Store, natsClient *nats.Conn, fortaAlertsTopic string) *handler {
 	return &handler{
-		log:        log,
-		metrics:    metricsStore,
-		natsClient: natsClient,
-		streamName: streamName,
+		log:              log,
+		metrics:          metricsStore,
+		natsClient:       natsClient,
+		fortaAlertsTopic: fortaAlertsTopic,
 	}
 }
 
@@ -92,7 +92,7 @@ func (h *handler) Handler(w http.ResponseWriter, r *http.Request) {
 				h.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: h.natsClient.ConnectedUrl()}).Observe(duration)
 			}()
 
-			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.%s`, h.streamName, subQueue), bb); publishErr != nil {
+			if publishErr := h.natsClient.Publish(fmt.Sprintf(`%s.%s`, h.fortaAlertsTopic, subQueue), bb); publishErr != nil {
 				h.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 
 				h.log.Error(fmt.Sprintf("could not publish alert to JetStream: error: %v", publishErr))

@@ -3,13 +3,14 @@ package notifiler
 import (
 	"context"
 	"fmt"
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -31,9 +32,19 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 	}
 }
 
-func (u *telegram) SendFinding(ctx context.Context, alert *models.Alert) error {
+func (u *telegram) SendFinding(ctx context.Context, alert *proto.Finding) error {
+	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.GetAlertId(), u.source)
+
+	return u.send(ctx, message)
+}
+
+func (u *telegram) SendAlert(ctx context.Context, alert *models.Alert) error {
 	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, u.source)
 
+	return u.send(ctx, message)
+}
+
+func (u *telegram) send(ctx context.Context, message string) error {
 	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {

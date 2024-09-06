@@ -35,7 +35,6 @@ outdated-deps:
 	go list -u -m -json -mod=readonly all
 .PHONY: outdated-deps
 
-
 .PHONY: swagger-gen
 swagger-gen:
 	rm -rf generated/forta && \
@@ -45,3 +44,15 @@ swagger-gen:
 		--exclude-main \
 		--skip-support \
 		--skip-operations
+
+generate-proto:
+	@mkdir -p ./generated/proto
+	protoc --go_out=./generated/proto \
+	       --go-grpc_out=./generated/proto \
+           brief/proto/*.proto
+
+generate-databus-objects:
+	bin/jsonschema -p databus -o generated/databaus/block.dto.go ./brief/databus/block.dto.json
+.PHONY: generate-databus-objects
+
+.PHONY: generate-proto

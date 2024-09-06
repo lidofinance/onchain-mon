@@ -1,6 +1,8 @@
 package server
 
 import (
+	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
+	"github.com/lidofinance/finding-forwarder/internal/pkg/chain"
 	"net/http"
 	"time"
 
@@ -15,12 +17,13 @@ type Services struct {
 	ErrorsTelegram         notifiler.FindingSender
 	Discord                notifiler.FindingSender
 	OpsGenia               notifiler.FindingSender
+	ChainSrv               feeder.ChainSrv
 }
 
 func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 	transport := &http.Transport{
 		MaxIdleConns:          30,
-		MaxIdleConnsPerHost:   4,
+		MaxIdleConnsPerHost:   5,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
@@ -38,11 +41,14 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore, cfg.Source)
 	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
 
+	chainSrv := chain.NewChain(cfg.JsonRpcURL, httpClient, metricsStore)
+
 	return Services{
 		OnChainAlertsTelegram:  alertsTelegram,
 		OnChainUpdatesTelegram: updatesTelegram,
 		ErrorsTelegram:         errorsTelegram,
 		Discord:                discord,
 		OpsGenia:               opsGenia,
+		ChainSrv:               chainSrv,
 	}
 }

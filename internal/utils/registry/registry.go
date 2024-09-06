@@ -2,6 +2,7 @@ package registry
 
 import (
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
@@ -37,27 +38,52 @@ var CodeOwners = map[string]string{
 }
 
 type AlertMapping = map[string]bool
+type FindingMapping = map[proto.Finding_Severity]bool
 
-var OnChainErrors = AlertMapping{
+var AlertOnChainErrors = AlertMapping{
 	models.AlertSeverityUNKNOWN: true,
 }
 
-var OnChainUpdates = AlertMapping{
+var AlertOnChainUpdates = AlertMapping{
 	models.AlertSeverityINFO:   true,
 	models.AlertSeverityLOW:    true,
 	models.AlertSeverityMEDIUM: true,
 }
 
-var OnChainAlerts = AlertMapping{
+var AlertOnChainAlerts = AlertMapping{
 	models.AlertSeverityHIGH:     true,
 	models.AlertSeverityCRITICAL: true,
 }
 
-var FallBackAlerts = AlertMapping{
+var AlertFallBackAlerts = AlertMapping{
 	models.AlertSeverityUNKNOWN:  true,
 	models.AlertSeverityINFO:     true,
 	models.AlertSeverityLOW:      true,
 	models.AlertSeverityMEDIUM:   true,
 	models.AlertSeverityHIGH:     true,
 	models.AlertSeverityCRITICAL: true,
+}
+
+var OnChainErrors = FindingMapping{
+	proto.Finding_UNKNOWN: true,
+}
+
+var OnChainUpdates = FindingMapping{
+	proto.Finding_INFO:   true,
+	proto.Finding_LOW:    true,
+	proto.Finding_MEDIUM: true,
+}
+
+var OnChainAlerts = FindingMapping{
+	proto.Finding_HIGH:     true,
+	proto.Finding_CRITICAL: true,
+}
+
+var FallBackAlerts = FindingMapping{
+	proto.Finding_UNKNOWN:  true,
+	proto.Finding_INFO:     true,
+	proto.Finding_LOW:      true,
+	proto.Finding_MEDIUM:   true,
+	proto.Finding_HIGH:     true,
+	proto.Finding_CRITICAL: true,
 }

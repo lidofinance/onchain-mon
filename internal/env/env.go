@@ -27,8 +27,13 @@ type AppConfig struct {
 	DiscordWebHookURL     string
 
 	NatsDefaultURL string
-	NatsStreamName string
 	MetricsPrefix  string
+
+	JsonRpcURL string
+
+	BlockTopic       string
+	FindingTopic     string
+	FortaAlertsTopic string
 }
 
 var (
@@ -62,6 +67,10 @@ func Read(configPath string) (*Config, error) {
 
 		var re = regexp.MustCompile(`[ -]`)
 
+		blocksTopic := "blocks.mainnet.l1"
+		findingTopic := "findings.nats"
+		fortaAlertsTopic := "alerts.forta"
+
 		cfg = Config{
 			AppConfig: AppConfig{
 				Name:      viper.GetString("APP_NAME"),
@@ -80,8 +89,12 @@ func Read(configPath string) (*Config, error) {
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
 
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
-				NatsStreamName: "FINDINGS",
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
+				JsonRpcURL:     viper.GetString("JSON_RPC_URL"),
+
+				BlockTopic:       blocksTopic,
+				FindingTopic:     findingTopic,
+				FortaAlertsTopic: fortaAlertsTopic,
 			},
 		}
 	})
