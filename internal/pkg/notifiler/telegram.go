@@ -45,7 +45,7 @@ func (u *telegram) SendAlert(ctx context.Context, alert *models.Alert) error {
 }
 
 func (u *telegram) send(ctx context.Context, message string) error {
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
+	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s&parse_mode=markdown", u.botToken, u.chatID, url.QueryEscape(message))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("could not create telegram request: %w", err)
