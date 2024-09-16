@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
+
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,6 +24,7 @@ import (
 	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
 	"github.com/lidofinance/finding-forwarder/internal/env"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
+	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
 func main() {
