@@ -20,7 +20,7 @@ func NewRedisClient(ctx context.Context, addr string, log *slog.Logger) (*redis.
 	onceDefaultClient.Do(func() {
 		rdb = redis.NewClient(&redis.Options{
 			Addr:            addr,
-			DB:              1,
+			DB:              2,
 			MaxRetries:      5,
 			MinRetryBackoff: 500 * time.Millisecond,
 			MaxRetryBackoff: 5 * time.Second,
