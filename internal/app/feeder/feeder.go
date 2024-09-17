@@ -108,7 +108,11 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				}
 
 				prevHashBlock = block.Result.Hash
-				if _, publishErr := w.js.PublishAsync(w.topic, payload, jetstream.WithMsgID(blockDto.Hash)); publishErr != nil {
+				if _, publishErr := w.js.PublishAsync(w.topic, payload,
+					jetstream.WithMsgID(blockDto.Hash),
+					jetstream.WithRetryAttempts(5),
+					jetstream.WithRetryWait(250*time.Millisecond),
+				); publishErr != nil {
 					w.metrics.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 					w.log.Error(fmt.Sprintf("could not publish block %d to JetStream: error: %v", blockDto.Number, publishErr))
 					continue

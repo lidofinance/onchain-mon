@@ -34,6 +34,9 @@ type AppConfig struct {
 	BlockTopic       string
 	FindingTopic     string
 	FortaAlertsTopic string
+
+	RedisURL   string
+	QuorumSize uint
 }
 
 var (
@@ -95,6 +98,9 @@ func Read(configPath string) (*Config, error) {
 				BlockTopic:       blocksTopic,
 				FindingTopic:     findingTopic,
 				FortaAlertsTopic: fortaAlertsTopic,
+
+				RedisURL:   viper.GetString("REDIS_ADDRESS"),
+				QuorumSize: viper.GetUint("QUORUM_SIZE"),
 			},
 		}
 	})

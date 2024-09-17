@@ -14,6 +14,7 @@ type Store struct {
 	PublishedAlerts *prometheus.CounterVec
 	PublishedBlocks *prometheus.CounterVec
 	SentAlerts      *prometheus.CounterVec
+	RedisErrors     prometheus.Counter
 	SummaryHandlers *prometheus.HistogramVec
 }
 
@@ -50,6 +51,10 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			Name: fmt.Sprintf("%s_finding_sent_total", prefix),
 			Help: "The total number of set findings",
 		}, []string{Channel, Status}),
+		RedisErrors: promauto.NewCounter(prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_redis_error_total", prefix),
+			Help: "The total number of redis errors",
+		}),
 		SummaryHandlers: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_request_processing_seconds", prefix),
 			Help:    "Time spent processing request to notification channel",
@@ -62,6 +67,7 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 		store.PublishedAlerts,
 		store.PublishedBlocks,
 		store.SentAlerts,
+		store.RedisErrors,
 		store.SummaryHandlers,
 	)
 

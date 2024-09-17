@@ -22,6 +22,7 @@ import (
 	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
+	"github.com/lidofinance/finding-forwarder/internal/connectors/redis"
 	"github.com/lidofinance/finding-forwarder/internal/env"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
@@ -40,20 +41,27 @@ func main() {
 
 	log := logger.New(&cfg.AppConfig)
 
+	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, log)
+	if err != nil {
+		log.Error(`create redis client error: `, err.Error())
+		return
+	}
+	defer rds.Close()
+
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
 		fmt.Println("Could not connect to nats error:", natsErr.Error())
 		return
 	}
 	defer natsClient.Close()
+	log.Info("Nats connected")
 
 	js, jetStreamErr := jetstream.New(natsClient)
 	if jetStreamErr != nil {
 		fmt.Println("Could not connect to jetStream error:", jetStreamErr.Error())
 		return
 	}
-
-	log.Info(fmt.Sprintf(`started %s worker`, cfg.AppConfig.Name))
+	log.Info("Nats jetStream connected")
 
 	r := chi.NewRouter()
 	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
@@ -79,7 +87,13 @@ func main() {
 		Subjects: []string{
 			protocolNatsSubject,
 		},
+		MaxMsgSize: 1 * 1024 * 1024,
 	})
+	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		fmt.Printf("could not create %s stream error: %v\n", natsStreamName, err)
+		return
+	}
+	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", natsStreamName))
 
 	fortaStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:    fortaStreamName,
@@ -89,12 +103,13 @@ func main() {
 			protocolFortaSubject,
 			fallbackFortaSubject,
 		},
+		MaxMsgSize: 1 * 1024 * 1024,
 	})
-
 	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
-		fmt.Printf("could not create %s stream error: %v\n", natsStreamName, err)
+		fmt.Printf("could not create %s stream error: %v\n", fortaStreamName, err)
 		return
 	}
+	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", fortaStreamName))
 
 	const (
 		Telegram = `Telegram`
@@ -104,6 +119,8 @@ func main() {
 
 	protocolWorker := worker.NewFindingWorker(
 		protocolNatsSubject,
+		cfg.AppConfig.QuorumSize,
+		rds,
 		natStream, log, metricsStore,
 		worker.WithFindingConsumer(services.OnChainAlertsTelegram, `OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
 		worker.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
@@ -150,6 +167,8 @@ func main() {
 	feederWrk.Run(gCtx, g)
 
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
+
+	log.Info(fmt.Sprintf(`Started %s worker`, cfg.AppConfig.Name))
 
 	if err := g.Wait(); err != nil {
 		log.Error(err.Error())
