@@ -192,7 +192,11 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 				if finding.Severity == proto.Finding_UNKNOWN {
 					if sendErr := consumer.notifiler.SendFinding(ctx, finding); sendErr != nil {
-						w.log.Error(fmt.Sprintf(`Could not send finding: %v`, sendErr))
+						w.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr),
+							slog.With(slog.Attr{
+								Key:   "alertID",
+								Value: slog.StringValue(finding.AlertId),
+							}))
 						w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
 						w.nackMessage(msg)
 						return
@@ -271,7 +275,10 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 						if readyToSend {
 							if sendErr := consumer.notifiler.SendFinding(ctx, finding); sendErr != nil {
-								w.log.Error(fmt.Sprintf(`Could not send finding: %v`, sendErr))
+								w.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr), slog.With(slog.Attr{
+									Key:   "alertID",
+									Value: slog.StringValue(finding.AlertId),
+								}))
 
 								count, err := w.redis.Decr(ctx, countKey).Result()
 								if err != nil {
@@ -388,7 +395,10 @@ func (w *alertWorker) Run(ctx context.Context, g *errgroup.Group) error {
 				}
 
 				if sendErr := consumer.notifiler.SendAlert(ctx, alert); sendErr != nil {
-					w.log.Error(fmt.Sprintf(`Could not send finding: %v`, sendErr))
+					w.log.Error(fmt.Sprintf(`Could not send forta-finding: %v`, sendErr), slog.With(slog.Attr{
+						Key:   "alertID",
+						Value: slog.StringValue(alert.AlertID),
+					}))
 					w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
 					w.nackMessage(msg)
 					return
