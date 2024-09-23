@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	slogchi "github.com/samber/slog-chi"
 	"log/slog"
 	"net/http"
 	"time"
@@ -12,13 +11,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	slogchi "github.com/samber/slog-chi"
+
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/env"
 	"github.com/lidofinance/finding-forwarder/internal/http/handlers/alerts"
 	"github.com/lidofinance/finding-forwarder/internal/http/handlers/health"
-	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (

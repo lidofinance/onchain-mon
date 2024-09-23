@@ -19,7 +19,7 @@ import (
 // swagger:model BotMetric
 type BotMetric struct {
 
-	// bot Id
+	// bot ID
 	// Example: 0x17381ae942ee1fe141d0652e9dad7d001761552f906fb1684b2812603de31049
 	BotID string `json:"botId,omitempty"`
 

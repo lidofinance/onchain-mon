@@ -32,21 +32,24 @@ func NewChain(jsonRpcUrl string, httpClient *http.Client, metricsStore *metrics.
 }
 
 func (c *chain) GetLatestBlock(ctx context.Context) (*entity.RpcResponse[entity.EthBlock], error) {
-	return doRpcRequest[entity.EthBlock](ctx, "eth_getBlockByNumber", []interface{}{"latest", false}, c.httpClient, c.metrics, c.jsonRpcUrl)
+	return doRpcRequest[entity.EthBlock](ctx, "eth_getBlockByNumber", []any{"latest", false}, c.httpClient, c.metrics, c.jsonRpcUrl)
 }
 
 func (c *chain) GetBlockReceipts(ctx context.Context, blockHash string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
-	return doRpcRequest[[]entity.BlockReceipt](ctx, "eth_getBlockReceipts", []interface{}{blockHash}, c.httpClient, c.metrics, c.jsonRpcUrl)
+	return doRpcRequest[[]entity.BlockReceipt](ctx, "eth_getBlockReceipts", []any{blockHash}, c.httpClient, c.metrics, c.jsonRpcUrl)
 }
 
-func doRpcRequest[T any](ctx context.Context, method string, params []interface{}, httpClient *http.Client, m *metrics.Store, jsonRpcUrl string) (*entity.RpcResponse[T], error) {
+func doRpcRequest[T any](
+	ctx context.Context, method string, params []any,
+	httpClient *http.Client, m *metrics.Store, jsonRpcUrl string,
+) (*entity.RpcResponse[T], error) {
 	return retry.DoWithData(
 		func() (*entity.RpcResponse[T], error) {
 			rpcRequest := entity.RpcRequest{
 				JsonRpc: "2.0",
 				Method:  method,
 				Params:  params,
-				Id:      uuid.New().String(),
+				ID:      uuid.New().String(),
 			}
 
 			payload, marshaErr := json.Marshal(rpcRequest)

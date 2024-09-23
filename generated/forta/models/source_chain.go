@@ -17,7 +17,7 @@ import (
 // swagger:model SourceChain
 type SourceChain struct {
 
-	// chain Id
+	// chain ID
 	ChainID int64 `json:"chainId,omitempty"`
 }
 

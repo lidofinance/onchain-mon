@@ -1,13 +1,13 @@
 package server
 
 import (
-	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
-	"github.com/lidofinance/finding-forwarder/internal/pkg/chain"
 	"net/http"
 	"time"
 
+	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/finding-forwarder/internal/pkg/chain"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
 )
 

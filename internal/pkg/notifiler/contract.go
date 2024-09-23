@@ -2,6 +2,7 @@ package notifiler
 
 import (
 	"context"
+
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/generated/proto"
 )

@@ -3,14 +3,14 @@ package notifiler
 import (
 	"context"
 	"fmt"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -45,6 +45,7 @@ func (u *telegram) SendAlert(ctx context.Context, alert *models.Alert) error {
 }
 
 func (u *telegram) send(ctx context.Context, message string) error {
+	//nolint
 	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s&parse_mode=markdown", u.botToken, u.chatID, url.QueryEscape(message))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {

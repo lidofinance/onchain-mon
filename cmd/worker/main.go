@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,6 +28,8 @@ import (
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
+const maxMsgSize = 3 * 1024 * 1024 // 3 Mb
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	defer stop()
@@ -43,14 +45,14 @@ func main() {
 
 	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, log)
 	if err != nil {
-		log.Error(`create redis client error: `, err.Error())
+		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
 		return
 	}
 	defer rds.Close()
 
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
-		fmt.Println("Could not connect to nats error:", natsErr.Error())
+		log.Error(fmt.Sprintf(`Could not connect to nats error: %v`, err))
 		return
 	}
 	defer natsClient.Close()
@@ -87,7 +89,7 @@ func main() {
 		Subjects: []string{
 			protocolNatsSubject,
 		},
-		MaxMsgSize: 1 * 1024 * 1024,
+		MaxMsgSize: maxMsgSize,
 	})
 	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
 		fmt.Printf("could not create %s stream error: %v\n", natsStreamName, err)
@@ -103,7 +105,7 @@ func main() {
 			protocolFortaSubject,
 			fallbackFortaSubject,
 		},
-		MaxMsgSize: 1 * 1024 * 1024,
+		MaxMsgSize: maxMsgSize,
 	})
 	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
 		fmt.Printf("could not create %s stream error: %v\n", fortaStreamName, err)
@@ -117,11 +119,12 @@ func main() {
 		OpsGenie = `OpsGenie`
 	)
 
+	const LruSize = 15
+	cache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*2)
 	protocolWorker := worker.NewFindingWorker(
-		protocolNatsSubject,
-		cfg.AppConfig.QuorumSize,
-		rds,
-		natStream, log, metricsStore,
+		log, metricsStore, cache,
+		rds, natStream,
+		protocolNatsSubject, cfg.AppConfig.QuorumSize,
 		worker.WithFindingConsumer(services.OnChainAlertsTelegram, `OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
 		worker.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
 		worker.WithFindingConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
@@ -130,8 +133,9 @@ func main() {
 	)
 
 	protocolFortaWorker := worker.NewAlertWorker(
+		log, metricsStore,
+		fortaStream,
 		protocolFortaSubject,
-		fortaStream, log, metricsStore,
 		worker.WithAlertConsumer(services.OnChainAlertsTelegram, `Forta_OnChainAlerts_Telegram_Consumer`, registry.AlertOnChainAlerts, Telegram),
 		worker.WithAlertConsumer(services.OnChainUpdatesTelegram, `Forta_OnChainUpdates_Telegram_Consumer`, registry.AlertOnChainUpdates, Telegram),
 		worker.WithAlertConsumer(services.ErrorsTelegram, `Forta_Protocol_Errors_Telegram_Consumer`, registry.AlertOnChainErrors, Telegram),
@@ -140,12 +144,10 @@ func main() {
 	)
 
 	fallbackFortaWorker := worker.NewAlertWorker(
-		fallbackFortaSubject,
-		fortaStream, log, metricsStore,
+		log, metricsStore,
+		fortaStream, fallbackFortaSubject,
 		worker.WithAlertConsumer(services.Discord, `FortaFallback_Discord_Consumer`, registry.AlertFallBackAlerts, Discord),
 	)
-
-	feederWrk := feeder.New(log, services.ChainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
 
 	// Listen findings from Nats
 	if err := protocolWorker.Run(gCtx, g); err != nil {
@@ -164,6 +166,7 @@ func main() {
 		return
 	}
 
+	feederWrk := feeder.New(log, services.ChainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
 	feederWrk.Run(gCtx, g)
 
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)

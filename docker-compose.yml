@@ -1,4 +1,3 @@
-version: '3.8'
 x-logging: &default-logging
   options:
     max-size: "50m"
@@ -20,11 +19,12 @@ services:
       - "4222:4222"
       - "8222:8222"
     command: >
-      -js
+      -js -c /etc/nats/nats.conf
     environment:
       - JS_STORAGE_DIR=/data/jetstream
     volumes:
-      - ./nats/data:/data
+      - ./nats/jetstream:/data/jetstream
+      - ./nats/nats.conf:/etc/nats/nats.conf
 
   service-forta-json-rpc:
     container_name: forta-json-rpc
@@ -32,7 +32,7 @@ services:
     image: forta-network/forta-node:latest
     command: /forta-node json-rpc
     ports:
-      - 8545:8545
+      - "8545:8545"
     volumes:
       - ./forta-local-config.yml:/.forta/config.yml
     depends_on:
@@ -48,33 +48,6 @@ services:
     depends_on:
       - service-forta-nats
       - service-forta-json-rpc
-      - service-ethereum-steth
-
-  forwarder-server:
-    container_name: finding-forwarder-server
-    build: ./
-    restart: always
-    command:
-      - ./main
-    env_file:
-      - .env
-    environment:
-      - READ_ENV_FROM_SHELL=true
-      - ENV=${ENV}
-      - APP_NAME=${APP_NAME}
-      - PORT=${PORT}
-      - LOG_FORMAT=${LOG_FORMAT}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ERRORS_CHAT_ID=${TELEGRAM_ERRORS_CHAT_ID}
-      - TELEGRAM_UPDATES_CHAT_ID=${TELEGRAM_UPDATES_CHAT_ID}
-      - TELEGRAM_ALERTS_CHAT_ID=${TELEGRAM_ALERTS_CHAT_ID}
-      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
-      - BOT_CONTAINERS=${BOT_CONTAINERS}
-    ports:
-      - '8080:8080'
 
   forwarder-worker:
     container_name: finding-forwarder-worker
@@ -102,42 +75,106 @@ services:
       - REDIS_ADDRESS=${REDIS_ADDRESS}
       - QUORUM_SIZE=${QUORUM_SIZE}
     ports:
-      - '8081:8080'
+      - "8081:8080"
     depends_on:
       - redis
       - service-forta-nats
 
-  service-ethereum-steth:
-    container_name: ethereum-steth
-    logging: *default-logging
-    image: monitoring/steth:latest
-    restart: unless-stopped
+  forwarder-server:
+    container_name: finding-forwarder-server
+    build: ./
+    restart: always
+    command:
+      - ./main
+    env_file:
+      - .env
     environment:
-      - APP_NAME=ethereum-steth
-      - INSTANCE=forta-local-host
-      - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
-      - USE_FORTA_RPC_URL=false
-      - NODE_ENV=production
-      - NATS_SERVER_URL=http://forta-nats:4222
+      - READ_ENV_FROM_SHELL=true
+      - ENV=${ENV}
+      - APP_NAME=${APP_NAME}
+      - PORT=${PORT}
+      - LOG_FORMAT=${LOG_FORMAT}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ERRORS_CHAT_ID=${TELEGRAM_ERRORS_CHAT_ID}
+      - TELEGRAM_UPDATES_CHAT_ID=${TELEGRAM_UPDATES_CHAT_ID}
+      - TELEGRAM_ALERTS_CHAT_ID=${TELEGRAM_ALERTS_CHAT_ID}
+      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
+      - BOT_CONTAINERS=${BOT_CONTAINERS}
+      - REDIS_ADDRESS=${REDIS_ADDRESS}
+      - QUORUM_SIZE=${QUORUM_SIZE}
+    ports:
+      - "8082:8080"
     depends_on:
-      - service-forta-json-rpc
+      - redis
       - service-forta-nats
-    ports:
-      - '3001:3000'
 
-  service-l2-bridge-arbitrum:
-    container_name: l2-bridge-arbitrum
-    logging: *default-logging
-    image: monitoring/l2-bridge-arbitrum:latest
-    restart: unless-stopped
-    environment:
-      - APP_NAME=l2-bridge-arbitrum
-      - INSTANCE=forta-local-host
-      - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
-      - ARBITRUM_RPC_URL=https://arbitrum-one.blastapi.io/<you_api_ley>
-      - USE_FORTA_RPC_URL=false
-      - NODE_ENV=production
-    depends_on:
-      - service-forta-json-rpc
-    ports:
-      - '3002:3000'
+  #service-ethereum-steth:
+  #  container_name: ethereum-steth
+  #  logging: *default-logging
+  #  image: monitoring/steth:latest
+  #  restart: unless-stopped
+  #  environment:
+  #    - APP_NAME=ethereum-steth
+  #    - INSTANCE=forta-local-host
+  #    - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
+  #    - USE_FORTA_RPC_URL=false
+  #    - NODE_ENV=production
+  #    - NATS_SERVER_URL=http://forta-nats:4222
+  #  depends_on:
+  #    - service-forta-json-rpc
+  #    - service-forta-nats
+  #  ports:
+  #    - "3001:3000"
+
+  #service-l2-bridge-arbitrum:
+  #  container_name: l2-bridge-arbitrum
+  #  logging: *default-logging
+  #  image: monitoring/l2-bridge-arbitrum:latest
+  #  restart: unless-stopped
+  #  environment:
+  #    - APP_NAME=l2-bridge-arbitrum
+  #    - INSTANCE=forta-local-host
+  #    - ETHEREUM_RPC_URL=http://forta-json-rpc:8545
+  #    - ARBITRUM_RPC_URL=https://arbitrum-one.blastapi.io/<your_api_key>
+  #    - USE_FORTA_RPC_URL=false
+  #    - NODE_ENV=production
+  #  depends_on:
+  #    - service-forta-json-rpc
+  #  ports:
+  #    - "3002:3000"
+
+  #service-ethereum-steth-v2:
+  #  container_name: ethereum-steth-v2
+  #  logging: *default-logging
+  #  image: monitoring/steth-v2:latest
+  #  restart: unless-stopped
+  #  environment:
+  #    - APP_NAME=ethereum-steth-v2
+  #    - INSTANCE=forta-local-host
+  #    - ETHEREUM_RPC_URL=https://eth-mainnet.alchemyapi.io/v2/<your_key>
+  #    - NODE_ENV=production
+  #    - NATS_SERVER_URL=http://127.0.0.1:4222
+  #  depends_on:
+  #    - service-forta-nats
+  #  ports:
+  #    - "3002:3000"
+
+  #service-l2-bridge-arbitrum-v2:
+  #  container_name: l2-bridge-arbitrum-v2
+  #  logging: *default-logging
+  #  image: monitoring/l2-bridge-arbitrum-v2:latest
+  #  restart: unless-stopped
+  #  environment:
+  #    - APP_NAME=l2-bridge-arbitrum-v2
+  #    - INSTANCE=forta-local-host
+  #    - ETHEREUM_RPC_URL=https://eth-mainnet.alchemyapi.io/v2/<your_key>
+  #    - ARBITRUM_RPC_URL=https://arbitrum-one.blastapi.io/<your_key>
+  #    - NODE_ENV=production
+  #    - NATS_DEFAULT_URL=http://127.0.0.1:4222
+  #  depends_on:
+  #    - service-forta-nats
+  #  ports:
+  #    - "3003:3000"

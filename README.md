@@ -2,7 +2,7 @@
 Service forwards findings from forta-local-node to telegram, opsGenia and discord
 
  ## How to develop
- 1. Install go1.22.3+
+ 1. Install go1.23.1+
  2. cd root repository
  3. make tools
  4. make vendor
