@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	databus "github.com/lidofinance/finding-forwarder/generated/databaus"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	"github.com/lidofinance/finding-forwarder/internal/pkg/chain/entity"
-	"github.com/nats-io/nats.go/jetstream"
-	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"strconv"
 	"time"
+
+	"golang.org/x/sync/errgroup"
+
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/prometheus/client_golang/prometheus"
+
+	databus "github.com/lidofinance/finding-forwarder/generated/databaus"
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+	"github.com/lidofinance/finding-forwarder/internal/pkg/chain/entity"
 )
 
 type ChainSrv interface {
@@ -21,28 +24,30 @@ type ChainSrv interface {
 }
 
 type Feeder struct {
-	log      *slog.Logger
-	chainSrv ChainSrv
-	js       jetstream.JetStream
-	metrics  *metrics.Store
-	topic    string
+	log          *slog.Logger
+	chainSrv     ChainSrv
+	js           jetstream.JetStream
+	metricsStore *metrics.Store
+	topic        string
 }
 
-func New(log *slog.Logger, chainSrv ChainSrv, js jetstream.JetStream, metrics *metrics.Store, topic string) *Feeder {
+func New(log *slog.Logger, chainSrv ChainSrv, js jetstream.JetStream, metricsStore *metrics.Store, topic string) *Feeder {
 	return &Feeder{
-		log:      log,
-		chainSrv: chainSrv,
-		js:       js,
-		metrics:  metrics,
-		topic:    topic,
+		log:          log,
+		chainSrv:     chainSrv,
+		js:           js,
+		metricsStore: metricsStore,
+		topic:        topic,
 	}
 }
+
+const Per6Sec = 6 * time.Second
 
 func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 	prevHashBlock := ""
 
 	g.Go(func() error {
-		ticker := time.NewTicker(6 * time.Second)
+		ticker := time.NewTicker(Per6Sec)
 		defer ticker.Stop()
 
 		for {
@@ -52,7 +57,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 			case <-ticker.C:
 				block, err := w.chainSrv.GetLatestBlock(ctx)
 				if err != nil {
-					w.log.Error("GetLatestBlock error:", err.Error())
+					w.log.Error(fmt.Sprintf("GetLatestBlock error: %v", err))
 					continue
 				}
 
@@ -62,14 +67,16 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 
 				blockReceipts, err := w.chainSrv.GetBlockReceipts(ctx, block.Result.Hash)
 				if err != nil {
-					w.log.Error("GetBlockReceipts error:", err.Error())
+					w.log.Error(fmt.Sprintf("GetBlockReceipts error: %v", err))
 					continue
 				}
 
 				receipts := make([]databus.BlockDtoJsonReceiptsElem, 0, len(*blockReceipts.Result))
-				for _, receipt := range *blockReceipts.Result {
+				for i := range *blockReceipts.Result {
+					receipt := (*blockReceipts.Result)[i]
 					logs := make([]databus.BlockDtoJsonReceiptsElemLogsElem, 0, len(receipt.Logs))
-					for _, receiptLog := range receipt.Logs {
+					for j := range receipt.Logs {
+						receiptLog := receipt.Logs[j]
 						blockNumber, _ := strconv.ParseInt(receiptLog.BlockNumber, 0, 64)
 						logIndex, _ := strconv.ParseInt(receiptLog.LogIndex, 0, 64)
 						trxInd, _ := strconv.ParseInt(receiptLog.TransactionIndex, 0, 64)
@@ -107,19 +114,25 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
+				payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
+
 				prevHashBlock = block.Result.Hash
 				if _, publishErr := w.js.PublishAsync(w.topic, payload,
 					jetstream.WithMsgID(blockDto.Hash),
+					//nolint
 					jetstream.WithRetryAttempts(5),
+					//nolint
 					jetstream.WithRetryWait(250*time.Millisecond),
 				); publishErr != nil {
-					w.metrics.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-					w.log.Error(fmt.Sprintf("could not publish block %d to JetStream: error: %v", blockDto.Number, publishErr))
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+					w.log.Error(fmt.Sprintf("could not publish block %d to JetStream: error: %v, ", blockDto.Number, publishErr),
+						payloadSize,
+					)
 					continue
 				}
 
-				w.log.Info(fmt.Sprintf(`%d, %s`, blockDto.Number, blockDto.Hash))
-				w.metrics.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+				w.log.Info(fmt.Sprintf(`%d, %s`, blockDto.Number, blockDto.Hash), payloadSize)
+				w.metricsStore.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
 			}
 		}
 	})

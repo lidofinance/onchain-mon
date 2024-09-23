@@ -21,7 +21,7 @@ type AlertSourceEvent struct {
 	// Example: 0xe9cfda18f167de5cdd63c101e38ec0d4cb0a1c2dea80921ecc4405c2b010855f
 	AlertHash string `json:"alertHash,omitempty"`
 
-	// bot Id
+	// bot ID
 	// Example: 0x17381ae942ee1fe141d0652e9dad7d001761552f906fb1684b2812603de31049
 	BotID string `json:"botId,omitempty"`
 }

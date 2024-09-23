@@ -17,7 +17,7 @@ import (
 // swagger:model AlertBlock
 type AlertBlock struct {
 
-	// chain Id
+	// chain ID
 	// Example: 1337
 	ChainID uint64 `json:"chainId,omitempty"`
 

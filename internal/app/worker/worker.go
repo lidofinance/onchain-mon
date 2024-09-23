@@ -7,14 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"log/slog"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
+	"github.com/go-redis/redis/v8"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/generated/proto"
@@ -48,8 +48,9 @@ type worker struct {
 }
 
 type findingWorker struct {
-	quorum uint
-	redis  *redis.Client
+	quorum      uint64
+	redisClient *redis.Client
+	cache       *expirable.LRU[string, uint]
 	worker
 	carriers []findingCarrier
 }
@@ -71,6 +72,10 @@ const (
 	StatusNotSend Status = "not_send"
 	StatusSending Status = "sending"
 	StatusSent    Status = "sent"
+)
+
+const (
+	TTLMins5 = 5 * time.Minute
 )
 
 func WithFindingConsumer(
@@ -110,18 +115,22 @@ func WithAlertConsumer(
 }
 
 func NewFindingWorker(
-	filterSubject string,
-	quorum uint,
-	redis *redis.Client,
-	stream jetstream.Stream,
 	log *slog.Logger,
 	metricsStore *metrics.Store,
+	cache *expirable.LRU[string, uint],
+
+	redisClient *redis.Client,
+	stream jetstream.Stream,
+
+	filterSubject string,
+	quorum uint,
 
 	options ...FindingWorkerOptions,
 ) *findingWorker {
 	w := &findingWorker{
-		redis:  redis,
-		quorum: quorum,
+		redisClient: redisClient,
+		quorum:      uint64(quorum),
+		cache:       cache,
 		worker: worker{
 			filterSubject: filterSubject,
 			stream:        stream,
@@ -138,11 +147,12 @@ func NewFindingWorker(
 }
 
 func NewAlertWorker(
-	filterSubject string,
-
-	stream jetstream.Stream,
 	log *slog.Logger,
 	metricsStore *metrics.Store,
+
+	stream jetstream.Stream,
+
+	filterSubject string,
 
 	options ...AlertWorkerOptions,
 ) *alertWorker {
@@ -193,10 +203,10 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 				if finding.Severity == proto.Finding_UNKNOWN {
 					if sendErr := consumer.notifiler.SendFinding(ctx, finding); sendErr != nil {
 						w.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr),
-							slog.With(slog.Attr{
+							slog.Attr{
 								Key:   "alertID",
 								Value: slog.StringValue(finding.AlertId),
-							}))
+							})
 						w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
 						w.nackMessage(msg)
 						return
@@ -213,33 +223,50 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 				countKey := fmt.Sprintf(countTemplate, consumer.Name, key)
 				statusKey := fmt.Sprintf(statusTemplate, consumer.Name, key)
 
-				count, err := w.redis.Incr(ctx, countKey).Result()
-				if err != nil {
-					w.log.Error(fmt.Sprintf(`Could not increase key value: %v`, err))
-					w.metrics.RedisErrors.Inc()
-					w.nackMessage(msg)
-					return
-				}
+				var (
+					count uint64
+					err   error
+				)
 
-				// TODO add finding.blockNumber
-				w.log.InfoContext(ctx, fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, count))
-
-				if count == 1 {
-					if err := w.redis.Expire(ctx, countKey, 5*time.Minute).Err(); err != nil {
-						w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
+				if !w.cache.Contains(key) {
+					count, err = w.redisClient.Incr(ctx, countKey).Uint64()
+					if err != nil {
+						w.log.Error(fmt.Sprintf(`Could not increase key value: %v`, err))
 						w.metrics.RedisErrors.Inc()
+						w.nackMessage(msg)
+						return
+					}
 
-						if _, err := w.redis.Decr(ctx, countKey).Result(); err != nil {
+					if count == 1 {
+						if err := w.redisClient.Expire(ctx, countKey, TTLMins5).Err(); err != nil {
+							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
 							w.metrics.RedisErrors.Inc()
-							w.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
-						}
 
+							if _, err := w.redisClient.Decr(ctx, countKey).Result(); err != nil {
+								w.metrics.RedisErrors.Inc()
+								w.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
+							}
+
+							w.nackMessage(msg)
+							return
+						}
+					}
+
+					return
+				} else {
+					count, err = w.redisClient.Get(ctx, countKey).Uint64()
+					if err != nil {
+						w.log.Error(fmt.Sprintf(`Could not get key value: %v`, err))
+						w.metrics.RedisErrors.Inc()
 						w.nackMessage(msg)
 						return
 					}
 				}
 
-				if count >= int64(w.quorum) {
+				// TODO add finding.blockNumber
+				w.log.InfoContext(ctx, fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, count))
+
+				if count >= w.quorum {
 					status, err := w.GetStatus(ctx, statusKey)
 					if err != nil {
 						w.log.Error(fmt.Sprintf(`Could not get notification status: %v`, err))
@@ -250,7 +277,6 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 					if status == StatusSending {
 						w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusOk}).Inc()
-						w.ackMessage(msg)
 
 						w.log.Info(fmt.Sprintf("Another instance is sending finding: %s", finding.AlertId))
 						return
@@ -275,26 +301,28 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 						if readyToSend {
 							if sendErr := consumer.notifiler.SendFinding(ctx, finding); sendErr != nil {
-								w.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr), slog.With(slog.Attr{
+								w.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr), slog.Attr{
 									Key:   "alertID",
 									Value: slog.StringValue(finding.AlertId),
-								}))
+								})
 
-								count, err := w.redis.Decr(ctx, countKey).Result()
+								count, err := w.redisClient.Decr(ctx, countKey).Result()
 								if err != nil {
 									w.metrics.RedisErrors.Inc()
 									w.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
 								} else if count <= 0 {
-									if err = w.redis.Del(ctx, countKey).Err(); err != nil {
+									if err = w.redisClient.Del(ctx, countKey).Err(); err != nil {
 										w.metrics.RedisErrors.Inc()
 										w.log.Error(fmt.Sprintf(`Could not delete countKey %s: %v`, countKey, err))
 									}
 								}
 
-								if err = w.redis.Del(ctx, statusKey).Err(); err != nil {
+								if err = w.redisClient.Del(ctx, statusKey).Err(); err != nil {
 									w.metrics.RedisErrors.Inc()
 									w.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
 								}
+
+								w.cache.Remove(key)
 
 								w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
 								w.nackMessage(msg)
@@ -321,7 +349,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 							if err := w.SeNotificationStatus(ctx, key, StatusSent); err != nil {
 								w.metrics.RedisErrors.Inc()
-								w.log.Error(fmt.Sprintf(`Could not set notificaton StatusSent: %v`, err))
+								w.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
 							}
 						}
 					}
@@ -395,10 +423,10 @@ func (w *alertWorker) Run(ctx context.Context, g *errgroup.Group) error {
 				}
 
 				if sendErr := consumer.notifiler.SendAlert(ctx, alert); sendErr != nil {
-					w.log.Error(fmt.Sprintf(`Could not send forta-finding: %v`, sendErr), slog.With(slog.Attr{
+					w.log.Error(fmt.Sprintf(`Could not send forta-finding: %v`, sendErr), slog.Attr{
 						Key:   "alertID",
 						Value: slog.StringValue(alert.AlertID),
-					}))
+					})
 					w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
 					w.nackMessage(msg)
 					return
@@ -469,18 +497,18 @@ func computeSHA256Hash(data []byte) string {
 
 func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
 	luaScript := `
-        local count = tonumber(redis.call("GET", KEYS[1]))
+        local count = tonumber(redisClient.call("GET", KEYS[1]))
         if count and count >= tonumber(ARGV[1]) then
-            local status = redis.call("GET", KEYS[2])
+            local status = redisClient.call("GET", KEYS[2])
             if not status or status == ARGV[2] then
-                redis.call("SET", KEYS[2], ARGV[3])
+                redisClient.call("SET", KEYS[2], ARGV[3])
                 return 1
             end
         end
         return 0
     `
 
-	res, err := w.redis.Eval(ctx, luaScript, []string{countKey, statusKey}, w.quorum, string(StatusNotSend), string(StatusSent)).Result()
+	res, err := w.redisClient.Eval(ctx, luaScript, []string{countKey, statusKey}, w.quorum, string(StatusNotSend), string(StatusSent)).Result()
 	if err != nil {
 		return false, fmt.Errorf(`could not get notification_sent_status: %v`, err)
 	}
@@ -494,11 +522,11 @@ func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKe
 }
 
 func (w *findingWorker) SeNotificationStatus(ctx context.Context, statusKey string, status Status) error {
-	return w.redis.Set(ctx, statusKey, string(status), 5*time.Minute).Err()
+	return w.redisClient.Set(ctx, statusKey, string(status), TTLMins5).Err()
 }
 
 func (w *findingWorker) GetStatus(ctx context.Context, statusKey string) (Status, error) {
-	status, err := w.redis.Get(ctx, statusKey).Result()
+	status, err := w.redisClient.Get(ctx, statusKey).Result()
 	if errors.Is(err, redis.Nil) {
 		return StatusNotSend, nil
 	} else if err != nil {

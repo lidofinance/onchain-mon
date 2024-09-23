@@ -1,3 +1,18 @@
+## 23.09.2024
+1. Add lru for quorum
+2. Tun docker-compose-file 
+3. Upgrade GO 1.23.1
+4. Increased MaxMsgSize for Nats for 3Mb
+5. Lint project
+
+## 16.09.2024
+1. Added redis
+2. Added quorum powered by redis
+3. Added retry for sending message to Telegram, Discord, OpsGenia
+
+## 14.09.2024
+1. Added feeder
+
 ## 22.06.2024
 1. Added DevOps independent consumer
 2. Updated readme.md

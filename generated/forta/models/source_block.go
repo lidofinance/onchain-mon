@@ -17,7 +17,7 @@ import (
 // swagger:model SourceBlock
 type SourceBlock struct {
 
-	// chain Id
+	// chain ID
 	ChainID int64 `json:"chainId,omitempty"`
 
 	// hash

@@ -17,7 +17,7 @@ import (
 // swagger:model SourceTransaction
 type SourceTransaction struct {
 
-	// chain Id
+	// chain ID
 	ChainID int64 `json:"chainId,omitempty"`
 
 	// hash

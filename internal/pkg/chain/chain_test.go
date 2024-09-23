@@ -2,11 +2,13 @@ package chain
 
 import (
 	"context"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	"github.com/lidofinance/finding-forwarder/internal/env"
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
 func Test_chain_GetLatestBlock(t *testing.T) {

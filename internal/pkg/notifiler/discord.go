@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/forta/models"
+	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 

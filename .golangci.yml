@@ -73,7 +73,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - funlen
     - gochecknoinits
     - goconst
@@ -147,3 +147,4 @@ run:
     - internal/renameio # extracted from Go code
     - internal/robustio # extracted from Go code
     - mocks
+    - vendor

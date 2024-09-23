@@ -27,7 +27,7 @@ func NewRedisClient(ctx context.Context, addr string, log *slog.Logger) (*redis.
 			DialTimeout:     5 * time.Second,
 			ReadTimeout:     3 * time.Second,
 			WriteTimeout:    3 * time.Second,
-			OnConnect: func(ctx context.Context, _ *redis.Conn) error {
+			OnConnect: func(_ context.Context, _ *redis.Conn) error {
 				log.Info("Redis connected")
 				return nil
 			},
