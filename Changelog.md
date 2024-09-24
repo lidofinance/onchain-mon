@@ -1,3 +1,6 @@
+## 24.09.2024
+1. Fix sending network alerts though telegram
+
 ## 23.09.2024
 1. Add lru for quorum
 2. Tun docker-compose-file 

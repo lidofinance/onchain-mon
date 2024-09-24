@@ -35,18 +35,30 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 func (u *telegram) SendFinding(ctx context.Context, alert *proto.Finding) error {
 	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.GetAlertId(), u.source)
 
-	return u.send(ctx, message)
+	if alert.Severity != proto.Finding_UNKNOWN {
+		return u.send(ctx, message, true)
+	}
+
+	return u.send(ctx, message, false)
 }
 
 func (u *telegram) SendAlert(ctx context.Context, alert *models.Alert) error {
 	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, u.source)
 
-	return u.send(ctx, message)
+	if alert.Severity != models.AlertSeverityUNKNOWN {
+		return u.send(ctx, message, true)
+	}
+
+	return u.send(ctx, message, false)
 }
 
-func (u *telegram) send(ctx context.Context, message string) error {
+func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) error {
 	//nolint
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s&parse_mode=markdown", u.botToken, u.chatID, url.QueryEscape(message))
+	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
+	if useMarkdown {
+		requestURL += `&parse_mode=markdown`
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("could not create telegram request: %w", err)
