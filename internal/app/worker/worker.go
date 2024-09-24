@@ -228,6 +228,26 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					err   error
 				)
 
+				// TODO add finding.blockNumber
+				w.log.Info(fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, count),
+					slog.Attr{
+						Key:   `desc`,
+						Value: slog.StringValue(finding.Description),
+					},
+					slog.Attr{
+						Key:   `name`,
+						Value: slog.StringValue(finding.Name),
+					},
+					slog.Attr{
+						Key:   `alertId`,
+						Value: slog.StringValue(finding.AlertId),
+					},
+					slog.Attr{
+						Key:   `severity`,
+						Value: slog.StringValue(finding.Severity.String()),
+					},
+				)
+
 				if !w.cache.Contains(key) {
 					count, err = w.redisClient.Incr(ctx, countKey).Uint64()
 					if err != nil {
@@ -262,9 +282,6 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 						return
 					}
 				}
-
-				// TODO add finding.blockNumber
-				w.log.InfoContext(ctx, fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, count))
 
 				if count >= w.quorum {
 					status, err := w.GetStatus(ctx, statusKey)
