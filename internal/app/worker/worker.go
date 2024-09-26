@@ -75,7 +75,7 @@ const (
 )
 
 const (
-	TTLMins5 = 5 * time.Minute
+	TTLMins10 = 10 * time.Minute
 )
 
 func WithFindingConsumer(
@@ -228,8 +228,50 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					err   error
 				)
 
+				if !w.cache.Contains(key) {
+					w.cache.Add(key, uint(1))
+
+					count, err = w.redisClient.Incr(ctx, countKey).Uint64()
+					if err != nil {
+						w.log.Error(fmt.Sprintf(`Could not increase key value: %v`, err))
+						w.metrics.RedisErrors.Inc()
+						w.nackMessage(msg)
+						return
+					}
+
+					if count == 1 {
+						if err := w.redisClient.Expire(ctx, countKey, TTLMins10).Err(); err != nil {
+							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
+							w.metrics.RedisErrors.Inc()
+
+							if _, err := w.redisClient.Decr(ctx, countKey).Result(); err != nil {
+								w.metrics.RedisErrors.Inc()
+								w.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
+							}
+
+							w.nackMessage(msg)
+							return
+						}
+					}
+
+					return
+				} else {
+					v, _ := w.cache.Get(key)
+					w.cache.Add(key, v+1)
+
+					count, err = w.redisClient.Get(ctx, countKey).Uint64()
+					if err != nil {
+						w.log.Error(fmt.Sprintf(`Could not get key value: %v`, err))
+						w.metrics.RedisErrors.Inc()
+						w.nackMessage(msg)
+						return
+					}
+				}
+
+				touchTimes, _ := w.cache.Get(key)
+
 				// TODO add finding.blockNumber
-				w.log.Info(fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, count),
+				w.log.Info(fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, touchTimes),
 					slog.Attr{
 						Key:   `desc`,
 						Value: slog.StringValue(finding.Description),
@@ -248,39 +290,19 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					},
 				)
 
-				if !w.cache.Contains(key) {
-					count, err = w.redisClient.Incr(ctx, countKey).Uint64()
-					if err != nil {
-						w.log.Error(fmt.Sprintf(`Could not increase key value: %v`, err))
-						w.metrics.RedisErrors.Inc()
-						w.nackMessage(msg)
-						return
+				if count == 1 && touchTimes == 10 {
+					finding.Severity = proto.Finding_UNKNOWN
+					finding.Description += fmt.Sprintf("\n\nWarning: Could not collect quorum. Finding.Severity downgraded to UNKNOWN")
+
+					if sendErr := consumer.notifiler.SendFinding(ctx, finding); sendErr != nil {
+						w.log.Error(fmt.Sprintf(`Could not send bot-finding when did not collect quorum: %v`, sendErr), slog.Attr{
+							Key:   "alertID",
+							Value: slog.StringValue(finding.AlertId),
+						})
 					}
 
-					if count == 1 {
-						if err := w.redisClient.Expire(ctx, countKey, TTLMins5).Err(); err != nil {
-							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
-							w.metrics.RedisErrors.Inc()
-
-							if _, err := w.redisClient.Decr(ctx, countKey).Result(); err != nil {
-								w.metrics.RedisErrors.Inc()
-								w.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
-							}
-
-							w.nackMessage(msg)
-							return
-						}
-					}
-
+					w.ackMessage(msg)
 					return
-				} else {
-					count, err = w.redisClient.Get(ctx, countKey).Uint64()
-					if err != nil {
-						w.log.Error(fmt.Sprintf(`Could not get key value: %v`, err))
-						w.metrics.RedisErrors.Inc()
-						w.nackMessage(msg)
-						return
-					}
 				}
 
 				if count >= w.quorum {
@@ -303,6 +325,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 						w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusOk}).Inc()
 						w.ackMessage(msg)
 
+						w.cache.Remove(key)
 						w.log.Info(fmt.Sprintf("Another instance already sent finding: %s", finding.AlertId))
 						return
 					}
@@ -539,7 +562,7 @@ func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKe
 }
 
 func (w *findingWorker) SeNotificationStatus(ctx context.Context, statusKey string, status Status) error {
-	return w.redisClient.Set(ctx, statusKey, string(status), TTLMins5).Err()
+	return w.redisClient.Set(ctx, statusKey, string(status), TTLMins10).Err()
 }
 
 func (w *findingWorker) GetStatus(ctx context.Context, statusKey string) (Status, error) {
