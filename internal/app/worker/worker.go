@@ -228,8 +228,8 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					err   error
 				)
 
-				if !w.cache.Contains(key) {
-					w.cache.Add(key, uint(1))
+				if !w.cache.Contains(countKey) {
+					w.cache.Add(countKey, uint(1))
 
 					count, err = w.redisClient.Incr(ctx, countKey).Uint64()
 					if err != nil {
@@ -256,8 +256,8 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 					return
 				} else {
-					v, _ := w.cache.Get(key)
-					w.cache.Add(key, v+1)
+					v, _ := w.cache.Get(countKey)
+					w.cache.Add(countKey, v+1)
 
 					count, err = w.redisClient.Get(ctx, countKey).Uint64()
 					if err != nil {
@@ -268,7 +268,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					}
 				}
 
-				touchTimes, _ := w.cache.Get(key)
+				touchTimes, _ := w.cache.Get(countKey)
 
 				// TODO add finding.blockNumber
 				w.log.Info(fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, touchTimes),
@@ -290,7 +290,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					},
 				)
 
-				if count == 1 && touchTimes == 10 {
+				/*if count == 1 && touchTimes == 10 {
 					finding.Severity = proto.Finding_UNKNOWN
 					finding.Description += fmt.Sprintf("\n\nWarning: Could not collect quorum. Finding.Severity downgraded to UNKNOWN")
 
@@ -303,7 +303,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 					w.ackMessage(msg)
 					return
-				}
+				}*/
 
 				if count >= w.quorum {
 					status, err := w.GetStatus(ctx, statusKey)
@@ -325,7 +325,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 						w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusOk}).Inc()
 						w.ackMessage(msg)
 
-						w.cache.Remove(key)
+						w.cache.Remove(countKey)
 						w.log.Info(fmt.Sprintf("Another instance already sent finding: %s", finding.AlertId))
 						return
 					}
@@ -362,7 +362,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 									w.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
 								}
 
-								w.cache.Remove(key)
+								w.cache.Remove(countKey)
 
 								w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
 								w.nackMessage(msg)
