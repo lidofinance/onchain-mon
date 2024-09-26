@@ -290,7 +290,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					},
 				)
 
-				if count == 1 && touchTimes == 10 {
+				/*if count == 1 && touchTimes == 10 {
 					finding.Severity = proto.Finding_UNKNOWN
 					finding.Description += fmt.Sprintf("\n\nWarning: Could not collect quorum. Finding.Severity downgraded to UNKNOWN")
 
@@ -303,7 +303,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 					w.ackMessage(msg)
 					return
-				}
+				}*/
 
 				if count >= w.quorum {
 					status, err := w.GetStatus(ctx, statusKey)
