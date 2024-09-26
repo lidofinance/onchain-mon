@@ -537,11 +537,11 @@ func computeSHA256Hash(data []byte) string {
 
 func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
 	luaScript := `
-        local count = tonumber(redisClient.call("GET", KEYS[1]))
+        local count = tonumber(redis.call("GET", KEYS[1]))
         if count and count >= tonumber(ARGV[1]) then
-            local status = redisClient.call("GET", KEYS[2])
+            local status = redis.call("GET", KEYS[2])
             if not status or status == ARGV[2] then
-                redisClient.call("SET", KEYS[2], ARGV[3])
+                redis.call("SET", KEYS[2], ARGV[3])
                 return 1
             end
         end
