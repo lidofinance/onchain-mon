@@ -119,8 +119,8 @@ func main() {
 		OpsGenie = `OpsGenie`
 	)
 
-	const LruSize = 15
-	cache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*2)
+	const LruSize = 125
+	cache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*10)
 	protocolWorker := worker.NewFindingWorker(
 		log, metricsStore, cache,
 		rds, natStream,
