@@ -253,8 +253,6 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 							return
 						}
 					}
-
-					return
 				} else {
 					v, _ := w.cache.Get(countKey)
 					w.cache.Add(countKey, v+1)
