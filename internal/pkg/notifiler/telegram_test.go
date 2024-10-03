@@ -5,14 +5,22 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/databus"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-
 	"github.com/lidofinance/finding-forwarder/internal/env"
 )
+
+// Helper function to create pointers for strings
+func stringPtr(s string) *string {
+	return &s
+}
+
+// Helper function to create pointers for ints
+func intPtr(i int) *int {
+	return &i
+}
 
 func Test_SendFinfing(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
@@ -32,7 +40,7 @@ func Test_SendFinfing(t *testing.T) {
 	}
 	type args struct {
 		ctx   context.Context
-		alert models.Alert
+		alert *databus.FindingDtoJson
 	}
 	tests := []struct {
 		name    string
@@ -50,11 +58,24 @@ func Test_SendFinfing(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				alert: models.Alert{
-					Name:        `Telegram test alert`,
-					Description: `Telegram test alert`,
-					Severity:    models.AlertSeverityMEDIUM,
-					AlertID:     `telegram-chat-id`,
+				alert: &databus.FindingDtoJson{
+					Name: `ℹ️ Lido: Token rebased`,
+					Description: `
+Withdrawals info:
+ requests count:    4302
+ withdrawn stETH:   174541.1742
+ finalized stETH:   174541.1742 4302
+ unfinalized stETH: 0.0000   0
+ claimed ether:     142576.2152 853
+ unclaimed ether:   31964.9590   3449
+`,
+					Severity:       databus.SeverityLow,
+					AlertId:        `LIDO-TOKEN-REBASED`,
+					BlockTimestamp: intPtr(1727965236),
+					BlockNumber:    intPtr(20884540),
+					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BotName:        `FF-telegram-unit-test`,
+					Team:           `Protocol`,
 				},
 			},
 			wantErr: false,
@@ -69,7 +90,7 @@ func Test_SendFinfing(t *testing.T) {
 				metrics:    metricsStore,
 				source:     `local`,
 			}
-			if err := u.SendAlert(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
+			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

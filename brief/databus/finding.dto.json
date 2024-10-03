@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Finding",
+  "type": "object",
+  "properties": {
+    "severity": {
+      "$ref": "#/definitions/Severity"
+    },
+    "alertId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "uniqueKey": {
+      "type": "string"
+    },
+    "blockTimestamp": {
+      "type": "integer"
+    },
+    "blockNumber": {
+      "type": "integer"
+    },
+    "txHash": {
+      "type": "string"
+    },
+    "botName": {
+      "type": "string"
+    },
+    "team": {
+      "type": "string"
+    }
+  },
+  "required": ["severity", "alertId", "name", "description", "botName", "team"],
+  "definitions": {
+    "Severity": {
+      "type": "string",
+      "enum": ["Unknown", "Info", "Low", "Medium", "High", "Critical"]
+    }
+  }
+}

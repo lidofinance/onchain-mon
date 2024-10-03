@@ -13,7 +13,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
-	databus "github.com/lidofinance/finding-forwarder/generated/databaus"
+	"github.com/lidofinance/finding-forwarder/generated/databus"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/chain/entity"
 )
