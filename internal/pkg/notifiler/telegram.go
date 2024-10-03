@@ -9,8 +9,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/finding-forwarder/generated/databus"
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -32,10 +32,10 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 	}
 }
 
-func (u *telegram) SendFinding(ctx context.Context, alert *proto.Finding) error {
-	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.GetAlertId(), u.source)
+func (u *telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+	message := fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, u.source))
 
-	if alert.Severity != proto.Finding_UNKNOWN {
+	if alert.Severity != databus.SeverityUnknown {
 		return u.send(ctx, message, true)
 	}
 
@@ -53,7 +53,7 @@ func (u *telegram) SendAlert(ctx context.Context, alert *models.Alert) error {
 }
 
 func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	//nolint
+	
 	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	if useMarkdown {
 		requestURL += `&parse_mode=markdown`

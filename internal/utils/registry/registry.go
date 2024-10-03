@@ -1,8 +1,8 @@
 package registry
 
 import (
+	"github.com/lidofinance/finding-forwarder/generated/databus"
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
@@ -38,7 +38,7 @@ var CodeOwners = map[string]string{
 }
 
 type AlertMapping = map[string]bool
-type FindingMapping = map[proto.Finding_Severity]bool
+type FindingMapping = map[databus.Severity]bool
 
 var AlertOnChainErrors = AlertMapping{
 	models.AlertSeverityUNKNOWN: true,
@@ -65,25 +65,25 @@ var AlertFallBackAlerts = AlertMapping{
 }
 
 var OnChainErrors = FindingMapping{
-	proto.Finding_UNKNOWN: true,
+	databus.SeverityUnknown: true,
 }
 
 var OnChainUpdates = FindingMapping{
-	proto.Finding_INFO:   true,
-	proto.Finding_LOW:    true,
-	proto.Finding_MEDIUM: true,
+	databus.SeverityInfo:   true,
+	databus.SeverityLow:    true,
+	databus.SeverityMedium: true,
 }
 
 var OnChainAlerts = FindingMapping{
-	proto.Finding_HIGH:     true,
-	proto.Finding_CRITICAL: true,
+	databus.SeverityHigh:     true,
+	databus.SeverityCritical: true,
 }
 
 var FallBackAlerts = FindingMapping{
-	proto.Finding_UNKNOWN:  true,
-	proto.Finding_INFO:     true,
-	proto.Finding_LOW:      true,
-	proto.Finding_MEDIUM:   true,
-	proto.Finding_HIGH:     true,
-	proto.Finding_CRITICAL: true,
+	databus.SeverityUnknown:  true,
+	databus.SeverityInfo:     true,
+	databus.SeverityLow:      true,
+	databus.SeverityMedium:   true,
+	databus.SeverityHigh:     true,
+	databus.SeverityCritical: true,
 }

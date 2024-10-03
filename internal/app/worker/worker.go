@@ -16,8 +16,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/lidofinance/finding-forwarder/generated/databus"
 	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-	"github.com/lidofinance/finding-forwarder/generated/proto"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
@@ -183,7 +183,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 		consumers = append(consumers, Consumer{
 			name: consumer.Name,
 			handler: func(msg jetstream.Msg) {
-				finding := new(proto.Finding)
+				finding := new(databus.FindingDtoJson)
 
 				if alertErr := json.Unmarshal(msg.Data(), finding); alertErr != nil {
 					w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
@@ -200,7 +200,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					return
 				}
 
-				if finding.Severity == proto.Finding_UNKNOWN {
+				if finding.Severity == databus.SeverityUnknown {
 					if sendErr := consumer.notifiler.SendFinding(ctx, finding); sendErr != nil {
 						w.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr),
 							slog.Attr{
@@ -268,8 +268,13 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 
 				touchTimes, _ := w.cache.Get(countKey)
 
+				msgInfo := fmt.Sprintf("%s: AlertId %s read %d times. %s...%s", consumer.Name, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:])
+				if finding.BlockNumber != nil {
+					msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
+				}
+
 				// TODO add finding.blockNumber
-				w.log.Info(fmt.Sprintf("Consumer: %s AlertId %s read %d times", consumer.Name, finding.AlertId, touchTimes),
+				w.log.Info(msgInfo,
 					slog.Attr{
 						Key:   `desc`,
 						Value: slog.StringValue(finding.Description),
@@ -284,7 +289,11 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					},
 					slog.Attr{
 						Key:   `severity`,
-						Value: slog.StringValue(finding.Severity.String()),
+						Value: slog.StringValue(string(finding.Severity)),
+					},
+					slog.Attr{
+						Key:   `hash`,
+						Value: slog.StringValue(key),
 					},
 				)
 

@@ -52,7 +52,10 @@ generate-proto:
            brief/proto/*.proto
 
 generate-databus-objects:
-	bin/jsonschema -p databus -o generated/databaus/block.dto.go ./brief/databus/block.dto.json
+	for file in ./brief/databus/*.dto.json; do \
+		base_name=$$(basename $$file .dto.json); \
+		bin/jsonschema -p databus -o generated/databus/$$base_name.dto.go $$file; \
+	done
 .PHONY: generate-databus-objects
 
 .PHONY: generate-proto
