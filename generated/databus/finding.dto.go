@@ -24,6 +24,9 @@ type FindingDtoJson struct {
 	// Description corresponds to the JSON schema field "description".
 	Description string `json:"description" yaml:"description" mapstructure:"description"`
 
+	// FindingBotTimestamp corresponds to the JSON schema field "findingBotTimestamp".
+	FindingBotTimestamp *int `json:"findingBotTimestamp,omitempty" yaml:"findingBotTimestamp,omitempty" mapstructure:"findingBotTimestamp,omitempty"`
+
 	// Name corresponds to the JSON schema field "name".
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 

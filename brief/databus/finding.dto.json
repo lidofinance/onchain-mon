@@ -24,6 +24,9 @@
     "blockNumber": {
       "type": "integer"
     },
+    "findingBotTimestamp": {
+      "type": "integer"
+    },
     "txHash": {
       "type": "string"
     },
