@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/lidofinance/finding-forwarder/internal/app/server"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
+	"github.com/lidofinance/finding-forwarder/internal/app/server"
 	"github.com/lidofinance/finding-forwarder/internal/app/worker"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"

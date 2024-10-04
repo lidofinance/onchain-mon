@@ -1,7 +1,14 @@
 package notifiler
 
 import (
+	"context"
+	"net/http"
 	"testing"
+
+	"github.com/lidofinance/finding-forwarder/generated/databus"
+	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
+	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const NameCritical = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
@@ -14,7 +21,7 @@ ETH: 19811516
 ZkSync: 33308621`
 
 func Test_opsGenia_SendMessage(t *testing.T) {
-	/*cfg, envErr := env.Read("../../../.env")
+	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
 		return
@@ -30,7 +37,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 	}
 	type args struct {
 		ctx   context.Context
-		alert models.Alert
+		alert *databus.FindingDtoJson
 	}
 	tests := []struct {
 		name    string
@@ -47,11 +54,16 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				alert: models.Alert{
-					Name:        NameCritical,
-					Description: DescriptionCritical,
-					AlertID:     `TEST-OPSGENIA-ALERT-ID`,
-					Severity:    models.AlertSeverityHIGH,
+				alert: &databus.FindingDtoJson{
+					Name:           NameCritical,
+					Description:    DescriptionCritical,
+					Severity:       databus.SeverityHigh,
+					AlertId:        `TEST-CRITICAL-ID`,
+					BlockTimestamp: intPtr(1727965236),
+					BlockNumber:    intPtr(20884540),
+					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BotName:        `Test`,
+					Team:           `Protocol`,
 				},
 			},
 			wantErr: false,
@@ -65,9 +77,9 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				metrics:     metricsStore,
 				source:      `local`,
 			}
-			if err := u.SendAlert(tt.args.ctx, &tt.args.alert); (err != nil) != tt.wantErr {
+			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
-	}*/
+	}
 }
