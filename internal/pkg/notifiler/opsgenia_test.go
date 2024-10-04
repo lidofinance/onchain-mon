@@ -1,17 +1,7 @@
 package notifiler
 
 import (
-	"context"
-	"net/http"
 	"testing"
-
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
-
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-
-	"github.com/lidofinance/finding-forwarder/internal/env"
 )
 
 const NameCritical = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
@@ -24,7 +14,7 @@ ETH: 19811516
 ZkSync: 33308621`
 
 func Test_opsGenia_SendMessage(t *testing.T) {
-	cfg, envErr := env.Read("../../../.env")
+	/*cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
 		return
@@ -79,5 +69,5 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
-	}
+	}*/
 }

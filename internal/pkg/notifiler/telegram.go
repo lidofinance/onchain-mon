@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -32,29 +31,32 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 	}
 }
 
+const maxTelegramMessageLength = 4096
+const warningTelegramMessage = "Warn: Msg >=4096, pls review description message"
+
 func (u *telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
-	message := fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, u.source))
+	message := TruncateMessageWithAlertID(
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, u.source)),
+		maxTelegramMessageLength,
+		warningTelegramMessage,
+	)
 
 	if alert.Severity != databus.SeverityUnknown {
-		return u.send(ctx, message, true)
-	}
+		m := EscapeMarkdownV1(message)
 
-	return u.send(ctx, message, false)
-}
+		if sendErr := u.send(ctx, m, true); sendErr != nil {
+			message += "\n\nWarning: Could not send msg as markdown"
+			return u.send(ctx, message, false)
+		}
 
-func (u *telegram) SendAlert(ctx context.Context, alert *models.Alert) error {
-	message := fmt.Sprintf("%s\n\n%s\n\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, u.source)
-
-	if alert.Severity != models.AlertSeverityUNKNOWN {
-		return u.send(ctx, message, true)
+		return nil
 	}
 
 	return u.send(ctx, message, false)
 }
 
 func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
+	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	if useMarkdown {
 		requestURL += `&parse_mode=markdown`
 	}
@@ -65,6 +67,7 @@ func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	}
 
 	start := time.Now()
+
 	resp, err := u.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send telegram request: %w", err)
@@ -76,6 +79,7 @@ func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	}()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Println(resp)
 		return fmt.Errorf("received from telegram non-200 response code: %v", resp.Status)
 	}
 

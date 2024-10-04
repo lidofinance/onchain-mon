@@ -2,6 +2,7 @@ package notifiler
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lidofinance/finding-forwarder/generated/databus"
@@ -23,11 +24,11 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 	footer += fmt.Sprintf("\nTeam: %s", alert.Team)
 
 	if alert.BlockNumber != nil {
-		footer += fmt.Sprintf("\nBlock number: [%d](https://etherscan.io/block/%d)", *alert.BlockNumber, *alert.BlockNumber)
+		footer += fmt.Sprintf("\nBlock number: [%d](https://etherscan.io/block/%d/)", *alert.BlockNumber, *alert.BlockNumber)
 	}
 
 	if alert.TxHash != nil {
-		footer += fmt.Sprintf("\nTx hash: [%s](https://etherscan.io/tx/%s)", shortenHex(*alert.TxHash), *alert.TxHash)
+		footer += fmt.Sprintf("\nTx hash: [%s](https://etherscan.io/tx/%s/)", shortenHex(*alert.TxHash), *alert.TxHash)
 	}
 
 	footer += fmt.Sprintf("\nSource: %s", source)
@@ -44,4 +45,42 @@ func shortenHex(input string) string {
 		return input
 	}
 	return fmt.Sprintf("x%s...%s", input[2:5], input[len(input)-3:])
+}
+
+func EscapeMarkdownV1(input string) string {
+	specialChars := map[string]struct{}{
+		`_`: {},
+	}
+
+	var escaped strings.Builder
+	for _, char := range input {
+		if _, ok := specialChars[string(char)]; ok {
+			escaped.WriteString(`\`)
+		}
+
+		escaped.WriteRune(char)
+	}
+
+	return escaped.String()
+}
+
+func TruncateMessageWithAlertID(message string, stringLimit int, warnMessage string) string {
+	if len(message) <= stringLimit {
+		return message
+	}
+
+	alertIndex := strings.LastIndex(message, "Alert Id:")
+	if alertIndex == -1 {
+		return fmt.Sprintf("%s\n%s", warnMessage, message[:stringLimit-len(warnMessage)-1])
+	}
+
+	alertText := message[alertIndex:]
+
+	maxTextLength := stringLimit - len(warnMessage) - len(alertText) - 9
+
+	if maxTextLength > 0 && alertIndex > maxTextLength {
+		return fmt.Sprintf("%s\n...\n\n*%s*\n%s", message[:maxTextLength], warnMessage, alertText)
+	}
+
+	return fmt.Sprintf("%s\n%s", warnMessage, alertText)
 }

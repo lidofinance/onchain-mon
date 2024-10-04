@@ -6,7 +6,6 @@ COPY . .
 
 RUN apk add git=2.45.2-r0
 
-RUN go build -ldflags="-X github.com/lidofinance/finding-forwarder/internal/connectors/metrics.Commit=$(git rev-parse HEAD)" -o ./bin/main ./cmd/service
 RUN go build -ldflags="-X github.com/lidofinance/finding-forwarder/internal/connectors/metrics.Commit=$(git rev-parse HEAD)" -o ./bin/worker ./cmd/worker
 
 # Run stage

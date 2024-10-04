@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -58,32 +57,6 @@ func (u *opsGenia) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		Message:     alert.Name,
 		Description: message,
 		Alias:       alert.AlertId,
-		Priority:    opsGeniaPriority,
-	}
-
-	return u.send(ctx, payload)
-}
-
-func (u *opsGenia) SendAlert(ctx context.Context, alert *models.Alert) error {
-	opsGeniaPriority := ""
-	switch alert.Severity {
-	case models.AlertSeverityCRITICAL:
-		opsGeniaPriority = "P2"
-	case models.AlertSeverityHIGH:
-		opsGeniaPriority = "P3"
-	}
-
-	// Send only P2 or P3 alerts
-	if opsGeniaPriority == "" {
-		return nil
-	}
-
-	message := fmt.Sprintf("%s\n\nAlertId:%s\nSource: %s", alert.Description, alert.AlertID, u.source)
-
-	payload := AlertPayload{
-		Message:     alert.Name,
-		Description: message,
-		Alias:       alert.AlertID,
 		Priority:    opsGeniaPriority,
 	}
 
