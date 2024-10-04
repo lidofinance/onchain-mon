@@ -218,7 +218,6 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					return
 				}
 
-				w.log.Info(string(msg.Data()))
 				key := findingToUniqueHash(finding)
 
 				countKey := fmt.Sprintf(countTemplate, consumer.Name, key)
