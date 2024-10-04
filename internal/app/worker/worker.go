@@ -33,11 +33,6 @@ type findingCarrier struct {
 	findingSeveritySet registry.FindingMapping
 }
 
-type alertCarrier struct {
-	carrier
-	alertSeveritySet registry.AlertMapping
-}
-
 type worker struct {
 	filterSubject string
 
@@ -54,13 +49,7 @@ type findingWorker struct {
 	carriers []findingCarrier
 }
 
-type alertWorker struct {
-	worker
-	carriers []alertCarrier
-}
-
 type FindingWorkerOptions func(worker *findingWorker)
-type AlertWorkerOptions func(worker *alertWorker)
 
 var statusTemplate = "%s:finding:%s:status"
 var countTemplate = "%s:finding:%s:count"
@@ -95,24 +84,6 @@ func WithFindingConsumer(
 	}
 }
 
-func WithAlertConsumer(
-	notifier notifiler.FindingSender,
-	consumerName string,
-	alertSeveritySet registry.AlertMapping,
-	channel string,
-) AlertWorkerOptions {
-	return func(w *alertWorker) {
-		w.carriers = append(w.carriers, alertCarrier{
-			carrier: carrier{
-				Name:      consumerName,
-				notifiler: notifier,
-				channel:   channel,
-			},
-			alertSeveritySet: alertSeveritySet,
-		})
-	}
-}
-
 func NewFindingWorker(
 	log *slog.Logger,
 	metricsStore *metrics.Store,
@@ -130,32 +101,6 @@ func NewFindingWorker(
 		redisClient: redisClient,
 		quorum:      uint64(quorum),
 		cache:       cache,
-		worker: worker{
-			filterSubject: filterSubject,
-			stream:        stream,
-			log:           log,
-			metrics:       metricsStore,
-		},
-	}
-
-	for _, option := range options {
-		option(w)
-	}
-
-	return w
-}
-
-func NewAlertWorker(
-	log *slog.Logger,
-	metricsStore *metrics.Store,
-
-	stream jetstream.Stream,
-
-	filterSubject string,
-
-	options ...AlertWorkerOptions,
-) *alertWorker {
-	w := &alertWorker{
 		worker: worker{
 			filterSubject: filterSubject,
 			stream:        stream,
