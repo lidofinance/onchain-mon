@@ -18,7 +18,6 @@ import (
 
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/env"
-	"github.com/lidofinance/finding-forwarder/internal/http/handlers/alerts"
 	"github.com/lidofinance/finding-forwarder/internal/http/handlers/health"
 )
 
@@ -67,16 +66,6 @@ func (a *App) RunHTTPServer(ctx context.Context, g *errgroup.Group, appPort uint
 		<-ctx.Done()
 		return server.Shutdown(ctx)
 	})
-}
-
-func (a *App) RegisterHTTPRoutes(r chi.Router) {
-	a.RegisterMiddleware(r)
-
-	alertsH := alerts.New(a.Logger, a.Metrics, a.natsClient, a.env.FortaAlertsTopic)
-	r.Post("/alerts", alertsH.Handler)
-
-	a.RegisterInfraRoutes(r)
-	a.RegisterPprofRoutes(r)
 }
 
 func (a *App) RegisterWorkerRoutes(r chi.Router) {

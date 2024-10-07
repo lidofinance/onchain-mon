@@ -76,11 +76,7 @@ func main() {
 
 	protocolNatsSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FindingTopic, teams.Protocol)
 
-	protocolFortaSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FortaAlertsTopic, teams.Protocol)
-	fallbackFortaSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FortaAlertsTopic, registry.FallBackTeam)
-
 	natsStreamName := `NatsStream`
-	fortaStreamName := `FortaStream`
 
 	natStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:    natsStreamName,
@@ -96,22 +92,6 @@ func main() {
 		return
 	}
 	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", natsStreamName))
-
-	fortaStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:    fortaStreamName,
-		Discard: jetstream.DiscardOld,
-		MaxAge:  10 * time.Minute,
-		Subjects: []string{
-			protocolFortaSubject,
-			fallbackFortaSubject,
-		},
-		MaxMsgSize: maxMsgSize,
-	})
-	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
-		fmt.Printf("could not create %s stream error: %v\n", fortaStreamName, err)
-		return
-	}
-	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", fortaStreamName))
 
 	const (
 		Telegram = `Telegram`
@@ -129,24 +109,7 @@ func main() {
 		worker.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
 		worker.WithFindingConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
 		worker.WithFindingConsumer(services.Discord, `Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
-		worker.WithFindingConsumer(services.OpsGenia, `Protocol_OpGenia_Consumer`, registry.OnChainAlerts, OpsGenie),
-	)
-
-	protocolFortaWorker := worker.NewAlertWorker(
-		log, metricsStore,
-		fortaStream,
-		protocolFortaSubject,
-		worker.WithAlertConsumer(services.OnChainAlertsTelegram, `Forta_OnChainAlerts_Telegram_Consumer`, registry.AlertOnChainAlerts, Telegram),
-		worker.WithAlertConsumer(services.OnChainUpdatesTelegram, `Forta_OnChainUpdates_Telegram_Consumer`, registry.AlertOnChainUpdates, Telegram),
-		worker.WithAlertConsumer(services.ErrorsTelegram, `Forta_Protocol_Errors_Telegram_Consumer`, registry.AlertOnChainErrors, Telegram),
-		worker.WithAlertConsumer(services.Discord, `Forta_Protocol_Discord_Consumer`, registry.AlertFallBackAlerts, Discord),
-		worker.WithAlertConsumer(services.OpsGenia, `Forta_Protocol_OpGenia_Consumer`, registry.AlertOnChainAlerts, OpsGenie),
-	)
-
-	fallbackFortaWorker := worker.NewAlertWorker(
-		log, metricsStore,
-		fortaStream, fallbackFortaSubject,
-		worker.WithAlertConsumer(services.Discord, `FortaFallback_Discord_Consumer`, registry.AlertFallBackAlerts, Discord),
+		worker.WithFindingConsumer(services.OpsGenie, `Protocol_OpGenie_Consumer`, registry.OnChainAlerts, OpsGenie),
 	)
 
 	// Listen findings from Nats
@@ -155,20 +118,10 @@ func main() {
 		return
 	}
 
-	// Listen alerts from Forta group software
-	if err := protocolFortaWorker.Run(gCtx, g); err != nil {
-		fmt.Println("Could not start protocolFortaWorker error:", err.Error())
-		return
-	}
-
-	if wrkErr := fallbackFortaWorker.Run(gCtx, g); wrkErr != nil {
-		fmt.Println("Could not start fallbackFortaWorker error:", wrkErr.Error())
-		return
-	}
-
 	feederWrk := feeder.New(log, services.ChainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
 	feederWrk.Run(gCtx, g)
 
+	app.RegisterInfraRoutes(r)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
 	log.Info(fmt.Sprintf(`Started %s worker`, cfg.AppConfig.Name))

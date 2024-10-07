@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 )
 
@@ -35,14 +34,15 @@ func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metric
 	}
 }
 
+const maxDiscordMsgLength = 2000
+const warningDiscordMessage = "Warn: Msg >=2000, pls review description message"
+
 func (d *discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
-	message := fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source))
-
-	return d.send(ctx, message)
-}
-
-func (d *discord) SendAlert(ctx context.Context, alert *models.Alert) error {
-	message := fmt.Sprintf("%s\n\n%s\nAlertId: %s\nSource: %s", alert.Name, alert.Description, alert.AlertID, d.source)
+	message := TruncateMessageWithAlertID(
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source)),
+		maxDiscordMsgLength,
+		warningDiscordMessage,
+	)
 
 	return d.send(ctx, message)
 }

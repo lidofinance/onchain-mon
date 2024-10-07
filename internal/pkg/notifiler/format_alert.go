@@ -2,6 +2,7 @@ package notifiler
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lidofinance/finding-forwarder/generated/databus"
@@ -13,7 +14,7 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 		footer string
 	)
 
-	if len(alert.Description) != 0 {
+	if alert.Description != "" {
 		body = alert.Description
 		footer += "\n\n"
 	}
@@ -23,11 +24,11 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 	footer += fmt.Sprintf("\nTeam: %s", alert.Team)
 
 	if alert.BlockNumber != nil {
-		footer += fmt.Sprintf("\nBlock number: [%d](https://etherscan.io/block/%d)", *alert.BlockNumber, *alert.BlockNumber)
+		footer += fmt.Sprintf("\nBlock number: [%d](https://etherscan.io/block/%d/)", *alert.BlockNumber, *alert.BlockNumber)
 	}
 
 	if alert.TxHash != nil {
-		footer += fmt.Sprintf("\nTx hash: [%s](https://etherscan.io/tx/%s)", shortenHex(*alert.TxHash), *alert.TxHash)
+		footer += fmt.Sprintf("\nTx hash: [%s](https://etherscan.io/tx/%s/)", shortenHex(*alert.TxHash), *alert.TxHash)
 	}
 
 	footer += fmt.Sprintf("\nSource: %s", source)
@@ -40,8 +41,30 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 }
 
 func shortenHex(input string) string {
-	if len(input) <= 10 {
+	if len(input) <= 5 {
 		return input
 	}
 	return fmt.Sprintf("x%s...%s", input[2:5], input[len(input)-3:])
+}
+
+func TruncateMessageWithAlertID(message string, stringLimit int, warnMessage string) string {
+	if len(message) <= stringLimit {
+		return message
+	}
+
+	alertIndex := strings.LastIndex(message, "Alert Id:")
+	if alertIndex == -1 {
+		return fmt.Sprintf("%s\n%s", warnMessage, message[:stringLimit-len(warnMessage)-1])
+	}
+
+	alertText := message[alertIndex:]
+
+	const formatSpecialCharsLength = 9
+	maxTextLength := stringLimit - len(warnMessage) - len(alertText) - formatSpecialCharsLength
+
+	if maxTextLength > 0 && alertIndex > maxTextLength {
+		return fmt.Sprintf("%s\n...\n\n*%s*\n%s", message[:maxTextLength], warnMessage, alertText)
+	}
+
+	return fmt.Sprintf("%s\n%s", warnMessage, alertText)
 }

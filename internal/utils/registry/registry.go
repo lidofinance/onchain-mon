@@ -2,7 +2,6 @@ package registry
 
 import (
 	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
 )
 
@@ -39,30 +38,6 @@ var CodeOwners = map[string]string{
 
 type AlertMapping = map[string]bool
 type FindingMapping = map[databus.Severity]bool
-
-var AlertOnChainErrors = AlertMapping{
-	models.AlertSeverityUNKNOWN: true,
-}
-
-var AlertOnChainUpdates = AlertMapping{
-	models.AlertSeverityINFO:   true,
-	models.AlertSeverityLOW:    true,
-	models.AlertSeverityMEDIUM: true,
-}
-
-var AlertOnChainAlerts = AlertMapping{
-	models.AlertSeverityHIGH:     true,
-	models.AlertSeverityCRITICAL: true,
-}
-
-var AlertFallBackAlerts = AlertMapping{
-	models.AlertSeverityUNKNOWN:  true,
-	models.AlertSeverityINFO:     true,
-	models.AlertSeverityLOW:      true,
-	models.AlertSeverityMEDIUM:   true,
-	models.AlertSeverityHIGH:     true,
-	models.AlertSeverityCRITICAL: true,
-}
 
 var OnChainErrors = FindingMapping{
 	databus.SeverityUnknown: true,

@@ -17,7 +17,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/generated/forta/models"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
 	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
@@ -32,11 +31,6 @@ type carrier struct {
 type findingCarrier struct {
 	carrier
 	findingSeveritySet registry.FindingMapping
-}
-
-type alertCarrier struct {
-	carrier
-	alertSeveritySet registry.AlertMapping
 }
 
 type worker struct {
@@ -55,13 +49,7 @@ type findingWorker struct {
 	carriers []findingCarrier
 }
 
-type alertWorker struct {
-	worker
-	carriers []alertCarrier
-}
-
 type FindingWorkerOptions func(worker *findingWorker)
-type AlertWorkerOptions func(worker *alertWorker)
 
 var statusTemplate = "%s:finding:%s:status"
 var countTemplate = "%s:finding:%s:count"
@@ -96,24 +84,6 @@ func WithFindingConsumer(
 	}
 }
 
-func WithAlertConsumer(
-	notifier notifiler.FindingSender,
-	consumerName string,
-	alertSeveritySet registry.AlertMapping,
-	channel string,
-) AlertWorkerOptions {
-	return func(w *alertWorker) {
-		w.carriers = append(w.carriers, alertCarrier{
-			carrier: carrier{
-				Name:      consumerName,
-				notifiler: notifier,
-				channel:   channel,
-			},
-			alertSeveritySet: alertSeveritySet,
-		})
-	}
-}
-
 func NewFindingWorker(
 	log *slog.Logger,
 	metricsStore *metrics.Store,
@@ -131,32 +101,6 @@ func NewFindingWorker(
 		redisClient: redisClient,
 		quorum:      uint64(quorum),
 		cache:       cache,
-		worker: worker{
-			filterSubject: filterSubject,
-			stream:        stream,
-			log:           log,
-			metrics:       metricsStore,
-		},
-	}
-
-	for _, option := range options {
-		option(w)
-	}
-
-	return w
-}
-
-func NewAlertWorker(
-	log *slog.Logger,
-	metricsStore *metrics.Store,
-
-	stream jetstream.Stream,
-
-	filterSubject string,
-
-	options ...AlertWorkerOptions,
-) *alertWorker {
-	w := &alertWorker{
 		worker: worker{
 			filterSubject: filterSubject,
 			stream:        stream,
@@ -420,84 +364,6 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 			return err
 		}
 
-		w.log.Info(fmt.Sprintf(`Consumer %s created or updated successfully`, consumer.name))
-
-		conCtx, consumeErr := con.Consume(consumer.handler)
-		if consumeErr != nil {
-			return consumeErr
-		}
-
-		connections = append(connections, conCtx)
-	}
-
-	g.Go(func() error {
-		<-ctx.Done()
-		for _, conCtx := range connections {
-			conCtx.Stop()
-		}
-		return nil
-	})
-
-	return nil
-}
-
-func (w *alertWorker) Run(ctx context.Context, g *errgroup.Group) error {
-	type Consumer struct {
-		name    string
-		handler func(msg jetstream.Msg)
-	}
-
-	consumers := make([]Consumer, 0, len(w.carriers))
-	for _, consumer := range w.carriers {
-		consumers = append(consumers, Consumer{
-			name: consumer.Name,
-			handler: func(msg jetstream.Msg) {
-				alert := new(models.Alert)
-
-				if alertErr := alert.UnmarshalBinary(msg.Data()); alertErr != nil {
-					w.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
-					w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
-					w.terminateMessage(msg)
-					return
-				}
-				defer func() {
-					alert = nil
-				}()
-
-				if _, ok := consumer.alertSeveritySet[alert.Severity]; !ok {
-					w.ackMessage(msg)
-					return
-				}
-
-				if sendErr := consumer.notifiler.SendAlert(ctx, alert); sendErr != nil {
-					w.log.Error(fmt.Sprintf(`Could not send forta-finding: %v`, sendErr), slog.Attr{
-						Key:   "alertID",
-						Value: slog.StringValue(alert.AlertID),
-					})
-					w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusFail}).Inc()
-					w.nackMessage(msg)
-					return
-				}
-
-				w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusOk}).Inc()
-				w.ackMessage(msg)
-			},
-		})
-	}
-
-	connections := make([]jetstream.ConsumeContext, 0, len(consumers))
-	for _, consumer := range consumers {
-		con, err := w.stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-			Durable:        consumer.name,
-			AckPolicy:      jetstream.AckExplicitPolicy,
-			MaxAckPending:  1,
-			FilterSubjects: []string{w.filterSubject},
-			DeliverPolicy:  jetstream.DeliverNewPolicy,
-			MaxDeliver:     10,
-		})
-		if err != nil {
-			return err
-		}
 		w.log.Info(fmt.Sprintf(`Consumer %s created or updated successfully`, consumer.name))
 
 		conCtx, consumeErr := con.Consume(consumer.handler)
