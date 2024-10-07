@@ -21,15 +21,15 @@ type AlertPayload struct {
 	Alias       string `json:"alias,omitempty"`
 }
 
-type opsGenia struct {
+type opsGenie struct {
 	opsGenieKey string
 	httpClient  *http.Client
 	metrics     *metrics.Store
 	source      string
 }
 
-func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) *opsGenia {
-	return &opsGenia{
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) *opsGenie {
+	return &opsGenie{
 		opsGenieKey: opsGenieKey,
 		httpClient:  httpClient,
 		metrics:     metricsStore,
@@ -37,7 +37,7 @@ func NewOpsGenia(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 	}
 }
 
-func (u *opsGenia) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (u *opsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	opsGeniaPriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
@@ -63,10 +63,10 @@ func (u *opsGenia) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	return u.send(ctx, payload)
 }
 
-func (u *opsGenia) send(ctx context.Context, payload AlertPayload) error {
+func (u *opsGenie) send(ctx context.Context, payload AlertPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("could not marshal OpsGenia payload: %w", err)
+		return fmt.Errorf("could not marshal OpsGenie payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST",
@@ -74,7 +74,7 @@ func (u *opsGenia) send(ctx context.Context, payload AlertPayload) error {
 		bytes.NewBuffer(payloadBytes),
 	)
 	if err != nil {
-		return fmt.Errorf("could not create OpsGenia request: %w", err)
+		return fmt.Errorf("could not create OpsGenie request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -83,7 +83,7 @@ func (u *opsGenia) send(ctx context.Context, payload AlertPayload) error {
 	start := time.Now()
 	resp, err := u.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("could not send OpsGenia request: %w", err)
+		return fmt.Errorf("could not send OpsGenie request: %w", err)
 	}
 	defer func() {
 		resp.Body.Close()
@@ -92,7 +92,7 @@ func (u *opsGenia) send(ctx context.Context, payload AlertPayload) error {
 	}()
 
 	if resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("received from OpsGenia non-202 response code: %v", resp.Status)
+		return fmt.Errorf("received from OpsGenie non-202 response code: %v", resp.Status)
 	}
 
 	return nil

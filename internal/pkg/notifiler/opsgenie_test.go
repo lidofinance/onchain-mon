@@ -71,7 +71,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := &opsGenia{
+			u := &opsGenie{
 				opsGenieKey: tt.fields.opsGenieKey,
 				httpClient:  tt.fields.httpClient,
 				metrics:     metricsStore,

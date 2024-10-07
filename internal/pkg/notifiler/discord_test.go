@@ -98,7 +98,7 @@ func Test_usecase_SendFinding(t *testing.T) {
 				ctx: context.Background(),
 				alert: &databus.FindingDtoJson{
 					Name:           "ℹ️ #l2_arbitrum Arbitrum digest",
-					Description:    EugineOnegin,
+					Description:    ParadiseLost,
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
 					BlockTimestamp: intPtr(1727965236),

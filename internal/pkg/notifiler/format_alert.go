@@ -14,7 +14,7 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 		footer string
 	)
 
-	if len(alert.Description) != 0 {
+	if alert.Description != "" {
 		body = alert.Description
 		footer += "\n\n"
 	}
@@ -41,27 +41,10 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 }
 
 func shortenHex(input string) string {
-	if len(input) <= 10 {
+	if len(input) <= 5 {
 		return input
 	}
 	return fmt.Sprintf("x%s...%s", input[2:5], input[len(input)-3:])
-}
-
-func EscapeMarkdownV1(input string) string {
-	specialChars := map[string]struct{}{
-		`_`: {},
-	}
-
-	var escaped strings.Builder
-	for _, char := range input {
-		if _, ok := specialChars[string(char)]; ok {
-			escaped.WriteString(`\`)
-		}
-
-		escaped.WriteRune(char)
-	}
-
-	return escaped.String()
 }
 
 func TruncateMessageWithAlertID(message string, stringLimit int, warnMessage string) string {
@@ -76,7 +59,8 @@ func TruncateMessageWithAlertID(message string, stringLimit int, warnMessage str
 
 	alertText := message[alertIndex:]
 
-	maxTextLength := stringLimit - len(warnMessage) - len(alertText) - 9
+	const formatSpecialCharsLength = 9
+	maxTextLength := stringLimit - len(warnMessage) - len(alertText) - formatSpecialCharsLength
 
 	if maxTextLength > 0 && alertIndex > maxTextLength {
 		return fmt.Sprintf("%s\n...\n\n*%s*\n%s", message[:maxTextLength], warnMessage, alertText)

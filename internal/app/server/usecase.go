@@ -16,7 +16,7 @@ type Services struct {
 	OnChainUpdatesTelegram notifiler.FindingSender
 	ErrorsTelegram         notifiler.FindingSender
 	Discord                notifiler.FindingSender
-	OpsGenia               notifiler.FindingSender
+	OpsGenie               notifiler.FindingSender
 	ChainSrv               feeder.ChainSrv
 }
 
@@ -39,7 +39,7 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 	errorsTelegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramErrorsChatID, httpClient, metricsStore, cfg.Source)
 
 	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore, cfg.Source)
-	opsGenia := notifiler.NewOpsGenia(cfg.OpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
+	opsGenia := notifiler.NewOpsgenie(cfg.OpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
 
 	chainSrv := chain.NewChain(cfg.JsonRpcURL, httpClient, metricsStore)
 
@@ -48,7 +48,7 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 		OnChainUpdatesTelegram: updatesTelegram,
 		ErrorsTelegram:         errorsTelegram,
 		Discord:                discord,
-		OpsGenia:               opsGenia,
+		OpsGenie:               opsGenia,
 		ChainSrv:               chainSrv,
 	}
 }

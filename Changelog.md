@@ -1,9 +1,9 @@
 ## 04.10.2024
-1. Removed forta
-2. Fixed telegram markdown
-3. When ff could not send telegram markdown it'll send it like simple text.
-4. Added limitation for Telegram if msg >= 4096 symbols in msg
-5. Added limitation for Discord if msg >= 2000 symbols in msg
+1. Removed Forta integration.
+2. Fixed issues with Telegram markdown formatting.
+3. Improved error handling: if FF fails to send a message with Telegram markdown, it will now send it as plain text.
+4. Implemented length checks for Telegram: messages exceeding 4,096 characters will be truncated.
+5. Implemented length checks for Discord: messages exceeding 2,000 characters will be truncated.
 
 ## 24.09.2024
 1. Fix sending network alerts though telegram

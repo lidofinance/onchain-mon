@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,7 +43,7 @@ func (u *telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	)
 
 	if alert.Severity != databus.SeverityUnknown {
-		m := EscapeMarkdownV1(message)
+		m := escapeMarkdownV1(message)
 
 		if sendErr := u.send(ctx, m, true); sendErr != nil {
 			message += "\n\nWarning: Could not send msg as markdown"
@@ -84,4 +85,26 @@ func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	}
 
 	return nil
+}
+
+// Telegram supports two versions of markdown. V1, V2
+// For V1 we have to escape some symbols
+//
+// V2 - is more reach for special symbols, more you can find by link
+// https://core.telegram.org/bots/update56kabdkb12ibuisabdubodbasbdaosd#markdownv2-style
+func escapeMarkdownV1(input string) string {
+	specialChars := map[string]struct{}{
+		`_`: {},
+	}
+
+	var escaped strings.Builder
+	for _, char := range input {
+		if _, ok := specialChars[string(char)]; ok {
+			escaped.WriteString(`\`)
+		}
+
+		escaped.WriteRune(char)
+	}
+
+	return escaped.String()
 }

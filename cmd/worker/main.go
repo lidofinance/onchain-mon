@@ -109,7 +109,7 @@ func main() {
 		worker.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
 		worker.WithFindingConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
 		worker.WithFindingConsumer(services.Discord, `Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
-		worker.WithFindingConsumer(services.OpsGenia, `Protocol_OpGenia_Consumer`, registry.OnChainAlerts, OpsGenie),
+		worker.WithFindingConsumer(services.OpsGenie, `Protocol_OpGenie_Consumer`, registry.OnChainAlerts, OpsGenie),
 	)
 
 	// Listen findings from Nats
