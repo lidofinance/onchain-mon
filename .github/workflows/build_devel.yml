@@ -7,7 +7,7 @@ on:
       - devel
 
 env:
-  IMAGE_NAME: lido-onchain-mon
+  IMAGE_NAME: onchain-mon
   IMAGE_TAG: latest
 
 jobs:
