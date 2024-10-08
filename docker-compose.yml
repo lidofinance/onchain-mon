@@ -26,13 +26,13 @@ services:
       - ./nats/jetstream:/data/jetstream
       - ./nats/nats.conf:/etc/nats/nats.conf
 
-  forwarder-worker:
-    image: monitoring/ff
-    container_name: finding-forwarder-worker
+  forwarder:
+    image: ff-monitoring
+    container_name: forwarder
     build: ./
     restart: always
     command:
-      - ./worker
+      - ./forwarder
     env_file:
       - .env
     environment:
@@ -54,6 +54,38 @@ services:
       - QUORUM_SIZE=${QUORUM_SIZE}
     ports:
       - "8081:8080"
+    depends_on:
+      - redis
+      - nats
+
+  feeder:
+    image: ff-monitoring
+    container_name: feeder
+    build: ./
+    restart: always
+    command:
+      - ./feeder
+    env_file:
+      - .env
+    environment:
+      - READ_ENV_FROM_SHELL=true
+      - ENV=${ENV}
+      - APP_NAME=${APP_NAME}
+      - PORT=${PORT}
+      - LOG_FORMAT=${LOG_FORMAT}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ERRORS_CHAT_ID=${TELEGRAM_ERRORS_CHAT_ID}
+      - TELEGRAM_UPDATES_CHAT_ID=${TELEGRAM_UPDATES_CHAT_ID}
+      - TELEGRAM_ALERTS_CHAT_ID=${TELEGRAM_ALERTS_CHAT_ID}
+      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
+      - BOT_CONTAINERS=${BOT_CONTAINERS}
+      - REDIS_ADDRESS=${REDIS_ADDRESS}
+      - QUORUM_SIZE=${QUORUM_SIZE}
+    ports:
+      - "8082:8080"
     depends_on:
       - redis
       - nats

@@ -16,9 +16,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
+	"github.com/lidofinance/finding-forwarder/internal/app/forwarder"
 	"github.com/lidofinance/finding-forwarder/internal/app/server"
-	"github.com/lidofinance/finding-forwarder/internal/app/worker"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
 	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
 	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
@@ -101,15 +100,15 @@ func main() {
 
 	const LruSize = 125
 	cache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*10)
-	protocolWorker := worker.NewFindingWorker(
+	protocolWorker := forwarder.NewFindingWorker(
 		log, metricsStore, cache,
 		rds, natStream,
 		protocolNatsSubject, cfg.AppConfig.QuorumSize,
-		worker.WithFindingConsumer(services.OnChainAlertsTelegram, `OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
-		worker.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
-		worker.WithFindingConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
-		worker.WithFindingConsumer(services.Discord, `Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
-		worker.WithFindingConsumer(services.OpsGenie, `Protocol_OpGenie_Consumer`, registry.OnChainAlerts, OpsGenie),
+		forwarder.WithFindingConsumer(services.OnChainAlertsTelegram, `OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
+		forwarder.WithFindingConsumer(services.OnChainUpdatesTelegram, `OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
+		forwarder.WithFindingConsumer(services.ErrorsTelegram, `Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
+		forwarder.WithFindingConsumer(services.Discord, `Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
+		forwarder.WithFindingConsumer(services.OpsGenie, `Protocol_OpGenie_Consumer`, registry.OnChainAlerts, OpsGenie),
 	)
 
 	// Listen findings from Nats
@@ -118,13 +117,10 @@ func main() {
 		return
 	}
 
-	feederWrk := feeder.New(log, services.ChainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
-	feederWrk.Run(gCtx, g)
-
 	app.RegisterInfraRoutes(r)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
-	log.Info(fmt.Sprintf(`Started %s worker`, cfg.AppConfig.Name))
+	log.Info(fmt.Sprintf(`Started %s forwarder`, cfg.AppConfig.Name))
 
 	if err := g.Wait(); err != nil {
 		log.Error(err.Error())

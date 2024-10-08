@@ -1,7 +1,7 @@
 ### GO tools
 # Makefile
 generate-docker:
-	docker build -t monitoring/ff -f Dockerfile .
+	docker build -t ff-monitoring -f Dockerfile .
 .PHONY: generate-docker
 
 .PHONY: tools
