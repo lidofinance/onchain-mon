@@ -7,7 +7,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: forta-finding-forwarder
+  IMAGE_NAME: lido-onchain-mon
   IMAGE_TAG: stable
 
 jobs:
