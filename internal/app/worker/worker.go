@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -161,8 +162,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 					return
 				}
 
-				// TODO to think on better hashing fields
-				key := computeSHA256Hash(msg.Data())
+				key := findingToUniqueHash(finding)
 
 				countKey := fmt.Sprintf(countTemplate, consumer.Name, key)
 				statusKey := fmt.Sprintf(statusTemplate, consumer.Name, key)
@@ -406,6 +406,24 @@ func (w *worker) ackMessage(msg jetstream.Msg) {
 func computeSHA256Hash(data []byte) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
+}
+
+func findingToUniqueHash(f *databus.FindingDtoJson) string {
+	var buffer bytes.Buffer
+
+	if f.UniqueKey != nil {
+		return *f.UniqueKey
+	}
+
+	buffer.WriteString(f.Team)
+	buffer.WriteString(f.BotName)
+	buffer.WriteString(f.AlertId)
+	buffer.WriteString(f.Name)
+	buffer.WriteString(string(f.Severity))
+
+	uniqueKey := computeSHA256Hash(buffer.Bytes())
+
+	return uniqueKey
 }
 
 func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
