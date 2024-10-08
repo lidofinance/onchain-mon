@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	"github.com/lidofinance/finding-forwarder/internal/pkg/chain/entity"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/pkg/chain/entity"
 )
 
 type chain struct {

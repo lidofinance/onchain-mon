@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/env"
 )
 
 func New(cfg *env.AppConfig) *slog.Logger {

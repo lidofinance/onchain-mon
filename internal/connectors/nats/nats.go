@@ -8,7 +8,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/env"
 )
 
 var (

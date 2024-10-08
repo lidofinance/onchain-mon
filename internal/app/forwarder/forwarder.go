@@ -17,10 +17,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	"github.com/lidofinance/finding-forwarder/internal/pkg/notifiler"
-	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
+	"github.com/lidofinance/onchain-mon/generated/databus"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type carrier struct {

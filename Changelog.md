@@ -1,6 +1,7 @@
 ## 08.10.2024
 1. Split up feeder, forwarder to independent bin applications
 2. Added mechanism for using UniqueKey for collecting quorum
+3. Renamed repo from "finding-forwarder" to "onchain-mon"
 
 ## 04.10.2024
 1. Removed Forta integration.

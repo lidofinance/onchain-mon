@@ -12,12 +12,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/lidofinance/finding-forwarder/internal/app/feeder"
-	"github.com/lidofinance/finding-forwarder/internal/app/server"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
-	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/app/feeder"
+	"github.com/lidofinance/onchain-mon/internal/app/server"
+	"github.com/lidofinance/onchain-mon/internal/connectors/logger"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	nc "github.com/lidofinance/onchain-mon/internal/connectors/nats"
+	"github.com/lidofinance/onchain-mon/internal/env"
 )
 
 func main() {

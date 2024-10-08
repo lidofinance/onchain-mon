@@ -3,7 +3,7 @@ package notifiler
 import (
 	"context"
 
-	"github.com/lidofinance/finding-forwarder/generated/databus"
+	"github.com/lidofinance/onchain-mon/generated/databus"
 )
 
 type FindingSender interface {
