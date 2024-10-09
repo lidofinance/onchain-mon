@@ -52,3 +52,36 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 		ChainSrv:               chainSrv,
 	}
 }
+
+func NewStageServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
+	transport := &http.Transport{
+		MaxIdleConns:          30,
+		MaxIdleConnsPerHost:   5,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
+	alertsTelegram := notifiler.NewTelegram(cfg.StageTelegramBotToken, cfg.StageTelegramAlertsChatID, httpClient, metricsStore, cfg.Source)
+	updatesTelegram := notifiler.NewTelegram(cfg.StageTelegramBotToken, cfg.StageTelegramUpdatesChatID, httpClient, metricsStore, cfg.Source)
+	errorsTelegram := notifiler.NewTelegram(cfg.StageTelegramBotToken, cfg.StageTelegramErrorsChatID, httpClient, metricsStore, cfg.Source)
+
+	discord := notifiler.NewDiscord(cfg.StageDiscordWebHookURL, httpClient, metricsStore, cfg.Source)
+	opsGenia := notifiler.NewOpsgenie(cfg.StageOpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
+
+	chainSrv := chain.NewChain(cfg.JsonRpcURL, httpClient, metricsStore)
+
+	return Services{
+		OnChainAlertsTelegram:  alertsTelegram,
+		OnChainUpdatesTelegram: updatesTelegram,
+		ErrorsTelegram:         errorsTelegram,
+		Discord:                discord,
+		OpsGenie:               opsGenia,
+		ChainSrv:               chainSrv,
+	}
+}

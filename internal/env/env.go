@@ -12,19 +12,27 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Name                  string
-	Source                string
-	Env                   string
-	URL                   string
-	Port                  uint
-	LogFormat             string
-	LogLevel              string
+	Name      string
+	Source    string
+	Env       string
+	URL       string
+	Port      uint
+	LogFormat string
+	LogLevel  string
+
 	TelegramBotToken      string
 	TelegramErrorsChatID  string
 	TelegramUpdatesChatID string
 	TelegramAlertsChatID  string
 	OpsGeniaAPIKey        string
 	DiscordWebHookURL     string
+
+	StageTelegramBotToken      string
+	StageTelegramErrorsChatID  string
+	StageTelegramUpdatesChatID string
+	StageTelegramAlertsChatID  string
+	StageOpsGeniaAPIKey        string
+	StageDiscordWebHookURL     string
 
 	NatsDefaultURL string
 	MetricsPrefix  string
@@ -91,6 +99,14 @@ func Read(configPath string) (*Config, error) {
 
 				OpsGeniaAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
+
+				StageTelegramBotToken:      viper.GetString("STAGE_TELEGRAM_BOT_TOKEN"),
+				StageTelegramErrorsChatID:  viper.GetString("STAGE_TELEGRAM_ERRORS_CHAT_ID"),
+				StageTelegramUpdatesChatID: viper.GetString("STAGE_TELEGRAM_UPDATES_CHAT_ID"),
+				StageTelegramAlertsChatID:  viper.GetString("STAGE_TELEGRAM_ALERTS_CHAT_ID"),
+
+				StageOpsGeniaAPIKey:    viper.GetString("STAGE_OPSGENIE_API_KEY"),
+				StageDiscordWebHookURL: viper.GetString("STAGE_DISCORD_WEBHOOK_URL"),
 
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),

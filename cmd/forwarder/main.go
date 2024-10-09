@@ -68,12 +68,14 @@ func main() {
 	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	services := server.NewServices(&cfg.AppConfig, metricsStore)
+	stageServices := server.NewServices(&cfg.AppConfig, metricsStore)
 	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
 
 	protocolNatsSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FindingTopic, teams.Protocol)
+	protocolStageNatsSubject := fmt.Sprintf(`%s.%s`, cfg.AppConfig.FindingTopic, teams.ProtocolStage)
 
 	natsStreamName := `NatsStream`
 
@@ -83,6 +85,7 @@ func main() {
 		MaxAge:  10 * time.Minute,
 		Subjects: []string{
 			protocolNatsSubject,
+			protocolStageNatsSubject,
 		},
 		MaxMsgSize: maxMsgSize,
 	})
@@ -111,9 +114,28 @@ func main() {
 		forwarder.WithFindingConsumer(services.OpsGenie, `Protocol_OpGenie_Consumer`, registry.OnChainAlerts, OpsGenie),
 	)
 
+	stageCache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*10)
+	protocolStageWorker := forwarder.NewFindingWorker(
+		log, metricsStore, stageCache,
+		rds, natStream,
+		protocolStageNatsSubject,
+		cfg.AppConfig.QuorumSize,
+		forwarder.WithFindingConsumer(stageServices.OnChainAlertsTelegram, `Stage_OnChainAlerts_Telegram_Consumer`, registry.OnChainAlerts, Telegram),
+		forwarder.WithFindingConsumer(stageServices.OnChainUpdatesTelegram, `Stage_OnChainUpdates_Telegram_Consumer`, registry.OnChainUpdates, Telegram),
+		forwarder.WithFindingConsumer(stageServices.ErrorsTelegram, `Stage_Protocol_Errors_Telegram_Consumer`, registry.OnChainErrors, Telegram),
+		forwarder.WithFindingConsumer(services.Discord, `Stage_Protocol_Discord_Consumer`, registry.FallBackAlerts, Discord),
+		// forwarder.WithFindingConsumer(services.OpsGenie, `Stage_Protocol_OpGenie_Consumer`, registry.OnChainAlerts, OpsGenie),
+	)
+
 	// Listen findings from Nats
 	if err := protocolWorker.Run(gCtx, g); err != nil {
 		fmt.Println("Could not start protocolWorker error:", err.Error())
+		return
+	}
+
+	// Listen stage findings from Nats
+	if err := protocolStageWorker.Run(gCtx, g); err != nil {
+		fmt.Println("Could not start StageProtocolWorker error:", err.Error())
 		return
 	}
 
