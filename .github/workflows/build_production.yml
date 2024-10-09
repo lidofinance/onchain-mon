@@ -7,7 +7,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: onchain-mon
+  IMAGE_NAME: forta-finding-forwarder
   IMAGE_TAG: stable
 
 jobs:
