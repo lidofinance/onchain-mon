@@ -1,8 +1,8 @@
 package registry
 
 import (
-	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
+	"github.com/lidofinance/onchain-mon/generated/databus"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry/teams"
 )
 
 const FallBackTeam = `default`

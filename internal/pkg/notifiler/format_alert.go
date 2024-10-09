@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lidofinance/finding-forwarder/generated/databus"
+	"github.com/lidofinance/onchain-mon/generated/databus"
 )
 
 func FormatAlert(alert *databus.FindingDtoJson, source string) string {

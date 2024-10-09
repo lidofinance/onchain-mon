@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/lidofinance/finding-forwarder/generated/databus"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	"github.com/lidofinance/finding-forwarder/internal/env"
+	"github.com/lidofinance/onchain-mon/generated/databus"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

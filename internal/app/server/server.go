@@ -16,9 +16,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	slogchi "github.com/samber/slog-chi"
 
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	"github.com/lidofinance/finding-forwarder/internal/env"
-	"github.com/lidofinance/finding-forwarder/internal/http/handlers/health"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/http/handlers/health"
 )
 
 const (

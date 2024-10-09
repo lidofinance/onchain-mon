@@ -27,7 +27,7 @@ services:
       - ./nats/nats.conf:/etc/nats/nats.conf
 
   forwarder:
-    image: ff-monitoring
+    image: lidofinance/onchain-mon:stable
     container_name: forwarder
     build: ./
     restart: always
@@ -59,7 +59,7 @@ services:
       - nats
 
   feeder:
-    image: ff-monitoring
+    image: lidofinance/onchain-mon:stable
     container_name: feeder
     build: ./
     restart: always

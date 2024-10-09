@@ -1,7 +1,7 @@
 ### GO tools
 # Makefile
 generate-docker:
-	docker build -t ff-monitoring -f Dockerfile .
+	docker build -t lidofinance/onchain-mon:stable -f Dockerfile .
 .PHONY: generate-docker
 
 .PHONY: tools
@@ -23,7 +23,7 @@ vet:
 	go vet ./cmd/... && go vet ./internal/...
 
 imports:
-	bin/goimports -local github.com/lidofinance/finding-forwarder -w -d $(shell find . -type f -name '*.go'| grep -v "/vendor/\|/.git/\|/tools/")
+	bin/goimports -local github.com/lidofinance/onchain-mon -w -d $(shell find . -type f -name '*.go'| grep -v "/vendor/\|/.git/\|/tools/")
 
 fix-lint:
 	bin/golangci-lint run --config=.golangci.yml --fix ./cmd... ./internal/...

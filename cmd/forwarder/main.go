@@ -16,15 +16,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/lidofinance/finding-forwarder/internal/app/forwarder"
-	"github.com/lidofinance/finding-forwarder/internal/app/server"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/logger"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/metrics"
-	nc "github.com/lidofinance/finding-forwarder/internal/connectors/nats"
-	"github.com/lidofinance/finding-forwarder/internal/connectors/redis"
-	"github.com/lidofinance/finding-forwarder/internal/env"
-	"github.com/lidofinance/finding-forwarder/internal/utils/registry"
-	"github.com/lidofinance/finding-forwarder/internal/utils/registry/teams"
+	"github.com/lidofinance/onchain-mon/internal/app/forwarder"
+	"github.com/lidofinance/onchain-mon/internal/app/server"
+	"github.com/lidofinance/onchain-mon/internal/connectors/logger"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	nc "github.com/lidofinance/onchain-mon/internal/connectors/nats"
+	"github.com/lidofinance/onchain-mon/internal/connectors/redis"
+	"github.com/lidofinance/onchain-mon/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry/teams"
 )
 
 const maxMsgSize = 3 * 1024 * 1024 // 3 Mb
