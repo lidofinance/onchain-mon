@@ -22,9 +22,9 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 	quorumTime := time.Now()
 	if alert.BlockNumber != nil {
 		eventToQuorumSecs := int(quorumTime.Unix()) - *alert.BlockTimestamp
-		footer += fmt.Sprintf("Happened at block [%d](https://etherscan.io/block/%d/), ~ %d seconds ago", *alert.BlockNumber, *alert.BlockNumber, eventToQuorumSecs)
+		footer += fmt.Sprintf("Happened ~%d seconds ago at block [%d](https://etherscan.io/block/%d/)", eventToQuorumSecs, *alert.BlockNumber, *alert.BlockNumber)
 	}
-	footer += fmt.Sprintf("\nTeam %s | %s | %s | quorum at %s by %s", alert.Team, alert.BotName, alert.AlertId, quorumTime.Format("15:04:05.000 MST"), source)
+	footer += fmt.Sprintf("\n_Team %s | %s | %s | quorum at %s by %s_", alert.Team, alert.BotName, alert.AlertId, quorumTime.Format("15:04:05.000 MST"), source)
 
 	if alert.TxHash != nil {
 		footer += fmt.Sprintf("\nTx hash: [%s](https://etherscan.io/tx/%s/)", shortenHex(*alert.TxHash), *alert.TxHash)
