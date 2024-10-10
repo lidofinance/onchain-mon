@@ -1,0 +1,7 @@
+exclude_paths:
+ - ansible_collections/
+offline: true
+skip_list:
+  - run-once
+  - yaml[line-length]
+  - ignore-errors
