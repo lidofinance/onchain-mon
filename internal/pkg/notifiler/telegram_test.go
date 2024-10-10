@@ -186,7 +186,7 @@ Source: local
 Server timestamp: 18:36:55.152 MSK
 Block  timestamp: 17:20:36.000 MSK`
 
-func Test_SendFinfing(t *testing.T) {
+func Test_SendFinding(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
