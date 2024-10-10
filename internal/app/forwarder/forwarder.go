@@ -412,18 +412,18 @@ func findingToUniqueHash(f *databus.FindingDtoJson) string {
 	var buffer bytes.Buffer
 
 	if f.UniqueKey != nil {
-		return *f.UniqueKey
+		buffer.WriteString(f.Team)
+		buffer.WriteString(f.BotName)
+		buffer.WriteString(*f.UniqueKey)
+	} else {
+		buffer.WriteString(f.Team)
+		buffer.WriteString(f.BotName)
+		buffer.WriteString(f.AlertId)
+		buffer.WriteString(f.Name)
+		buffer.WriteString(string(f.Severity))
 	}
 
-	buffer.WriteString(f.Team)
-	buffer.WriteString(f.BotName)
-	buffer.WriteString(f.AlertId)
-	buffer.WriteString(f.Name)
-	buffer.WriteString(string(f.Severity))
-
-	uniqueKey := computeSHA256Hash(buffer.Bytes())
-
-	return uniqueKey
+	return computeSHA256Hash(buffer.Bytes())
 }
 
 func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
