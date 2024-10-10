@@ -39,7 +39,7 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 	errorsTelegram := notifiler.NewTelegram(cfg.TelegramBotToken, cfg.TelegramErrorsChatID, httpClient, metricsStore, cfg.Source)
 
 	discord := notifiler.NewDiscord(cfg.DiscordWebHookURL, httpClient, metricsStore, cfg.Source)
-	opsGenia := notifiler.NewOpsgenie(cfg.OpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
+	opsGenie := notifiler.NewOpsgenie(cfg.OpsGenieAPIKey, httpClient, metricsStore, cfg.Source)
 
 	chainSrv := chain.NewChain(cfg.JsonRpcURL, httpClient, metricsStore)
 
@@ -48,7 +48,7 @@ func NewServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services {
 		OnChainUpdatesTelegram: updatesTelegram,
 		ErrorsTelegram:         errorsTelegram,
 		Discord:                discord,
-		OpsGenie:               opsGenia,
+		OpsGenie:               opsGenie,
 		ChainSrv:               chainSrv,
 	}
 }
@@ -72,7 +72,7 @@ func NewStageServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services 
 	errorsTelegram := notifiler.NewTelegram(cfg.StageTelegramBotToken, cfg.StageTelegramErrorsChatID, httpClient, metricsStore, cfg.Source)
 
 	discord := notifiler.NewDiscord(cfg.StageDiscordWebHookURL, httpClient, metricsStore, cfg.Source)
-	opsGenia := notifiler.NewOpsgenie(cfg.StageOpsGeniaAPIKey, httpClient, metricsStore, cfg.Source)
+	opsGenie := notifiler.NewOpsgenie(cfg.StageOpsGenieAPIKey, httpClient, metricsStore, cfg.Source)
 
 	chainSrv := chain.NewChain(cfg.JsonRpcURL, httpClient, metricsStore)
 
@@ -81,7 +81,7 @@ func NewStageServices(cfg *env.AppConfig, metricsStore *metrics.Store) Services 
 		OnChainUpdatesTelegram: updatesTelegram,
 		ErrorsTelegram:         errorsTelegram,
 		Discord:                discord,
-		OpsGenie:               opsGenia,
+		OpsGenie:               opsGenie,
 		ChainSrv:               chainSrv,
 	}
 }

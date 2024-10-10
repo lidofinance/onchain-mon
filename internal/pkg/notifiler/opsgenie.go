@@ -38,16 +38,16 @@ func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 }
 
 func (u *opsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
-	opsGeniaPriority := ""
+	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
-		opsGeniaPriority = "P2"
+		opsGeniePriority = "P2"
 	case databus.SeverityHigh:
-		opsGeniaPriority = "P3"
+		opsGeniePriority = "P3"
 	}
 
 	// Send only P2 or P3 alerts
-	if opsGeniaPriority == "" {
+	if opsGeniePriority == "" {
 		return nil
 	}
 
@@ -57,7 +57,7 @@ func (u *opsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		Message:     alert.Name,
 		Description: message,
 		Alias:       alert.AlertId,
-		Priority:    opsGeniaPriority,
+		Priority:    opsGeniePriority,
 	}
 
 	return u.send(ctx, payload)

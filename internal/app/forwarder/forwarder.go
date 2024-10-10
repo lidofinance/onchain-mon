@@ -323,7 +323,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 							w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusOk}).Inc()
 							w.ackMessage(msg)
 
-							w.log.Info(fmt.Sprintf("Consumer: %s succefully sent finding to %s, alertId %s", consumer.Name, consumer.channel, finding.AlertId),
+							w.log.Info(fmt.Sprintf("Consumer: %s successfully sent finding to %s, alertId %s", consumer.Name, consumer.channel, finding.AlertId),
 								slog.Attr{
 									Key:   `alertId`,
 									Value: slog.StringValue(finding.AlertId),

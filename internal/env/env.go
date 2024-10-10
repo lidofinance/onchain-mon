@@ -24,14 +24,14 @@ type AppConfig struct {
 	TelegramErrorsChatID  string
 	TelegramUpdatesChatID string
 	TelegramAlertsChatID  string
-	OpsGeniaAPIKey        string
+	OpsGenieAPIKey        string
 	DiscordWebHookURL     string
 
 	StageTelegramBotToken      string
 	StageTelegramErrorsChatID  string
 	StageTelegramUpdatesChatID string
 	StageTelegramAlertsChatID  string
-	StageOpsGeniaAPIKey        string
+	StageOpsGenieAPIKey        string
 	StageDiscordWebHookURL     string
 
 	NatsDefaultURL string
@@ -97,7 +97,7 @@ func Read(configPath string) (*Config, error) {
 				TelegramUpdatesChatID: viper.GetString("TELEGRAM_UPDATES_CHAT_ID"),
 				TelegramAlertsChatID:  viper.GetString("TELEGRAM_ALERTS_CHAT_ID"),
 
-				OpsGeniaAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
+				OpsGenieAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
 				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
 
 				StageTelegramBotToken:      viper.GetString("STAGE_TELEGRAM_BOT_TOKEN"),
@@ -105,7 +105,7 @@ func Read(configPath string) (*Config, error) {
 				StageTelegramUpdatesChatID: viper.GetString("STAGE_TELEGRAM_UPDATES_CHAT_ID"),
 				StageTelegramAlertsChatID:  viper.GetString("STAGE_TELEGRAM_ALERTS_CHAT_ID"),
 
-				StageOpsGeniaAPIKey:    viper.GetString("STAGE_OPSGENIE_API_KEY"),
+				StageOpsGenieAPIKey:    viper.GetString("STAGE_OPSGENIE_API_KEY"),
 				StageDiscordWebHookURL: viper.GetString("STAGE_DISCORD_WEBHOOK_URL"),
 
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),

@@ -1,12 +1,12 @@
 # Finding-forwarder
-Service forwards findings from forta-local-node to telegram, opsGenia and discord
+Service forwards findings from forta-local-node to telegram, opsGenie and discord
 
  ## How to develop
  1. Install go1.23.1+
  2. cd root repository
  3. make tools
  4. make vendor
- 5. copy `sample.env` to `.env` 
+ 5. copy `sample.env` to `.env`
  6. clone https://github.com/lidofinance/alerting-forta/
     1. cd ethereum-steth
     2. make steth
@@ -21,7 +21,7 @@ Service forwards findings from forta-local-node to telegram, opsGenia and discor
 3. Also, you have to provide the container name of your bot to FORTA-SOFTWARE by analogy with steth:
    1. Container name for steth is **ethereum-steth** look docker-compose file
    2. put bot's container name to the file forta-local-config.yml by analogy with steth
-   3. Consider that in app has programmed consumer for your team bot or use fallback consumer 
+   3. Consider that in app has programmed consumer for your team bot or use fallback consumer
       (provider any name that not included in the list internal/utils/registry/registry.go)
 
 ### I want to develop finding-forwarder server or worker
