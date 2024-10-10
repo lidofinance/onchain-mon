@@ -1,0 +1,8 @@
+---
+- name: Deploy onchain_mon services
+  hosts: onchain_mon_nodes
+  become: true
+  gather_facts: false
+  roles:
+    - role: onchain_mon_deploy
+      tags: [onchain_mon_deploy]

@@ -1,0 +1,38 @@
+---
+name: Open SOPS secrets
+description: Initialize gpg/sops and import CI secrets from sops
+inputs:
+  sops_key:
+    description: Private GPG key to decrypt sops files
+    required: true
+  encrypted_ssh_key:
+    description: Path to private ssh key in sops
+    required: false
+    default: ""
+  encrypted_ci_env:
+    description: Path to env variables in sops
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Import GPG key
+      uses: ./.github/actions/configure_sops # masking is here
+      with:
+        gpg_private_key: "${{ inputs.sops_key }}"
+
+    - name: Add ssh-key to keyring
+      if: inputs.encrypted_ssh_key != ''
+      run: |
+        eval $(ssh-agent)
+        echo "SSH_AUTH_SOCK=${SSH_AUTH_SOCK}" >> $GITHUB_ENV
+        sops exec-file "${{ inputs.encrypted_ssh_key }}" 'ssh-add {}'
+        ssh-add -l
+      shell: bash
+
+    - name: Decrypt env secrets
+      if: inputs.encrypted_ci_env != ''
+      run: |
+        sops exec-file "${{ inputs.encrypted_ci_env }}" 'cat {} >> $GITHUB_ENV'
+      shell: bash

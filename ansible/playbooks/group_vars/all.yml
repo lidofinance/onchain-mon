@@ -1,0 +1,3 @@
+---
+compose_retries: 11
+compose_retries_delay_sec: 3

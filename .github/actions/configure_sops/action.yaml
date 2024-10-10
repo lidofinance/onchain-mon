@@ -1,0 +1,17 @@
+---
+name: Configure sops
+description: Import gpg key and mask sops secrets
+inputs:
+  gpg_private_key:
+    description: 'GPG private key exported as an ASCII armored version or its base64 encoding'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: ./.github/actions/import_gpg
+      with:
+        gpg_private_key: "${{ inputs.gpg_private_key }}"
+    - run: |
+        ./scripts/mask_sops_secrets_in_gh.py
+      shell: bash
