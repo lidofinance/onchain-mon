@@ -80,15 +80,31 @@ services:
       - TELEGRAM_ALERTS_CHAT_ID=${TELEGRAM_ALERTS_CHAT_ID}
       - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
+      - NATS_DEFAULT_URL=http://nats:4222
       - BOT_CONTAINERS=${BOT_CONTAINERS}
-      - REDIS_ADDRESS=${REDIS_ADDRESS}
+      - REDIS_ADDRESS=redis:6379
       - QUORUM_SIZE=${QUORUM_SIZE}
     ports:
       - "8082:8080"
     depends_on:
       - redis
       - nats
+
+  # l2-optimism:
+  #   container_name: l2-optimism
+  #   image: l2-unified
+  #   restart: unless-stopped
+  #   # networks:
+  #   #   - forta_default
+  #   depends_on:
+  #     - nats
+  #   environment:
+  #     - ETHEREUM_RPC_URL=${ETHEREUM_RPC_URL:-https://eth.drpc.org}
+  #     - L2_RPC_URL=${OPTIMISM_RPC_URL:-https://mainnet.optimism.io}
+  #     # - L2_RPC_URL=https://mainnet.optimism.io
+  #     - NATS_SERVER_URL=http://nats:4222
+  #     - LOG_LEVEL=debug
+  #   command: ["yarn", "start:optimism:prod"]
 
   #service-ethereum-steth-v2:
   #  container_name: ethereum-steth-v2
