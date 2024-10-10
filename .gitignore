@@ -26,30 +26,3 @@ bin
 
 vendor/
 tools/vendor
-
-# Ansible
-*.retry
-*.pass
-/secrets/*
-!/**/.gitkeep
-*.pyc
-__pycache__/*
-*.swp
-.vscode
-*.tar
-.vm_ssh
-.vm_ssh.pub
-invites
-.decrypt*
-*.vault
-.venv
-.direnv
-.poetry
-.pre-commit-config.yaml
-.idea
-.DS_Store
-
-# Ignore everything except google collections
-ansible/ansible_collections/*
-!ansible/ansible_collections/google/
-!ansible/ansible_collections/lido/
