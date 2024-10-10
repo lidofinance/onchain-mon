@@ -67,8 +67,8 @@ func main() {
 	r := chi.NewRouter()
 	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
-	services := server.NewServices(&cfg.AppConfig, metricsStore)
-	stageServices := server.NewServices(&cfg.AppConfig, metricsStore)
+	services := server.NewServices(&cfg.AppConfig.DeliveryConfig, cfg.AppConfig.Source, cfg.AppConfig.JsonRpcURL, metricsStore)
+	stageServices := server.NewServices(&cfg.AppConfig.DeliveryStageConfig, cfg.AppConfig.Source, cfg.AppConfig.JsonRpcURL, metricsStore)
 	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
