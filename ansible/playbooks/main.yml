@@ -1,3 +1,0 @@
----
-- name: Deploy onchain_mon services
-  import_playbook: _onchain_mon_deploy.yml

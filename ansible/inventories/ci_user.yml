@@ -1,4 +1,0 @@
----
-all:
-  vars:
-    ansible_user: ci_user

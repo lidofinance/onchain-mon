@@ -9,10 +9,6 @@ on:
 env:
   IMAGE_NAME: onchain-mon
   IMAGE_TAG: latest
-  ANSIBLE_FORCE_COLOR: "True"
-  ANSIBLE_INVENTORY: inventories/devel/,provider_inventories/devel/,inventories/ci_user.yml
-  encrypted_ssh_key: .github/secrets/devel/ssh_private_key.sops
-  encrypted_ci_env: ""
 
 jobs:
   build-and-push:
@@ -38,36 +34,3 @@ jobs:
           push: true
           tags: lidofinance/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           builder: ${{ steps.buildx.outputs.name }}
-
-  deploy:
-    needs:
-      - build-and-push
-    concurrency:
-      group: onchain_mon
-      cancel-in-progress: false
-    runs-on: ubuntu-20.04
-    container:
-      image: ghcr.io/lidofinance/ci:stable
-      credentials:
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Open sops secrets
-        uses: ./.github/actions/import_sops_secrets
-        with:
-          sops_key: ${{ env.sops_key }}
-          encrypted_ssh_key: ${{ env.encrypted_ssh_key }}
-          encrypted_ci_env: ${{ env.encrypted_ci_env }}
-
-      - name: Deploy on devel
-        run: ansible-playbook
-          playbooks/main.yml
-          -e github_username=${{ github.actor }}
-        working-directory: ansible
-        shell: bash
