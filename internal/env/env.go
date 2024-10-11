@@ -99,7 +99,7 @@ func Read(configPath string) (*Config, error) {
 					DiscordWebHookURL:     viper.GetString("DISCORD_WEBHOOK_URL"),
 				},
 
-				DeliveryStageConfig: DeliveryServicesConfig{
+				/*DeliveryStageConfig: DeliveryServicesConfig{
 					TelegramBotToken:      viper.GetString("STAGE_TELEGRAM_BOT_TOKEN"),
 					TelegramErrorsChatID:  viper.GetString("STAGE_TELEGRAM_ERRORS_CHAT_ID"),
 					TelegramUpdatesChatID: viper.GetString("STAGE_TELEGRAM_UPDATES_CHAT_ID"),
@@ -107,7 +107,7 @@ func Read(configPath string) (*Config, error) {
 
 					OpsGenieAPIKey:    viper.GetString("STAGE_OPSGENIE_API_KEY"),
 					DiscordWebHookURL: viper.GetString("STAGE_DISCORD_WEBHOOK_URL"),
-				},
+				},*/
 
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),

@@ -338,7 +338,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 								},
 							)
 
-							if err := w.SeNotificationStatus(ctx, key, StatusSent); err != nil {
+							if err := w.SeNotificationStatus(ctx, statusKey, StatusSent); err != nil {
 								w.metrics.RedisErrors.Inc()
 								w.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
 							}
