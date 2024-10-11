@@ -20,7 +20,7 @@ L1 balanceOf: 1080.11
 ETH: 19811516
 ZkSync: 33308621`
 
-func Test_opsGenia_SendMessage(t *testing.T) {
+func Test_opsGenie_SendMessage(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
@@ -48,7 +48,7 @@ func Test_opsGenia_SendMessage(t *testing.T) {
 		{
 			name: "Success",
 			fields: fields{
-				opsGenieKey:  cfg.AppConfig.OpsGeniaAPIKey,
+				opsGenieKey:  cfg.AppConfig.OpsGenieAPIKey,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},

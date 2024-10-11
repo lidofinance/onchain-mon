@@ -65,6 +65,7 @@ const (
 
 const (
 	TTLMins10 = 10 * time.Minute
+	TTLMin1   = 1 * time.Minute
 )
 
 func WithFindingConsumer(
@@ -277,6 +278,17 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 						w.ackMessage(msg)
 
 						w.cache.Remove(countKey)
+
+						if err := w.redisClient.Expire(ctx, countKey, TTLMin1).Err(); err != nil {
+							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
+							w.metrics.RedisErrors.Inc()
+						}
+
+						if err := w.redisClient.Expire(ctx, statusKey, TTLMin1).Err(); err != nil {
+							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
+							w.metrics.RedisErrors.Inc()
+						}
+
 						w.log.Info(fmt.Sprintf("Another instance already sent finding: %s", finding.AlertId))
 						return
 					}
@@ -323,7 +335,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 							w.metrics.SentAlerts.With(prometheus.Labels{metrics.Channel: consumer.channel, metrics.Status: metrics.StatusOk}).Inc()
 							w.ackMessage(msg)
 
-							w.log.Info(fmt.Sprintf("Consumer: %s succefully sent finding to %s, alertId %s", consumer.Name, consumer.channel, finding.AlertId),
+							w.log.Info(fmt.Sprintf("Consumer: %s successfully sent finding to %s, alertId %s", consumer.Name, consumer.channel, finding.AlertId),
 								slog.Attr{
 									Key:   `alertId`,
 									Value: slog.StringValue(finding.AlertId),
@@ -338,7 +350,7 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 								},
 							)
 
-							if err := w.SeNotificationStatus(ctx, key, StatusSent); err != nil {
+							if err := w.SeNotificationStatus(ctx, statusKey, StatusSent); err != nil {
 								w.metrics.RedisErrors.Inc()
 								w.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
 							}
@@ -412,18 +424,18 @@ func findingToUniqueHash(f *databus.FindingDtoJson) string {
 	var buffer bytes.Buffer
 
 	if f.UniqueKey != nil {
-		return *f.UniqueKey
+		buffer.WriteString(f.Team)
+		buffer.WriteString(f.BotName)
+		buffer.WriteString(*f.UniqueKey)
+	} else {
+		buffer.WriteString(f.Team)
+		buffer.WriteString(f.BotName)
+		buffer.WriteString(f.AlertId)
+		buffer.WriteString(f.Name)
+		buffer.WriteString(string(f.Severity))
 	}
 
-	buffer.WriteString(f.Team)
-	buffer.WriteString(f.BotName)
-	buffer.WriteString(f.AlertId)
-	buffer.WriteString(f.Name)
-	buffer.WriteString(string(f.Severity))
-
-	uniqueKey := computeSHA256Hash(buffer.Bytes())
-
-	return uniqueKey
+	return computeSHA256Hash(buffer.Bytes())
 }
 
 func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {

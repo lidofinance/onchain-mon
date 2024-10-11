@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nats-io/nats.go/jetstream"
@@ -18,6 +20,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	nc "github.com/lidofinance/onchain-mon/internal/connectors/nats"
 	"github.com/lidofinance/onchain-mon/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/pkg/chain"
 )
 
 func main() {
@@ -51,23 +54,36 @@ func main() {
 	r := chi.NewRouter()
 	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
-	services := server.NewServices(&cfg.AppConfig, metricsStore)
+	transport := &http.Transport{
+		MaxIdleConns:          10,
+		MaxIdleConnsPerHost:   5,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
+	chainSrv := chain.NewChain(cfg.AppConfig.JsonRpcURL, httpClient, metricsStore)
 	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
 
-	feederWrk := feeder.New(log, services.ChainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
+	feederWrk := feeder.New(log, chainSrv, js, metricsStore, cfg.AppConfig.BlockTopic)
 	feederWrk.Run(gCtx, g)
 
 	app.RegisterWorkerRoutes(r)
 	app.RegisterInfraRoutes(r)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
-	log.Info(fmt.Sprintf(`Started %s feeder`, cfg.AppConfig.Name))
+	log.Info(fmt.Sprintf(`Started %s`, cfg.AppConfig.Name))
 
 	if err := g.Wait(); err != nil {
 		log.Error(err.Error())
 	}
 
-	fmt.Println(`Main done`)
+	log.Info(fmt.Sprintf(`Main done %s`, cfg.AppConfig.Name))
 }

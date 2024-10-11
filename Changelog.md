@@ -1,5 +1,9 @@
 ## 11.10.2024
-1. Fixed sending status
+1. Quorum hash calculation: if unique key is specified - salt it with botId and Team
+2. Made alert footer compact (2 lines) and add "happened ~ X seconds ago" text
+3. Added code for stage consumers: yet disabled by commenting out
+4. Fixed statusKey: from key -> statusKey on statusSent
+5. Set expired 1m ttl for statusKey, countKey when instance has sent finding
 
 ## 08.10.2024
 1. Split up feeder, forwarder to independent bin applications
@@ -18,7 +22,7 @@
 
 ## 23.09.2024
 1. Add lru for quorum
-2. Tun docker-compose-file 
+2. Tun docker-compose-file
 3. Upgrade GO 1.23.1
 4. Increased MaxMsgSize for Nats for 3Mb
 5. Lint project
@@ -26,7 +30,7 @@
 ## 16.09.2024
 1. Added redis
 2. Added quorum powered by redis
-3. Added retry for sending message to Telegram, Discord, OpsGenia
+3. Added retry for sending message to Telegram, Discord, OpsGenie
 
 ## 14.09.2024
 1. Added feeder
@@ -62,18 +66,18 @@
 6. Updated dependencies
 
 ## 06.06.2024
-1. Added sending alertAlias to OpsGenia
+1. Added sending alertAlias to OpsGenie
 2. Fix alert handler
 
 ## 05.06.2024
 1. Added Nats
-2. Added workers for sending alert to telegram, discord and, opsGenia
+2. Added workers for sending alert to telegram, discord and, opsGenie
 3. Load environment variables inside docker from shell
 
 ## 31.05.2024
 1. Added method for sending messages into telegram chat
 2. Added method for sending messages into discord chat
-3. Added method for sending messages into opsGenia chat
+3. Added method for sending messages into opsGenie chat
 4. Set up linter rules
 5. Preparation for redis-queue task
 

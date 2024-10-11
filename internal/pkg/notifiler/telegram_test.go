@@ -27,26 +27,26 @@ Of Mans First Disobedience, and the Fruit
 Of that Forbidden Tree, whose mortal taste
 Brought Death into the World, and all our woe,
 With loss of Eden, till one greater Man
-Restore us, and regain the blissful Seat, 
+Restore us, and regain the blissful Seat,
 
 Sing Heav'nly Muse, that on the secret top
 Of Oreb, or of Sinai, didst inspire
 That Shepherd, who first taught the chosen Seed,
 In the Beginning how the Heav'ns and Earth
 
-Rose out of Chaos: Or if Sion Hill 
+Rose out of Chaos: Or if Sion Hill
 Delight thee more, and Siloa's Brook that flow'd
 Fast by the Oracle of God; I thence
 Invoke thy aid to my adventurous Song,
 That with no middle flight intends to soar
 
-Above th' Aonian Mount, while it pursues 
+Above th' Aonian Mount, while it pursues
 Things unattempted yet in Prose or Rhime.
 And chiefly Thou O Spirit, that dost prefer
 Before all Temples th' upright heart and pure,
 
 Instruct me, for Thou know'st; Thou from the first
-Wast present, and with mighty wings outspread 
+Wast present, and with mighty wings outspread
 Dove-like satst brooding on the vast Abyss
 And mad'st it pregnant: What in me is dark
 
@@ -58,20 +58,20 @@ And justifie the wayes of God to men.
 Say first, for Heav'n hides nothing from thy view
 Nor the deep Tract of Hell, say first what cause
 Mov'd our Grand Parents in that happy State,
-Favour'd of Heav'n so highly, to fall off 
+Favour'd of Heav'n so highly, to fall off
 
 From thir Creator, and transgress his Will
 For one restraint, Lords of the World besides?
 Who first seduc'd them to that foul revolt?
 Th' infernal Serpent; he it was, whose guile
-Stird up with Envy and Revenge, deceiv'd 
+Stird up with Envy and Revenge, deceiv'd
 
 The Mother of Mankind, what time his Pride
 Had cast him out from Heav'n, with all his Host
 Of Rebel Angels, by whose aid aspiring
 To set himself in Glory above his Peers,
 
-He trusted to have equal'd the most High, 
+He trusted to have equal'd the most High,
 If he oppos'd; and with ambitious aim
 Against the Throne and Monarchy of God
 Rais'd impious War in Heav'n and Battel proud
@@ -102,7 +102,7 @@ As one great Furnace flam'd, yet from those flames
 No light, but rather darkness visible
 
 Serv'd onely to discover sights of woe,
-Regions of sorrow, doleful shades, where peace 
+Regions of sorrow, doleful shades, where peace
 And rest can never dwell, hope never comes
 That comes to all; but torture without end
 
@@ -124,16 +124,16 @@ One next himself in power, and next in crime,
 Long after known in Palestine, and nam'd
 Beelzebub. To whom th' Arch-Enemy,
 And thence in Heav'n call'd Satan, with bold words
-Breaking the horrid silence thus began. 
+Breaking the horrid silence thus began.
 
 If thou beest he; But O how fall'n! how chang'd
-From him, who in the happy Realms of Light 
+From him, who in the happy Realms of Light
 Cloth'd with transcendent brightness didst out-shine
 Myriads though bright: If he Whom mutual league,
 
 United thoughts and counsels, equal hope
 And hazard in the Glorious Enterprise,
-Joynd with me once, now misery hath joynd 
+Joynd with me once, now misery hath joynd
 In equal ruin: into what Pit thou seest
 
 From what highth fall'n, so much the stronger prov'd
@@ -158,19 +158,19 @@ And study of revenge, immortal hate,
 And courage never to submit or yield:
 And what is else not to be overcome?
 
-That Glory never shall his wrath or might 
+That Glory never shall his wrath or might
 Extort from me. To bow and sue for grace
 With suppliant knee, and deifie his power,
 Who from the terrour of this Arm so late
 
 Doubted his Empire, that were low indeed,
-That were an ignominy and shame beneath 
+That were an ignominy and shame beneath
 This downfall; since by Fate the strength of Gods
 And this Empyreal substance cannot fail,
 
 Since through experience of this great event
 In Arms not worse, in foresight much advanc't,
-We may with more successful hope resolve 
+We may with more successful hope resolve
 To wage by force or guile eternal Warr
 
 Irreconcileable, to our grand Foe,
@@ -186,7 +186,7 @@ Source: local
 Server timestamp: 18:36:55.152 MSK
 Block  timestamp: 17:20:36.000 MSK`
 
-func Test_SendFinfing(t *testing.T) {
+func Test_SendFinding(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")
 	if envErr != nil {
 		t.Errorf("Read env error: %s", envErr.Error())
@@ -215,8 +215,8 @@ func Test_SendFinfing(t *testing.T) {
 		{
 			name: "Send_Test_Message_to_telegram",
 			fields: fields{
-				botToken:     cfg.AppConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.TelegramErrorsChatID,
+				botToken:     cfg.AppConfig.DeliveryConfig.TelegramBotToken,
+				chatID:       cfg.AppConfig.DeliveryConfig.TelegramErrorsChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -247,8 +247,8 @@ Withdrawals info:
 		{
 			name: "Send_Test_Message_to_telegram",
 			fields: fields{
-				botToken:     cfg.AppConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.TelegramErrorsChatID,
+				botToken:     cfg.AppConfig.DeliveryConfig.TelegramBotToken,
+				chatID:       cfg.AppConfig.DeliveryConfig.TelegramErrorsChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -271,8 +271,8 @@ Withdrawals info:
 		{
 			name: "Send_4096_symbol_to_telegram",
 			fields: fields{
-				botToken:     cfg.AppConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.TelegramErrorsChatID,
+				botToken:     cfg.AppConfig.DeliveryConfig.TelegramBotToken,
+				chatID:       cfg.AppConfig.DeliveryConfig.TelegramErrorsChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -327,26 +327,26 @@ Of Mans First Disobedience, and the Fruit
 Of that Forbidden Tree, whose mortal taste
 Brought Death into the World, and all our woe,
 With loss of Eden, till one greater Man
-Restore us, and regain the blissful Seat, 
+Restore us, and regain the blissful Seat,
 
 Sing Heav'nly Muse, that on the secret top
 Of Oreb, or of Sinai, didst inspire
 That Shepherd, who first taught the chosen Seed,
 In the Beginning how the Heav'ns and Earth
 
-Rose out of Chaos: Or if Sion Hill 
+Rose out of Chaos: Or if Sion Hill
 Delight thee more, and Siloa's Brook that flow'd
 Fast by the Oracle of God; I thence
 Invoke thy aid to my adventurous Song,
 That with no middle flight intends to soar
 
-Above th' Aonian Mount, while it pursues 
+Above th' Aonian Mount, while it pursues
 Things unattempted yet in Prose or Rhime.
 And chiefly Thou O Spirit, that dost prefer
 Before all Temples th' upright heart and pure,
 
 Instruct me, for Thou know'st; Thou from the first
-Wast present, and with mighty wings outspread 
+Wast present, and with mighty wings outspread
 Dove-like satst brooding on the vast Abyss
 And mad'st it pregnant: What in me is dark
 
@@ -358,20 +358,20 @@ And justifie the wayes of God to men.
 Say first, for Heav'n hides nothing from thy view
 Nor the deep Tract of Hell, say first what cause
 Mov'd our Grand Parents in that happy State,
-Favour'd of Heav'n so highly, to fall off 
+Favour'd of Heav'n so highly, to fall off
 
 From thir Creator, and transgress his Will
 For one restraint, Lords of the World besides?
 Who first seduc'd them to that foul revolt?
 Th' infernal Serpent; he it was, whose guile
-Stird up with Envy and Revenge, deceiv'd 
+Stird up with Envy and Revenge, deceiv'd
 
 The Mother of Mankind, what time his Pride
 Had cast him out from Heav'n, with all his Host
 Of Rebel Angels, by whose aid aspiring
 To set himself in Glory above his Peers,
 
-He trusted to have equal'd the most High, 
+He trusted to have equal'd the most High,
 If he oppos'd; and with ambitious aim
 Against the Throne and Monarchy of God
 Rais'd impious War in Heav'n and Battel proud
@@ -402,7 +402,7 @@ As one great Furnace flam'd, yet from those flames
 No light, but rather darkness visible
 
 Serv'd onely to discover sights of woe,
-Regions of sorrow, doleful shades, where peace 
+Regions of sorrow, doleful shades, where peace
 And rest can never dwell, hope never comes
 That comes to all; but torture without end
 
@@ -424,10 +424,10 @@ One next himself in power, and next in crime,
 Long after known in Palestine, and nam'd
 Beelzebub. To whom th' Arch-Enemy,
 And thence in Heav'n call'd Satan, with bold words
-Breaking the horrid silence thus began. 
+Breaking the horrid silence thus began.
 
 If thou beest he; But O how fall'n! how chang'd
-From him, who in the happy Realms of Light 
+From him, who in the happy Realms of Light
 Cloth'd with transcendent brightness did
 ...
 

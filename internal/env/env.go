@@ -11,20 +11,26 @@ type Config struct {
 	AppConfig AppConfig
 }
 
-type AppConfig struct {
-	Name                  string
-	Source                string
-	Env                   string
-	URL                   string
-	Port                  uint
-	LogFormat             string
-	LogLevel              string
+type DeliveryServicesConfig struct {
 	TelegramBotToken      string
 	TelegramErrorsChatID  string
 	TelegramUpdatesChatID string
 	TelegramAlertsChatID  string
-	OpsGeniaAPIKey        string
+	OpsGenieAPIKey        string
 	DiscordWebHookURL     string
+}
+
+type AppConfig struct {
+	Name      string
+	Source    string
+	Env       string
+	URL       string
+	Port      uint
+	LogFormat string
+	LogLevel  string
+
+	DeliveryConfig      DeliveryServicesConfig
+	DeliveryStageConfig DeliveryServicesConfig
 
 	NatsDefaultURL string
 	MetricsPrefix  string
@@ -84,13 +90,24 @@ func Read(configPath string) (*Config, error) {
 				LogFormat: viper.GetString("LOG_FORMAT"),
 				LogLevel:  viper.GetString("LOG_LEVEL"),
 
-				TelegramBotToken:      viper.GetString("TELEGRAM_BOT_TOKEN"),
-				TelegramErrorsChatID:  viper.GetString("TELEGRAM_ERRORS_CHAT_ID"),
-				TelegramUpdatesChatID: viper.GetString("TELEGRAM_UPDATES_CHAT_ID"),
-				TelegramAlertsChatID:  viper.GetString("TELEGRAM_ALERTS_CHAT_ID"),
+				DeliveryConfig: DeliveryServicesConfig{
+					TelegramBotToken:      viper.GetString("TELEGRAM_BOT_TOKEN"),
+					TelegramErrorsChatID:  viper.GetString("TELEGRAM_ERRORS_CHAT_ID"),
+					TelegramUpdatesChatID: viper.GetString("TELEGRAM_UPDATES_CHAT_ID"),
+					TelegramAlertsChatID:  viper.GetString("TELEGRAM_ALERTS_CHAT_ID"),
+					OpsGenieAPIKey:        viper.GetString("OPSGENIE_API_KEY"),
+					DiscordWebHookURL:     viper.GetString("DISCORD_WEBHOOK_URL"),
+				},
 
-				OpsGeniaAPIKey:    viper.GetString("OPSGENIE_API_KEY"),
-				DiscordWebHookURL: viper.GetString("DISCORD_WEBHOOK_URL"),
+				/*DeliveryStageConfig: DeliveryServicesConfig{
+					TelegramBotToken:      viper.GetString("STAGE_TELEGRAM_BOT_TOKEN"),
+					TelegramErrorsChatID:  viper.GetString("STAGE_TELEGRAM_ERRORS_CHAT_ID"),
+					TelegramUpdatesChatID: viper.GetString("STAGE_TELEGRAM_UPDATES_CHAT_ID"),
+					TelegramAlertsChatID:  viper.GetString("STAGE_TELEGRAM_ALERTS_CHAT_ID"),
+
+					OpsGenieAPIKey:    viper.GetString("STAGE_OPSGENIE_API_KEY"),
+					DiscordWebHookURL: viper.GetString("STAGE_DISCORD_WEBHOOK_URL"),
+				},*/
 
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
