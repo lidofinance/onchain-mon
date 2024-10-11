@@ -65,6 +65,7 @@ const (
 
 const (
 	TTLMins10 = 10 * time.Minute
+	TTLMin1   = 1 * time.Minute
 )
 
 func WithFindingConsumer(
@@ -277,6 +278,17 @@ func (w *findingWorker) Run(ctx context.Context, g *errgroup.Group) error {
 						w.ackMessage(msg)
 
 						w.cache.Remove(countKey)
+
+						if err := w.redisClient.Expire(ctx, countKey, TTLMin1).Err(); err != nil {
+							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
+							w.metrics.RedisErrors.Inc()
+						}
+
+						if err := w.redisClient.Expire(ctx, statusKey, TTLMin1).Err(); err != nil {
+							w.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
+							w.metrics.RedisErrors.Inc()
+						}
+
 						w.log.Info(fmt.Sprintf("Another instance already sent finding: %s", finding.AlertId))
 						return
 					}
