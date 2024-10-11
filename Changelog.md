@@ -1,5 +1,9 @@
-## 09.10.2024
-1. Added stage consumers
+## 11.10.2024
+1. Quorum hash calculation: if unique key is specified - salt it with botId and Team
+2. Made alert footer compact (2 lines) and add "happened ~ X seconds ago" text
+3. Added code for stage consumers: yet disabled by commenting out
+4. Fixed statusKey: from key -> statusKey on statusSent
+5. Set expired 1m ttl for statusKey, countKey when instance has sent finding
 
 ## 08.10.2024
 1. Split up feeder, forwarder to independent bin applications
