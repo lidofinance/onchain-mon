@@ -439,7 +439,7 @@ func (w *findingWorker) SetSendingStatus(ctx context.Context, countKey, statusKe
         return 0
     `
 
-	res, err := w.redisClient.Eval(ctx, luaScript, []string{countKey, statusKey}, w.quorum, string(StatusNotSend), string(StatusSent)).Result()
+	res, err := w.redisClient.Eval(ctx, luaScript, []string{countKey, statusKey}, w.quorum, string(StatusNotSend), string(StatusSending)).Result()
 	if err != nil {
 		return false, fmt.Errorf(`could not get notification_sent_status: %v`, err)
 	}
