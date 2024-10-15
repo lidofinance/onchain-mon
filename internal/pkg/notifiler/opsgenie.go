@@ -21,15 +21,15 @@ type AlertPayload struct {
 	Alias       string `json:"alias,omitempty"`
 }
 
-type opsGenie struct {
+type OpsGenie struct {
 	opsGenieKey string
 	httpClient  *http.Client
 	metrics     *metrics.Store
 	source      string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) *opsGenie {
-	return &opsGenie{
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) *OpsGenie {
+	return &OpsGenie{
 		opsGenieKey: opsGenieKey,
 		httpClient:  httpClient,
 		metrics:     metricsStore,
@@ -37,7 +37,7 @@ func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 	}
 }
 
-func (u *opsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (u *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
@@ -63,7 +63,7 @@ func (u *opsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	return u.send(ctx, payload)
 }
 
-func (u *opsGenie) send(ctx context.Context, payload AlertPayload) error {
+func (u *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("could not marshal OpsGenie payload: %w", err)
@@ -96,4 +96,8 @@ func (u *opsGenie) send(ctx context.Context, payload AlertPayload) error {
 	}
 
 	return nil
+}
+
+func (d *OpsGenie) GetType() string {
+	return "OpsGenie"
 }

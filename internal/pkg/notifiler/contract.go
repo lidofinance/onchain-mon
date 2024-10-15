@@ -8,4 +8,5 @@ import (
 
 type FindingSender interface {
 	SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error
+	GetType() string
 }

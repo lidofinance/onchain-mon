@@ -14,7 +14,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 )
 
-type discord struct {
+type Discord struct {
 	webhookURL string
 	httpClient *http.Client
 	metrics    *metrics.Store
@@ -25,8 +25,8 @@ type MessagePayload struct {
 	Content string `json:"content"`
 }
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string) *discord {
-	return &discord{
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string) *Discord {
+	return &Discord{
 		webhookURL: webhookURL,
 		httpClient: httpClient,
 		metrics:    metricsStore,
@@ -37,7 +37,7 @@ func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metric
 const maxDiscordMsgLength = 2000
 const warningDiscordMessage = "Warn: Msg >=2000, pls review description message"
 
-func (d *discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
 		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source)),
 		maxDiscordMsgLength,
@@ -47,7 +47,7 @@ func (d *discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson
 	return d.send(ctx, message)
 }
 
-func (d *discord) send(ctx context.Context, message string) error {
+func (d *Discord) send(ctx context.Context, message string) error {
 	payload := MessagePayload{
 		Content: message,
 	}
@@ -80,4 +80,8 @@ func (d *discord) send(ctx context.Context, message string) error {
 	}
 
 	return nil
+}
+
+func (d *Discord) GetType() string {
+	return "Discord"
 }

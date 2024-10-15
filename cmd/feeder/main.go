@@ -68,7 +68,7 @@ func main() {
 	}
 
 	chainSrv := chain.NewChain(cfg.AppConfig.JsonRpcURL, httpClient, metricsStore)
-	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
+	app := server.New(&cfg.AppConfig, nil, log, metricsStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
 

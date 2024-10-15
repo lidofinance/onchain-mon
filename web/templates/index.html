@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consumers Configuration</title>
+    <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .sortable {
+            cursor: pointer;
+        }
+        .sortable:hover {
+            text-decoration: underline;
+        }
+        .icon {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Consumers Configuration</h1>
+
+<table>
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th class="sortable" onclick="sortTable(1)">Type <span class="icon">⬍</span></th>
+        <th>Channel Description</th>
+        <th>Severities</th>
+        <th>By Quorum</th>
+        <th class="sortable" onclick="sortTable(5)">Team <span class="icon">⬍</span></th>
+        <th class="sortable" onclick="sortTable(6)">Bot <span class="icon">⬍</span></th>
+        <th>Subject</th>
+    </tr>
+    </thead>
+    <tbody id="consumers-table">
+    {{range .Consumers}}
+    <tr>
+        <td>{{.ConsumerName}}</td>
+        <td>{{.Type}}</td>
+        <td>{{.ChannelDesc}}</td>
+        <td>{{range .Severities}}<div>{{.}}</div>{{end}}</td>
+        <td>{{if .ByQuorum}}Yes{{else}}No{{end}}</td>
+        <td>{{.Team}}</td>
+        <td>{{.Bot}}</td>
+        <td>{{.Subject}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+</table>
+
+<script>
+    function sortTable(columnIndex) {
+        var table = document.getElementById("consumers-table");
+        var rows = Array.prototype.slice.call(table.getElementsByTagName("tr"));
+
+        var ascending = table.getAttribute("data-sort-asc") === "true";
+        table.setAttribute("data-sort-asc", !ascending);
+
+        rows.sort(function(a, b) {
+            var aText = a.getElementsByTagName("td")[columnIndex].innerText.toLowerCase();
+            var bText = b.getElementsByTagName("td")[columnIndex].innerText.toLowerCase();
+
+            if (aText < bText) return ascending ? -1 : 1;
+            if (aText > bText) return ascending ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(function(row) {
+            table.appendChild(row);
+        });
+    }
+</script>
+
+</body>
+</html>

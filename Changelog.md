@@ -1,3 +1,6 @@
+## 16.10.2024
+1. Added dynamic yaml notification config
+
 ## 11.10.2024
 1. Quorum hash calculation: if unique key is specified - salt it with botId and Team
 2. Made alert footer compact (2 lines) and add "happened ~ X seconds ago" text

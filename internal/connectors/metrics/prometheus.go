@@ -20,6 +20,7 @@ type Store struct {
 
 const Status = `status`
 const Channel = `channel`
+const ConsumerName = `consumerName`
 
 const StatusOk = `Ok`
 const StatusFail = `Fail`
@@ -50,7 +51,7 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 		SentAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_finding_sent_total", prefix),
 			Help: "The total number of set findings",
-		}, []string{Channel, Status}),
+		}, []string{ConsumerName, Status}),
 		RedisErrors: promauto.NewCounter(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_redis_error_total", prefix),
 			Help: "The total number of redis errors",
