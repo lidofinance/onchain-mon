@@ -1,225 +1,211 @@
 
-# Notification Configuration Guide
+# Notification System Configuration
 
-This configuration file is used to set up notification channels for various services like Telegram, Discord, and OpsGenie. It defines the severity levels for events and the consumers that process messages from NATS. The configuration allows you to manage different notification channels, assign severity filters, and control the quorum settings for each consumer.
+This configuration file defines the settings for a notification system that forwards messages to various channels such as Telegram, Discord, and OpsGenie. The configuration includes settings for severity levels, channels, and consumers. Below is an explanation of how to configure the YAML file properly.
 
-## Main Sections of the Configuration
+## Sections
 
-### 1. **severity_levels**
-
-This section defines the available severity levels for filtering events based on their importance. These severity levels are referenced in the `notification_channels` section to specify which events a consumer should handle.
-
-Available severity levels:
-- `info`
-- `low`
-- `medium`
-- `high`
-- `critical`
+### 1. **Severity Levels**
+This section defines the different severity levels used to categorize messages. These severity levels will be referenced by the consumers to filter which messages they will process.
 
 Example:
 ```yaml
 severity_levels:
-  - id: "info"
-  - id: "low"
-  - id: "medium"
-  - id: "high"
-  - id: "critical"
+  - id: Unknown
+  - id: Info
+  - id: Low
+  - id: Medium
+  - id: High
+  - id: Critical
 ```
 
-### 2. **telegram_channels**
+- **id**: The identifier for the severity level. These values will be used to define which severity levels a consumer should process.
 
-This section describes all available Telegram channels for sending notifications.
-
-Fields:
-- `id`: A unique identifier for the Telegram channel. This will be used to reference the channel in the `notification_channels` section.
-- `description`: A brief description of what this channel is used for (e.g., which team or type of alerts).
-- `token`: The Telegram bot token used to send notifications.
-- `chat_id`: The Telegram chat ID where notifications will be sent.
+### 2. **Telegram Channels**
+Define the Telegram channels where notifications will be sent. Each channel must have a unique ID, a description, and authentication details (bot token and chat ID).
 
 Example:
 ```yaml
 telegram_channels:
-  - id: "Telegram1"
-    description: "Main Telegram channel for Team A alerts"
-    token: "YOUR_TELEGRAM_BOT_TOKEN_1"
-    chat_id: "YOUR_CHAT_ID_1"
+  - id: Telegram1
+    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
+    chat_id: YOUR_CHAT_ID_1
+  - id: Telegram2
+    description: Telegram channel for all messages >= Low, no quorum
+    bot_token: YOUR_TELEGRAM_BOT_TOKEN_2
+    chat_id: YOUR_CHAT_ID_2
 ```
 
-### 3. **discord_channels**
+- **id**: Unique identifier for the Telegram channel.
+- **description**: A short description of the channel and its intended purpose.
+- **bot_token**: The Telegram bot token used to authenticate the bot.
+- **chat_id**: The chat ID where the messages will be sent.
 
-This section defines Discord channels that send notifications via webhooks.
-
-Fields:
-- `id`: A unique identifier for the Discord channel.
-- `description`: A description of what the channel is used for (e.g., what type of alerts it handles).
-- `webhook_url`: The Discord webhook URL used to send notifications.
+### 3. **Discord Channels**
+Define the Discord channels where notifications will be sent. Each channel must have a unique ID, description, and a webhook URL for sending messages.
 
 Example:
 ```yaml
 discord_channels:
-  - id: "Discord1"
-    description: "Discord channel for Team A's critical alerts"
-    webhook_url: "YOUR_DISCORD_WEBHOOK_URL_1"
+  - id: Discord1
+    description: "Discord channel for debug messages (severity: Unknown, no quorum)"
+    webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 ```
 
-### 4. **opsgenie_channels**
+- **id**: Unique identifier for the Discord channel.
+- **description**: A short description of the channel and its intended purpose.
+- **webhook_url**: The Discord webhook URL used to send messages to the channel.
 
-This section lists OpsGenie channels for sending alerts using the OpsGenie API.
-
-Fields:
-- `id`: A unique identifier for the OpsGenie channel.
-- `description`: A description explaining the purpose of this OpsGenie channel.
-- `api_key`: The API key used to send notifications via OpsGenie.
+### 4. **OpsGenie Channels**
+Define the OpsGenie channels where critical alerts will be sent. Each channel must have a unique ID, description, and an API key.
 
 Example:
 ```yaml
 opsgenie_channels:
-  - id: "OpsGenie1"
-    description: "OpsGenie integration for Team A critical incidents"
-    api_key: "YOUR_OPSGENIE_API_KEY_1"
+  - id: OpsGenie1
+    description: OpsGenie channel for High and Critical messages
+    api_key: YOUR_OPSGENIE_API_KEY_1
 ```
 
-### 5. **teams**
+- **id**: Unique identifier for the OpsGenie channel.
+- **description**: A short description of the channel and its intended purpose.
+- **api_key**: The API key used to authenticate with OpsGenie.
 
-The `teams` section defines the teams and their corresponding consumers that will listen to specific NATS subjects and send notifications using the previously defined channels.
-
-Fields:
-- `name`: The name of the team.
-- `nats_subject`: The default NATS subject that this team listens to for events. It can be overridden at the consumer level if necessary.
-- `notification_channels`: A list of consumers that will process messages and send notifications.
-
-### 6. **notification_channels**
-
-Each `notification_channels` entry describes a consumer that listens for messages and sends notifications. **The `consumerName` must be unique** across all teams. This is a requirement, as NATS does not allow multiple consumers with the same name.
-
-Fields:
-- `consumerName`: A unique name for this consumer. It **must be unique** across the entire configuration.
-- `type`: The type of notification channel (`Telegram`, `Discord`, or `OpsGenie`).
-- `channel_id`: A reference to the channel defined in either `telegram_channels`, `discord_channels`, or `opsgenie_channels` using its `id`.
-- `severity_refs`: A list of severity levels this consumer should process. These levels must be defined in the `severity_levels` section.
-- `by_quorum`: A boolean value (`true` or `false`) indicating whether a quorum is required before the notification is sent.
-- `nats_subject`: (Optional) A specific NATS subject that this consumer will listen to. If not provided, the team's default `nats_subject` will be used.
+### 5. **Consumers**
+Consumers are responsible for listening to specific NATS subjects and forwarding messages to the appropriate channels. Each consumer has its own configuration, including the channel to which it sends notifications, the severity levels it processes, and whether it operates based on a quorum.
 
 Example:
 ```yaml
-notification_channels:
-  - consumerName: "TelegramAlerts1"
-    type: "Telegram"
-    channel_id: "Telegram1"
-    severity_refs:
-      - "high"
-      - "critical"
-    by_quorum: true
-    nats_subject: "nats.teamA.custom"
+consumers:
+  - consumerName: TelegramDebug
+    type: Telegram
+    channel_id: Telegram1
+    severities:
+      - Unknown
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
 ```
 
-### Example Configuration for Team "protocol"
+- **consumerName**: The name of the consumer, which will be used to generate the unique consumer name as `<teamName>_<consumerName>_<botName>`.
+- **type**: The type of channel the consumer forwards messages to (`Telegram`, `Discord`, or `OpsGenie`).
+- **channel_id**: The ID of the channel where the messages will be sent (references `telegram_channels`, `discord_channels`, or `opsgenie_channels`).
+- **severities**: The list of severity levels this consumer will process (references `severity_levels`).
+- **by_quorum**: A boolean flag indicating whether the consumer requires a quorum to process messages. `true` means the consumer will wait for quorum.
+- **subjects**: The list of NATS subjects that this consumer listens to. The second part of the subject is the team name, and the third part is the bot name.
 
-This is an example setup for a team called "protocol" that uses multiple Telegram, Discord, and OpsGenie channels with different severity levels and quorum settings.
+### Example Consumer Breakdown
+
+1. **TelegramDebug**
+    - Processes messages with severity `Unknown` and sends them to the `Telegram1` channel.
+    - Does not use a quorum.
+    - Listens to subjects: `findings.protocol.steth`, `findings.protocol.arb`, `findings.protocol.opt`.
+
+2. **TelegramForwarder**
+    - Processes messages with severity `Low`, `Medium`, `High`, `Critical` and sends them to the `Telegram2` channel.
+    - Does not use a quorum.
+    - Listens to the same subjects as `TelegramDebug`.
+
+3. **DiscordDebug**
+    - Processes messages with severity `Unknown` and sends them to the `Discord1` channel.
+    - Does not use a quorum.
+    - Listens to subjects: `findings.protocol.steth`, `findings.protocol.arb`, `findings.protocol.opt`.
+
+### Configuration Structure
 
 ```yaml
 severity_levels:
-  - id: "info"
-  - id: "low"
-  - id: "medium"
-  - id: "high"
-  - id: "critical"
-  - id: "unknown"
+  - id: Unknown
+  - id: Info
+  - id: Low
+  - id: Medium
+  - id: High
+  - id: Critical
 
 telegram_channels:
-  - id: "Telegram1"
-    description: "Telegram channel for debug messages (severity: unknown, no quorum)"
-    token: "YOUR_TELEGRAM_BOT_TOKEN_1"
-    chat_id: "YOUR_CHAT_ID_1"
-  - id: "Telegram2"
-    description: "Telegram channel for all messages >= low, no quorum"
-    token: "YOUR_TELEGRAM_BOT_TOKEN_2"
-    chat_id: "YOUR_CHAT_ID_2"
-  - id: "Telegram3"
-    description: "Telegram channel for messages >= low, with quorum"
-    token: "YOUR_TELEGRAM_BOT_TOKEN_3"
-    chat_id: "YOUR_CHAT_ID_3"
-  - id: "Telegram4"
-    description: "Telegram channel for high and critical messages, with quorum"
-    token: "YOUR_TELEGRAM_BOT_TOKEN_4"
-    chat_id: "YOUR_CHAT_ID_4"
+  - id: Telegram1
+    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
+    chat_id: YOUR_CHAT_ID_1
+  - id: Telegram2
+    description: Telegram channel for all messages >= Low, no quorum
+    bot_token: YOUR_TELEGRAM_BOT_TOKEN_2
+    chat_id: YOUR_CHAT_ID_2
 
 discord_channels:
-  - id: "Discord1"
-    description: "Discord channel for debug messages (severity: unknown, no quorum)"
-    webhook_url: "YOUR_DISCORD_WEBHOOK_URL_1"
-  - id: "Discord2"
-    description: "Discord channel for all messages >= low, no quorum"
-    webhook_url: "YOUR_DISCORD_WEBHOOK_URL_2"
+  - id: Discord1
+    description: "Discord channel for debug messages (severity: Unknown, no quorum)"
+    webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 
 opsgenie_channels:
-  - id: "OpsGenie1"
-    description: "OpsGenie channel for high and critical messages"
-    api_key: "YOUR_OPSGENIE_API_KEY_1"
+  - id: OpsGenie1
+    description: OpsGenie channel for High and Critical messages
+    api_key: YOUR_OPSGENIE_API_KEY_1
 
-teams:
-  - name: "protocol"
-    nats_subject: "nats.protocol.findings"
+consumers:
+  - consumerName: TelegramDebug
+    type: Telegram
+    channel_id: Telegram1
+    severities:
+      - Unknown
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
 
-    notification_channels:
-      - consumerName: "TelegramDebug"
-        type: "Telegram"
-        channel_id: "Telegram1"
-        severity_refs:
-          - "unknown"
-        by_quorum: false
-
-      - consumerName: "TelegramAllNoQuorum"
-        type: "Telegram"
-        channel_id: "Telegram2"
-        severity_refs:
-          - "low"
-          - "medium"
-          - "high"
-          - "critical"
-        by_quorum: false
-
-      - consumerName: "TelegramAllWithQuorum"
-        type: "Telegram"
-        channel_id: "Telegram3"
-        severity_refs:
-          - "low"
-          - "medium"
-          - "high"
-          - "critical"
-        by_quorum: true
-
-      - consumerName: "TelegramHighCritical"
-        type: "Telegram"
-        channel_id: "Telegram4"
-        severity_refs:
-          - "high"
-          - "critical"
-        by_quorum: true
-
-      - consumerName: "DiscordDebug"
-        type: "Discord"
-        channel_id: "Discord1"
-        severity_refs:
-          - "unknown"
-        by_quorum: false
-
-      - consumerName: "DiscordAllNoQuorum"
-        type: "Discord"
-        channel_id: "Discord2"
-        severity_refs:
-          - "low"
-          - "medium"
-          - "high"
-          - "critical"
-        by_quorum: false
-
-      - consumerName: "OpsGenieHighCritical"
-        type: "OpsGenie"
-        channel_id: "OpsGenie1"
-        severity_refs:
-          - "high"
-          - "critical"
-        by_quorum: true
+  - consumerName: DiscordDebug
+    type: Discord
+    channel_id: Discord1
+    severities:
+      - Unknown
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
 ```
 
+### Important Notes:
+- **Unique Channel IDs**: Ensure that each `channel_id` in `telegram_channels`, `discord_channels`, and `opsgenie_channels` is unique.
+- **Unique Consumer Names**: Each consumer must have a unique `consumerName` for proper operation.
+- **NATS Subjects**: Consumers will listen to the subjects defined in the `subjects` field.
+
+### Visualisation:
+**Simple Explanation:**
+The consumer named **TelegramForwarder** uses the **Telegram Channel** to send alerts from the following NATS subjects: findings.protocol.steth, findings.protocol.arb, and findings.protocol.opt.
+
+**Detailed Explanation:**
+The system will dynamically create three separate consumers: **protocol_TelegramForwarder_steth**, **protocol_TelegramForwarder_arb**, and **protocol_TelegramForwarder_opt**.
+Each consumer is responsible for delivering findings specific to its corresponding bot (steth, arb, or opt), using the designated **Telegram Channel** for alert notifications.
+
+```
++---------------------------------------------------+
+|                NATS Subjects                      |
+|---------------------------------------------------|
+| findings.protocol.steth                           |
+| findings.protocol.arb                             |
+| findings.protocol.opt                             |
++---------------------------------------------------+
+              | 
+              v
++----------------------------------------------------+
+|               Consumer: TelegramForwarder          |
+|----------------------------------------------------|
+| Type       : Telegram                              |
+| Channel ID : Telegram                              |
+| Severities : Low, Medium, High, Critical           |
+| Quorum     : Yes                                   |
++----------------------------------------------------+
+              | 
+              v
++---------------------------------------------------+
+|            Telegram Channel                       |
+|---------------------------------------------------|
+| Description: "Telegram channel for all messages   |
+|              (>= Low severity, by quorum)"        |
+| Bot Token  : YOUR_TELEGRAM_BOT_TOKEN              |
+| Chat ID    : YOUR_CHAT_ID                         |
++---------------------------------------------------+
+```
