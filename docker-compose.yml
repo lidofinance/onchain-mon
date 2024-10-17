@@ -57,6 +57,8 @@ services:
     depends_on:
       - redis
       - nats
+    volumes:
+      - ./notification.yaml:/etc/forwarder/notification.yaml
 
   feeder:
     image: lidofinance/onchain-mon:stable

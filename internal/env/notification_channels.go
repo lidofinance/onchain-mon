@@ -24,17 +24,17 @@ func NewNotificationChannels(log *slog.Logger, cfg *NotificationConfig, httpClie
 
 	for _, tgChannel := range cfg.TelegramChannels {
 		channels.TelegramChannels[tgChannel.ID] = notifiler.NewTelegram(tgChannel.BotToken, tgChannel.ChatID, httpClient, metricsStore, source)
-		log.Info(fmt.Sprintf("Initialized %s channel: %s\n", tgChannel.ID, tgChannel.Description))
+		log.Info(fmt.Sprintf("Initialized %s channel: %s", tgChannel.ID, tgChannel.Description))
 	}
 
 	for _, discordChannel := range cfg.DiscordChannels {
 		channels.DiscordChannels[discordChannel.ID] = notifiler.NewDiscord(discordChannel.WebhookURL, httpClient, metricsStore, source)
-		log.Info(fmt.Sprintf("Initialized %s channel: %s\n", discordChannel.ID, discordChannel.Description))
+		log.Info(fmt.Sprintf("Initialized %s channel: %s", discordChannel.ID, discordChannel.Description))
 	}
 
 	for _, opsGenieChannel := range cfg.OpsGenieChannels {
 		channels.OpsGenieChannels[opsGenieChannel.ID] = notifiler.NewOpsgenie(opsGenieChannel.APIKey, httpClient, metricsStore, source)
-		log.Info(fmt.Sprintf("Initialized %s channel: %s\n", opsGenieChannel.ID, opsGenieChannel.Description))
+		log.Info(fmt.Sprintf("Initialized %s channel: %s", opsGenieChannel.ID, opsGenieChannel.Description))
 	}
 
 	return channels, nil

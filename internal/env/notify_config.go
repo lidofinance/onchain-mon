@@ -2,11 +2,14 @@ package env
 
 import (
 	"fmt"
-	"github.com/lidofinance/onchain-mon/generated/databus"
-	"github.com/lidofinance/onchain-mon/internal/utils/registry"
-	"github.com/spf13/viper"
+	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/spf13/viper"
+
+	"github.com/lidofinance/onchain-mon/generated/databus"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 const (
@@ -56,12 +59,20 @@ type NotificationConfig struct {
 	Consumers        []*Consumer       `mapstructure:"consumers"`
 }
 
-func ReadNotificationConfig(configPath string) (*NotificationConfig, error) {
+func ReadNotificationConfig(env string) (*NotificationConfig, error) {
 	v := viper.New()
+
+	configPath := `notification.yaml`
+	if env != `local` {
+		configPath = `/etc/forwarder/notification.yaml`
+	}
+
+	if _, err := os.Stat(configPath); err != nil {
+		return nil, err
+	}
 
 	v.SetConfigName(filepath.Base(configPath))
 	v.SetConfigType("yaml")
-
 	v.AddConfigPath(filepath.Dir(configPath))
 
 	if err := v.ReadInConfig(); err != nil {
