@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -36,12 +37,13 @@ func (w *worker) Run(ctx context.Context, g *errgroup.Group) error {
 	connections := make([]jetstream.ConsumeContext, 0, len(w.consumers))
 	for _, consumer := range w.consumers {
 		con, err := w.stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-			Durable:        consumer.GetName(),
-			AckPolicy:      jetstream.AckExplicitPolicy,
-			MaxAckPending:  1,
-			FilterSubjects: []string{consumer.GetTopic()},
-			DeliverPolicy:  jetstream.DeliverNewPolicy,
-			MaxDeliver:     10,
+			Durable:           consumer.GetName(),
+			AckPolicy:         jetstream.AckExplicitPolicy,
+			MaxAckPending:     1,
+			FilterSubjects:    []string{consumer.GetTopic()},
+			DeliverPolicy:     jetstream.DeliverNewPolicy,
+			MaxDeliver:        10,
+			InactiveThreshold: 2 * time.Hour,
 		})
 
 		if err != nil {
