@@ -11,15 +11,6 @@ type Config struct {
 	AppConfig AppConfig
 }
 
-type DeliveryServicesConfig struct {
-	TelegramBotToken      string
-	TelegramErrorsChatID  string
-	TelegramUpdatesChatID string
-	TelegramAlertsChatID  string
-	OpsGenieAPIKey        string
-	DiscordWebHookURL     string
-}
-
 type AppConfig struct {
 	Name      string
 	Source    string
@@ -29,20 +20,17 @@ type AppConfig struct {
 	LogFormat string
 	LogLevel  string
 
-	DeliveryConfig      DeliveryServicesConfig
-	DeliveryStageConfig DeliveryServicesConfig
-
 	NatsDefaultURL string
 	MetricsPrefix  string
 
 	//nolint
 	JsonRpcURL string
 
-	BlockTopic       string
-	FindingTopic     string
-	FortaAlertsTopic string
+	BlockTopic   string
+	FindingTopic string
 
 	RedisURL   string
+	RedisDB    int
 	QuorumSize uint
 }
 
@@ -77,10 +65,6 @@ func Read(configPath string) (*Config, error) {
 
 		var re = regexp.MustCompile(`[ -]`)
 
-		blocksTopic := "blocks.mainnet.l1"
-		findingTopic := "findings.nats"
-		fortaAlertsTopic := "alerts.forta"
-
 		cfg = Config{
 			AppConfig: AppConfig{
 				Name:      viper.GetString("APP_NAME"),
@@ -90,35 +74,13 @@ func Read(configPath string) (*Config, error) {
 				LogFormat: viper.GetString("LOG_FORMAT"),
 				LogLevel:  viper.GetString("LOG_LEVEL"),
 
-				DeliveryConfig: DeliveryServicesConfig{
-					TelegramBotToken:      viper.GetString("TELEGRAM_BOT_TOKEN"),
-					TelegramErrorsChatID:  viper.GetString("TELEGRAM_ERRORS_CHAT_ID"),
-					TelegramUpdatesChatID: viper.GetString("TELEGRAM_UPDATES_CHAT_ID"),
-					TelegramAlertsChatID:  viper.GetString("TELEGRAM_ALERTS_CHAT_ID"),
-					OpsGenieAPIKey:        viper.GetString("OPSGENIE_API_KEY"),
-					DiscordWebHookURL:     viper.GetString("DISCORD_WEBHOOK_URL"),
-				},
-
-				/*DeliveryStageConfig: DeliveryServicesConfig{
-					TelegramBotToken:      viper.GetString("STAGE_TELEGRAM_BOT_TOKEN"),
-					TelegramErrorsChatID:  viper.GetString("STAGE_TELEGRAM_ERRORS_CHAT_ID"),
-					TelegramUpdatesChatID: viper.GetString("STAGE_TELEGRAM_UPDATES_CHAT_ID"),
-					TelegramAlertsChatID:  viper.GetString("STAGE_TELEGRAM_ALERTS_CHAT_ID"),
-
-					OpsGenieAPIKey:    viper.GetString("STAGE_OPSGENIE_API_KEY"),
-					DiscordWebHookURL: viper.GetString("STAGE_DISCORD_WEBHOOK_URL"),
-				},*/
-
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
 				JsonRpcURL:     viper.GetString("JSON_RPC_URL"),
-
-				BlockTopic:       blocksTopic,
-				FindingTopic:     findingTopic,
-				FortaAlertsTopic: fortaAlertsTopic,
-
-				RedisURL:   viper.GetString("REDIS_ADDRESS"),
-				QuorumSize: viper.GetUint("QUORUM_SIZE"),
+				BlockTopic:     viper.GetString("BLOCK_TOPIC"),
+				RedisURL:       viper.GetString("REDIS_ADDRESS"),
+				RedisDB:        viper.GetInt("REDIS_DB"),
+				QuorumSize:     viper.GetUint("QUORUM_SIZE"),
 			},
 		}
 	})

@@ -36,29 +36,4 @@ var CodeOwners = map[string]string{
 	`host.docker.internal`:    FallBackTeam,
 }
 
-type AlertMapping = map[string]bool
 type FindingMapping = map[databus.Severity]bool
-
-var OnChainErrors = FindingMapping{
-	databus.SeverityUnknown: true,
-}
-
-var OnChainUpdates = FindingMapping{
-	databus.SeverityInfo:   true,
-	databus.SeverityLow:    true,
-	databus.SeverityMedium: true,
-}
-
-var OnChainAlerts = FindingMapping{
-	databus.SeverityHigh:     true,
-	databus.SeverityCritical: true,
-}
-
-var FallBackAlerts = FindingMapping{
-	databus.SeverityUnknown:  true,
-	databus.SeverityInfo:     true,
-	databus.SeverityLow:      true,
-	databus.SeverityMedium:   true,
-	databus.SeverityHigh:     true,
-	databus.SeverityCritical: true,
-}

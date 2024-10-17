@@ -223,7 +223,7 @@ func Test_SendFinding(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
-					Name: `ℹ️ Lido: Token rebased`,
+					Name: `ℹ️ Lido: BotToken rebased`,
 					Description: `
 Withdrawals info:
  requests count:    4302
@@ -279,7 +279,7 @@ Withdrawals info:
 			args: args{
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
-					Name:           "ℹ️ Lido: Token rebased",
+					Name:           "ℹ️ Lido: BotToken rebased",
 					Description:    ParadiseLost,
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,

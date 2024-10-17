@@ -42,21 +42,17 @@ services:
       - PORT=${PORT}
       - LOG_FORMAT=${LOG_FORMAT}
       - LOG_LEVEL=${LOG_LEVEL}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ERRORS_CHAT_ID=${TELEGRAM_ERRORS_CHAT_ID}
-      - TELEGRAM_UPDATES_CHAT_ID=${TELEGRAM_UPDATES_CHAT_ID}
-      - TELEGRAM_ALERTS_CHAT_ID=${TELEGRAM_ALERTS_CHAT_ID}
-      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
-      - BOT_CONTAINERS=${BOT_CONTAINERS}
-      - REDIS_ADDRESS=${REDIS_ADDRESS}
+      - NATS_DEFAULT_URL=http://nats:4222
+      - REDIS_ADDRESS=redis:6379
+      - REDIS_DB=${REDIS_DB}
       - QUORUM_SIZE=${QUORUM_SIZE}
     ports:
       - "8081:8080"
     depends_on:
       - redis
       - nats
+    volumes:
+      - ./notification.yaml:/etc/forwarder/notification.yaml
 
   feeder:
     image: lidofinance/onchain-mon:stable
@@ -74,16 +70,9 @@ services:
       - PORT=${PORT}
       - LOG_FORMAT=${LOG_FORMAT}
       - LOG_LEVEL=${LOG_LEVEL}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ERRORS_CHAT_ID=${TELEGRAM_ERRORS_CHAT_ID}
-      - TELEGRAM_UPDATES_CHAT_ID=${TELEGRAM_UPDATES_CHAT_ID}
-      - TELEGRAM_ALERTS_CHAT_ID=${TELEGRAM_ALERTS_CHAT_ID}
-      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - NATS_DEFAULT_URL=http://nats:4222
-      - BOT_CONTAINERS=${BOT_CONTAINERS}
       - REDIS_ADDRESS=redis:6379
-      - QUORUM_SIZE=${QUORUM_SIZE}
+      - BLOCK_TOPIC=${BLOCK_TOPIC}
     ports:
       - "8082:8080"
     depends_on:

@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const Name = `[INFO] ℹ️ Lido: Token rebased`
+const Name = `[INFO] ℹ️ Lido: BotToken rebased`
 const Description = `APR stats
 APR: 3.15%
 Total shares: 8,123,765.58 (+170686.98) × 1e18
