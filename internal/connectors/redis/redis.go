@@ -14,13 +14,13 @@ var (
 	onceDefaultClient sync.Once
 )
 
-func NewRedisClient(ctx context.Context, addr string, log *slog.Logger) (*redis.Client, error) {
+func NewRedisClient(ctx context.Context, addr string, db int, log *slog.Logger) (*redis.Client, error) {
 	var err error
 
 	onceDefaultClient.Do(func() {
 		rdb = redis.NewClient(&redis.Options{
 			Addr:            addr,
-			DB:              2,
+			DB:              db,
 			MaxRetries:      5,
 			MinRetryBackoff: 500 * time.Millisecond,
 			MaxRetryBackoff: 5 * time.Second,

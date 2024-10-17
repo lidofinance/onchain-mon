@@ -51,6 +51,7 @@ services:
       - NATS_DEFAULT_URL=${NATS_DEFAULT_URL}
       - BOT_CONTAINERS=${BOT_CONTAINERS}
       - REDIS_ADDRESS=${REDIS_ADDRESS}
+      - REDIS_DB=${REDIS_DB}
       - QUORUM_SIZE=${QUORUM_SIZE}
     ports:
       - "8081:8080"

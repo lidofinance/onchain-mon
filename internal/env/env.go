@@ -30,6 +30,7 @@ type AppConfig struct {
 	FindingTopic string
 
 	RedisURL   string
+	RedisDB    int
 	QuorumSize uint
 }
 
@@ -82,6 +83,7 @@ func Read(configPath string) (*Config, error) {
 				BlockTopic: blocksTopic,
 
 				RedisURL:   viper.GetString("REDIS_ADDRESS"),
+				RedisDB:    viper.GetInt("REDIS_DB"),
 				QuorumSize: viper.GetUint("QUORUM_SIZE"),
 			},
 		}

@@ -47,7 +47,7 @@ func main() {
 		return
 	}
 
-	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, log)
+	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, cfg.AppConfig.RedisDB, log)
 	if err != nil {
 		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
 		return
