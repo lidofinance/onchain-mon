@@ -65,8 +65,6 @@ func Read(configPath string) (*Config, error) {
 
 		var re = regexp.MustCompile(`[ -]`)
 
-		blocksTopic := "blocks.mainnet.l1"
-
 		cfg = Config{
 			AppConfig: AppConfig{
 				Name:      viper.GetString("APP_NAME"),
@@ -79,12 +77,10 @@ func Read(configPath string) (*Config, error) {
 				NatsDefaultURL: viper.GetString("NATS_DEFAULT_URL"),
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
 				JsonRpcURL:     viper.GetString("JSON_RPC_URL"),
-
-				BlockTopic: blocksTopic,
-
-				RedisURL:   viper.GetString("REDIS_ADDRESS"),
-				RedisDB:    viper.GetInt("REDIS_DB"),
-				QuorumSize: viper.GetUint("QUORUM_SIZE"),
+				BlockTopic:     viper.GetString("BLOCK_TOPIC"),
+				RedisURL:       viper.GetString("REDIS_ADDRESS"),
+				RedisDB:        viper.GetInt("REDIS_DB"),
+				QuorumSize:     viper.GetUint("QUORUM_SIZE"),
 			},
 		}
 	})
