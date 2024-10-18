@@ -31,6 +31,9 @@ discord_channels:
   - id: DiscordProtocolDebug
     description: "For debug messages (severity: >= Low, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_2
+  - id: DiscordProtocolUpdate
+    description: "For debug messages (severity: >= Low, by quorum)"
+    webhook_url: YOUR_DISCORD_WEBHOOK_URL_3
 
 opsgenie_channels:
   - id: OpsGenieProtocolAlerts
@@ -112,6 +115,21 @@ consumers:
       - High
       - Critical
     by_quorum: false
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
+
+  - consumerName: DiscordUpdates
+    type: Discord
+    channel_id: DiscordProtocolUpdate
+    severities:
+      - Low
+      - Info
+      - Medium
+      - High
+      - Critical
+    by_quorum: true
     subjects:
       - findings.protocol.steth
       - findings.protocol.arb
