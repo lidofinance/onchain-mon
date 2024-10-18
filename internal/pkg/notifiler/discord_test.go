@@ -1,14 +1,17 @@
-package notifiler
+package notifiler_test
 
 import (
 	"context"
 	"net/http"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
 
 const Name = `[INFO] ℹ️ Lido: BotToken rebased`
@@ -49,6 +52,12 @@ func Test_usecase_SendFinding(t *testing.T) {
 	promRegistry := prometheus.NewRegistry()
 	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
+	notifcationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, "../../../notification.yaml")
+	if err != nil {
+		t.Errorf("Read notification config error: %s", err.Error())
+		return
+	}
+
 	type fields struct {
 		webhookURL   string
 		httpClient   *http.Client
@@ -67,7 +76,7 @@ func Test_usecase_SendFinding(t *testing.T) {
 		{
 			name: "Success",
 			fields: fields{
-				webhookURL:   cfg.AppConfig.DiscordWebHookURL,
+				webhookURL:   notifcationConfig.DiscordChannels[0].WebhookURL,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -78,9 +87,9 @@ func Test_usecase_SendFinding(t *testing.T) {
 					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
-					BlockTimestamp: intPtr(1727965236),
-					BlockNumber:    intPtr(20884540),
-					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
 					Team:           `Protocol`,
 				},
@@ -90,7 +99,7 @@ func Test_usecase_SendFinding(t *testing.T) {
 		{
 			name: "Too long message",
 			fields: fields{
-				webhookURL:   cfg.AppConfig.DiscordWebHookURL,
+				webhookURL:   notifcationConfig.DiscordChannels[0].WebhookURL,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -101,9 +110,9 @@ func Test_usecase_SendFinding(t *testing.T) {
 					Description:    ParadiseLost,
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
-					BlockTimestamp: intPtr(1727965236),
-					BlockNumber:    intPtr(20884540),
-					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
 					Team:           `Protocol`,
 				},
@@ -113,7 +122,7 @@ func Test_usecase_SendFinding(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := NewDiscord(
+			u := notifiler.NewDiscord(
 				tt.fields.webhookURL,
 				tt.fields.httpClient,
 				metricsStore,

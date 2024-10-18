@@ -16,5 +16,6 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /go/src/app/bin .
+COPY --from=builder /go/src/app/web /app/web/
 
 USER nobody

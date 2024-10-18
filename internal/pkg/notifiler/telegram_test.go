@@ -1,4 +1,4 @@
-package notifiler
+package notifiler_test
 
 import (
 	"context"
@@ -10,17 +10,9 @@ import (
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
-
-// Helper function to create pointers for strings
-func stringPtr(s string) *string {
-	return &s
-}
-
-// Helper function to create pointers for ints
-func intPtr(i int) *int {
-	return &i
-}
 
 const ParadiseLost = `
 Of Mans First Disobedience, and the Fruit
@@ -193,6 +185,12 @@ func Test_SendFinding(t *testing.T) {
 		return
 	}
 
+	notifcationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, "../../../notification.yaml")
+	if err != nil {
+		t.Errorf("Read notification config error: %s", err.Error())
+		return
+	}
+
 	promRegistry := prometheus.NewRegistry()
 	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
@@ -215,8 +213,8 @@ func Test_SendFinding(t *testing.T) {
 		{
 			name: "Send_Test_Message_to_telegram",
 			fields: fields{
-				botToken:     cfg.AppConfig.DeliveryConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.DeliveryConfig.TelegramErrorsChatID,
+				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
+				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -235,9 +233,9 @@ Withdrawals info:
 `,
 					Severity:       databus.SeverityLow,
 					AlertId:        `LIDO-TOKEN-REBASED`,
-					BlockTimestamp: intPtr(1727965236),
-					BlockNumber:    intPtr(20884540),
-					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `FF-telegram-unit-test`,
 					Team:           `Protocol`,
 				},
@@ -247,8 +245,8 @@ Withdrawals info:
 		{
 			name: "Send_Test_Message_to_telegram",
 			fields: fields{
-				botToken:     cfg.AppConfig.DeliveryConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.DeliveryConfig.TelegramErrorsChatID,
+				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
+				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -259,9 +257,9 @@ Withdrawals info:
 					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
-					BlockTimestamp: intPtr(1727965236),
-					BlockNumber:    intPtr(20884540),
-					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
 					Team:           `Protocol`,
 				},
@@ -271,8 +269,8 @@ Withdrawals info:
 		{
 			name: "Send_4096_symbol_to_telegram",
 			fields: fields{
-				botToken:     cfg.AppConfig.DeliveryConfig.TelegramBotToken,
-				chatID:       cfg.AppConfig.DeliveryConfig.TelegramErrorsChatID,
+				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
+				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -283,9 +281,9 @@ Withdrawals info:
 					Description:    ParadiseLost,
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
-					BlockTimestamp: intPtr(1727965236),
-					BlockNumber:    intPtr(20884540),
-					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
 					Team:           `Protocol`,
 				},
@@ -295,7 +293,7 @@ Withdrawals info:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := NewTelegram(
+			u := notifiler.NewTelegram(
 				tt.fields.botToken,
 				tt.fields.chatID,
 				tt.fields.httpClient,
@@ -444,7 +442,7 @@ Block  timestamp: 17:20:36.000 MSK`,
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := TruncateMessageWithAlertID(tt.args.message, maxTelegramMessageLength, warningTelegramMessage); got != tt.want {
+			if got := notifiler.TruncateMessageWithAlertID(tt.args.message, notifiler.MaxTelegramMessageLength, notifiler.WarningTelegramMessage); got != tt.want {
 				t.Errorf("TruncateMessageWithAlertID() = %v, want %v", got, tt.want)
 			}
 		})

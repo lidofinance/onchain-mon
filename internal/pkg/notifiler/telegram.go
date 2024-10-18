@@ -32,14 +32,14 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 	}
 }
 
-const maxTelegramMessageLength = 4096
-const warningTelegramMessage = "Warn: Msg >=4096, pls review description message"
+const MaxTelegramMessageLength = 4096
+const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message"
 
 func (u *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
 		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, u.source)),
-		maxTelegramMessageLength,
-		warningTelegramMessage,
+		MaxTelegramMessageLength,
+		WarningTelegramMessage,
 	)
 
 	if alert.Severity != databus.SeverityUnknown {

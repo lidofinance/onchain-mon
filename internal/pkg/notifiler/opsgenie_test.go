@@ -1,14 +1,17 @@
-package notifiler
+package notifiler_test
 
 import (
 	"context"
 	"net/http"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
 
 const NameCritical = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
@@ -30,6 +33,12 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 	promRegistry := prometheus.NewRegistry()
 	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
+	notifcationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, "../../../notification.yaml")
+	if err != nil {
+		t.Errorf("Read notification config error: %s", err.Error())
+		return
+	}
+
 	type fields struct {
 		opsGenieKey  string
 		httpClient   *http.Client
@@ -48,7 +57,7 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 		{
 			name: "Success",
 			fields: fields{
-				opsGenieKey:  cfg.AppConfig.OpsGenieAPIKey,
+				opsGenieKey:  notifcationConfig.OpsGenieChannels[0].APIKey,
 				httpClient:   &http.Client{},
 				metricsStore: metricsStore,
 			},
@@ -59,9 +68,9 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 					Description:    DescriptionCritical,
 					Severity:       databus.SeverityHigh,
 					AlertId:        `TEST-CRITICAL-ID`,
-					BlockTimestamp: intPtr(1727965236),
-					BlockNumber:    intPtr(20884540),
-					TxHash:         stringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
 					Team:           `Protocol`,
 				},
@@ -71,12 +80,12 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u := &opsGenie{
-				opsGenieKey: tt.fields.opsGenieKey,
-				httpClient:  tt.fields.httpClient,
-				metrics:     metricsStore,
-				source:      `local`,
-			}
+			u := notifiler.NewOpsgenie(
+				tt.fields.opsGenieKey,
+				tt.fields.httpClient,
+				metricsStore,
+				`local`,
+			)
 			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
