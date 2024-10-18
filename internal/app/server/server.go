@@ -19,6 +19,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/http/handlers/health"
+	"github.com/lidofinance/onchain-mon/internal/http/handlers/show"
 )
 
 const (
@@ -28,23 +29,28 @@ const (
 )
 
 type App struct {
-	env        *env.AppConfig
-	Logger     *slog.Logger
-	Metrics    *metrics.Store
-	JetStream  jetstream.JetStream
-	natsClient *nats.Conn
+	env             *env.AppConfig
+	notificationCfg *env.NotificationConfig
+	Logger          *slog.Logger
+	Metrics         *metrics.Store
+	JetStream       jetstream.JetStream
+	natsClient      *nats.Conn
 }
 
-func New(config *env.AppConfig, logger *slog.Logger,
+func New(
+	config *env.AppConfig,
+	notificationCfg *env.NotificationConfig,
+	logger *slog.Logger,
 	promStore *metrics.Store,
 	jetClient jetstream.JetStream, natsClient *nats.Conn,
 ) *App {
 	return &App{
-		env:        config,
-		Logger:     logger,
-		Metrics:    promStore,
-		JetStream:  jetClient,
-		natsClient: natsClient,
+		env:             config,
+		notificationCfg: notificationCfg,
+		Logger:          logger,
+		Metrics:         promStore,
+		JetStream:       jetClient,
+		natsClient:      natsClient,
 	}
 }
 
@@ -72,6 +78,10 @@ func (a *App) RegisterWorkerRoutes(r chi.Router) {
 	a.RegisterMiddleware(r)
 	a.RegisterInfraRoutes(r)
 	a.RegisterPprofRoutes(r)
+
+	if a.notificationCfg != nil {
+		r.Get("/", show.New(a.notificationCfg).Handler)
+	}
 }
 
 func (a *App) RegisterMiddleware(r chi.Router) {

@@ -14,7 +14,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 )
 
-type telegram struct {
+type Telegram struct {
 	botToken   string
 	chatID     string
 	httpClient *http.Client
@@ -22,8 +22,8 @@ type telegram struct {
 	source     string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string) *telegram {
-	return &telegram{
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string) *Telegram {
+	return &Telegram{
 		botToken:   botToken,
 		chatID:     chatID,
 		httpClient: httpClient,
@@ -35,7 +35,7 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 const maxTelegramMessageLength = 4096
 const warningTelegramMessage = "Warn: Msg >=4096, pls review description message"
 
-func (u *telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (u *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
 		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, u.source)),
 		maxTelegramMessageLength,
@@ -56,7 +56,7 @@ func (u *telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	return u.send(ctx, message, false)
 }
 
-func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) error {
+func (u *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
 	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
 	if useMarkdown {
 		requestURL += `&parse_mode=markdown`
@@ -85,6 +85,10 @@ func (u *telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	}
 
 	return nil
+}
+
+func (d *Telegram) GetType() string {
+	return "Telegram"
 }
 
 // Telegram supports two versions of markdown. V1, V2

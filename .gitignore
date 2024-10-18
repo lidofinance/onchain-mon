@@ -26,3 +26,5 @@ bin
 
 vendor/
 tools/vendor
+
+notification.yaml
