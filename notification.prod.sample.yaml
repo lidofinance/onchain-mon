@@ -53,8 +53,8 @@ consumers:
     by_quorum: true
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: TelegramAlerts
     type: Telegram
@@ -65,8 +65,8 @@ consumers:
     by_quorum: true
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: TelegramErrors
     type: Telegram
@@ -76,8 +76,8 @@ consumers:
     by_quorum: false
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: TelegramDebug
     type: Telegram
@@ -91,8 +91,8 @@ consumers:
     by_quorum: false
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: DiscordErrors
     type: Discord
@@ -102,8 +102,8 @@ consumers:
     by_quorum: false
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: DiscordDebug
     type: Discord
@@ -117,8 +117,8 @@ consumers:
     by_quorum: false
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: DiscordUpdates
     type: Discord
@@ -132,8 +132,8 @@ consumers:
     by_quorum: true
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
 
   - consumerName: OpsGenie
     type: OpsGenie
@@ -144,5 +144,5 @@ consumers:
     by_quorum: true
     subjects:
       - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
+      - findings.protocol.arbitrum
+      - findings.protocol.optimism
