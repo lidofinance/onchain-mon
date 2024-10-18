@@ -7,66 +7,40 @@ severity_levels:
   - id: Critical
 
 telegram_channels:
-  - id: Telegram1
+  - id: TelegramProtocolErrors
     description: "For errors messages (severity: Unknown, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
-  - id: Telegram2
+  - id: TelegramProtocolDebug
     description: "For debug messages (severity: >= Low, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_2
     chat_id: YOUR_CHAT_ID_2
-  - id: Telegram3
+  - id: TelegramCommonUpdates
     description: "for updates messages (severity: >= Low, by quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_3
     chat_id: YOUR_CHAT_ID_3
-  - id: Telegram4
+  - id: TelegramCommonAlerts
     description: "for alerts messages (severity: >= High, by quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_4
     chat_id: YOUR_CHAT_ID_4
 
 discord_channels:
-  - id: Discord1
+  - id: DiscordProtocolErrors
     description: "For errors messages (severity: Unknown, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
-  - id: Discord2
+  - id: DiscordProtocolDebug
     description: "For debug messages (severity: >= Low, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_2
 
 opsgenie_channels:
-  - id: OpsGenie1
+  - id: OpsGenieProtocolAlerts
     description: OpsGenie channel for High and Critical messages
     api_key: YOUR_OPSGENIE_API_KEY_1
 
 consumers:
-  - consumerName: TelegramErrors
-    type: Telegram
-    channel_id: Telegram1
-    severities:
-      - Unknown
-    by_quorum: false
-    subjects:
-      - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
-
-  - consumerName: TelegramDebug
-    type: Telegram
-    channel_id: Telegram2
-    severities:
-      - Low
-      - Info
-      - Medium
-      - High
-      - Critical
-    by_quorum: false
-    subjects:
-      - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
-
   - consumerName: TelegramUpdates
     type: Telegram
-    channel_id: Telegram3
+    channel_id: TelegramCommonUpdates
     severities:
       - Low
       - Info
@@ -79,21 +53,47 @@ consumers:
       - findings.protocol.arb
       - findings.protocol.opt
 
-#  - consumerName: TelegramAlerts
-#    type: Telegram
-#    channel_id: Telegram4
-#    severities:
-#      - High
-#      - Critical
-#    by_quorum: true
-#    subjects:
-#      - findings.protocol.steth
-#      - findings.protocol.arb
-#      - findings.protocol.opt
+  - consumerName: TelegramAlerts
+    type: Telegram
+    channel_id: TelegramCommonAlerts
+    severities:
+      - High
+      - Critical
+    by_quorum: true
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
+
+  - consumerName: TelegramErrors
+    type: Telegram
+    channel_id: TelegramProtocolErrors
+    severities:
+      - Unknown
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
+
+  - consumerName: TelegramDebug
+    type: Telegram
+    channel_id: TelegramProtocolDebug
+    severities:
+      - Low
+      - Info
+      - Medium
+      - High
+      - Critical
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
 
   - consumerName: DiscordErrors
     type: Discord
-    channel_id: Discord1
+    channel_id: DiscordProtocolErrors
     severities:
       - Unknown
     by_quorum: false
@@ -104,7 +104,7 @@ consumers:
 
   - consumerName: DiscordDebug
     type: Discord
-    channel_id: Discord2
+    channel_id: DiscordProtocolDebug
     severities:
       - Low
       - Info
@@ -119,7 +119,7 @@ consumers:
 
   - consumerName: OpsGenie
     type: OpsGenie
-    channel_id: OpsGenie1
+    channel_id: OpsGenieProtocolAlerts
     severities:
       - High
       - Critical
