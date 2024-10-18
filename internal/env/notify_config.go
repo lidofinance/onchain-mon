@@ -59,10 +59,9 @@ type NotificationConfig struct {
 	Consumers        []*Consumer       `mapstructure:"consumers"`
 }
 
-func ReadNotificationConfig(env string) (*NotificationConfig, error) {
+func ReadNotificationConfig(env string, configPath string) (*NotificationConfig, error) {
 	v := viper.New()
 
-	configPath := `notification.yaml`
 	if env != `local` {
 		configPath = `/etc/forwarder/notification.yaml`
 	}

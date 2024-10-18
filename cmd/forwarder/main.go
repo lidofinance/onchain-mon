@@ -41,7 +41,7 @@ func main() {
 
 	log := logger.New(&cfg.AppConfig)
 
-	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env)
+	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, `notification.yaml`)
 	if err != nil {
 		log.Error(fmt.Sprintf("Error loading consumer's config: %v", err))
 		return

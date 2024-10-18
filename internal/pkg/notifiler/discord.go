@@ -34,14 +34,14 @@ func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metric
 	}
 }
 
-const maxDiscordMsgLength = 2000
-const warningDiscordMessage = "Warn: Msg >=2000, pls review description message"
+const MaxDiscordMsgLength = 2000
+const WarningDiscordMessage = "Warn: Msg >=2000, pls review description message"
 
 func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
 		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source)),
-		maxDiscordMsgLength,
-		warningDiscordMessage,
+		MaxDiscordMsgLength,
+		WarningDiscordMessage,
 	)
 
 	return d.send(ctx, message)
