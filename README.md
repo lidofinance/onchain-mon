@@ -103,21 +103,21 @@ To set up a local development environment for **Finding-Forwarder**, follow thes
       ```
     - Configure your environment variables as needed. Below is an explanation of the available environment variables:
 
-      | Variable              | Description                                                                                       | Default Value                      |
-           |------------------------|---------------------------------------------------------------------------------------------------|------------------------------------|
-      | `READ_ENV_FROM_SHELL`  | Whether to read environment variables from the shell (useful for container setups).              | `false`                            |
-      | `SOURCE`               | Source name for identifying where the forwarder is running.                                      | `local`                            |
-      | `ENV`                  | The environment mode of the application.                                                         | `local`                            |
-      | `APP_NAME`             | Name of the application.                                                                        | `finding_forwarder`               |
-      | `PORT`                 | Port on which the application will run.                                                         | `8080`                             |
-      | `LOG_FORMAT`           | Log format (`simple` or `json`).                                                                | `simple`                           |
-      | `LOG_LEVEL`            | Log level (e.g., `debug`, `info`, `warn`, `error`).                                             | `debug`                            |
-      | `BLOCK_TOPIC`          | NATS topic for the Feeder to publish blockchain data.                                           | `blocks.mainnet.l1`                |
-      | `NATS_DEFAULT_URL`     | URL for connecting to the NATS server.                                                          | `http://service-forta-nats:4222`   |
-      | `REDIS_ADDRESS`        | Address for connecting to the Redis instance.                                                   | `redis:6379`                       |
-      | `REDIS_DB`             | Redis database index to use.                                                                    | `0`                                |
-      | `QUORUM_SIZE`          | The number of confirmations required before forwarding a message.                              | `1`                                |
-      | `JSON_RPC_URL`         | URL for connecting to the Ethereum JSON-RPC endpoint.                                           | `https://eth.drpc.org`             |
+      | Variable                | Description                                                                                       | Default Value                       |
+      |-------------------------|---------------------------------------------------------------------------------------------------|-------------------------------------|
+      | `READ_ENV_FROM_SHELL`   | Whether to read environment variables from the shell (useful for container setups).               | `false`                             |
+      | `SOURCE`                | Source name for identifying where the forwarder is running.                                       | `local`                             |
+      | `ENV`                   | The environment mode of the application.                                                          | `local`                             |
+      | `APP_NAME`              | Name of the application.                                                                          | `finding_forwarder`                 |
+      | `PORT`                  | Port on which the application will run.                                                           | `8080`                              |
+      | `LOG_FORMAT`            | Log format (`simple` or `json`).                                                                  | `simple`                            |
+      | `LOG_LEVEL`             | Log level (e.g., `debug`, `info`, `warn`, `error`).                                               | `debug`                             |
+      | `BLOCK_TOPIC`           | NATS topic for the Feeder to publish blockchain data.                                             | `blocks.mainnet.l1`                 |
+      | `NATS_DEFAULT_URL`      | URL for connecting to the NATS server.                                                            | `http://service-forta-nats:4222`    |
+      | `REDIS_ADDRESS`         | Address for connecting to the Redis instance.                                                     | `redis:6379`                        |
+      | `REDIS_DB`              | Redis database index to use.                                                                      | `0`                                 |
+      | `QUORUM_SIZE`           | The number of confirmations required before forwarding a message.                                 | `1`                                 |
+      | `JSON_RPC_URL`          | URL for connecting to the Ethereum JSON-RPC endpoint.                                             | `https://eth.drpc.org`              |
 
 4. **Building and Running Bots**:
     - Clone the **Testing Forta Bots** repository:
