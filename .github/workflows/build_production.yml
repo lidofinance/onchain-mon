@@ -7,11 +7,12 @@ on:
       - main
 
 env:
-  IMAGE_NAME: forta-finding-forwarder
+  IMAGE_NAME: onchain-mon
   IMAGE_TAG: stable
 
 jobs:
   build-and-push:
+    name: Build and push image
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
