@@ -49,5 +49,5 @@ jobs:
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
           # TAG: '${{ github.event.release.tag_name }}'
-          TARGET: devel
+          TARGET: main
           TARGET_WORKFLOW: 'onchain_mon_devel_deploy.yaml'
