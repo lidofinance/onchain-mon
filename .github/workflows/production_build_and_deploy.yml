@@ -1,18 +1,18 @@
 ---
-name: Build and release devel image
+name: Build and deploy production image
 
 on:
   push:
     branches:
-      - devel
+      - main
 
 env:
   IMAGE_NAME: onchain-mon
-  IMAGE_TAG: devel
+  IMAGE_TAG: stable
 
 jobs:
   build-and-push:
-    name: Build and push image
+    name: Build and push stable image
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -40,15 +40,23 @@ jobs:
     needs:
       - build-and-push
     runs-on: ubuntu-latest
-    name: Deploy devel
+    name: Deploy stable image
     steps:
-      - name: Deploy devel image
+      - name: Deploy to production cluster1
         uses: lidofinance/dispatch-workflow@v1
         env:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
-          # TAG: '${{ github.event.release.tag_name }}'
-          TARGET: devel
+          TARGET: main
           DISPATCH_BRANCH: main
-          TARGET_WORKFLOW: 'onchain_mon_devel_deploy.yaml'
+          TARGET_WORKFLOW: 'onchain_mon_prod1_deploy.yaml'
+      - name: Deploy to production cluster2
+        uses: lidofinance/dispatch-workflow@v1
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
+          TARGET: main
+          DISPATCH_BRANCH: main
+          TARGET_WORKFLOW: 'onchain_mon_prod2_deploy.yaml'
