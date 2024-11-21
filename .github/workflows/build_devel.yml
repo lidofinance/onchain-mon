@@ -35,3 +35,16 @@ jobs:
           push: true
           tags: lidofinance/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           builder: ${{ steps.buildx.outputs.name }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy devel
+    steps:
+      - name: Deploy devel image
+        uses: lidofinance/dispatch-workflow@v1
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
+          TAG: '${{ github.event.release.tag_name }}'
+          TARGET_WORKFLOW: 'onchain_mon_devel_deploy.yaml'
