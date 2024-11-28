@@ -1,10 +1,7 @@
 package consumer
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -208,7 +205,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			return
 		}
 
-		key := findingToUniqueHash(finding)
+		key := finding.UniqueKey
 		countKey := fmt.Sprintf(countTemplate, c.name, key)
 		statusKey := fmt.Sprintf(statusTemplate, c.name, key)
 
@@ -404,27 +401,4 @@ func (c *Consumer) ackMessage(msg jetstream.Msg) {
 	if ackErr := msg.Ack(); ackErr != nil {
 		c.log.Error(fmt.Sprintf(`Could not ack msg: %v`, ackErr))
 	}
-}
-
-func computeSHA256Hash(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
-}
-
-func findingToUniqueHash(f *databus.FindingDtoJson) string {
-	var buffer bytes.Buffer
-
-	if f.UniqueKey != nil {
-		buffer.WriteString(f.Team)
-		buffer.WriteString(f.BotName)
-		buffer.WriteString(*f.UniqueKey)
-	} else {
-		buffer.WriteString(f.Team)
-		buffer.WriteString(f.BotName)
-		buffer.WriteString(f.AlertId)
-		buffer.WriteString(f.Name)
-		buffer.WriteString(string(f.Severity))
-	}
-
-	return computeSHA256Hash(buffer.Bytes())
 }

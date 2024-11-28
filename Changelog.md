@@ -1,3 +1,6 @@
+## 28.11.2024
+1. Field "uniqueKey" is required for getting quorum.
+
 ## 16.10.2024
 1. Added dynamic yaml notification config
 

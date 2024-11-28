@@ -81,6 +81,7 @@ func main() {
 		MaxAge:     10 * time.Minute,
 		Subjects:   env.CollectNatsSubjects(notificationConfig),
 		MaxMsgSize: maxMsgSize,
+		Retention:  jetstream.InterestPolicy,
 	})
 	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
 		fmt.Printf("could not create %s stream error: %v\n", natsStreamName, err)

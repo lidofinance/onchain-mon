@@ -2,11 +2,9 @@
 
 package databus
 
-import (
-	"encoding/json"
-	"fmt"
-	"reflect"
-)
+import "encoding/json"
+import "fmt"
+import "reflect"
 
 type FindingDtoJson struct {
 	// AlertId corresponds to the JSON schema field "alertId".
@@ -40,7 +38,7 @@ type FindingDtoJson struct {
 	TxHash *string `json:"txHash,omitempty" yaml:"txHash,omitempty" mapstructure:"txHash,omitempty"`
 
 	// UniqueKey corresponds to the JSON schema field "uniqueKey".
-	UniqueKey *string `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty" mapstructure:"uniqueKey,omitempty"`
+	UniqueKey string `json:"uniqueKey" yaml:"uniqueKey" mapstructure:"uniqueKey"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -66,6 +64,9 @@ func (j *FindingDtoJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["team"]; raw != nil && !ok {
 		return fmt.Errorf("field team in FindingDtoJson: required")
+	}
+	if _, ok := raw["uniqueKey"]; raw != nil && !ok {
+		return fmt.Errorf("field uniqueKey in FindingDtoJson: required")
 	}
 	type Plain FindingDtoJson
 	var plain Plain
