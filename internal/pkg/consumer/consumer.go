@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
@@ -111,7 +111,15 @@ func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.C
 			const LruSize = 125
 			cache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*10)
 
-			consumer := New(log, metrics, cache, redisClient, repo, consumerName, subject, consumerCfg.SeveritySet, consumerCfg.ByQuorum, quorumSize, notificationChannel)
+			consumer := New(
+				log, metrics, cache, redisClient, repo,
+				consumerName,
+				subject,
+				consumerCfg.SeveritySet,
+				consumerCfg.ByQuorum,
+				quorumSize,
+				notificationChannel,
+			)
 
 			consumers = append(consumers, consumer)
 		}
@@ -221,6 +229,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			if err != nil {
 				c.log.Error(fmt.Sprintf(`Could not increase key value: %v`, err))
 				c.metrics.RedisErrors.Inc()
+				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
 				return
 			}
@@ -229,9 +238,11 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				if err := c.redisClient.Expire(ctx, countKey, TTLMins10).Err(); err != nil {
 					c.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
 					c.metrics.RedisErrors.Inc()
+					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 
 					if _, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
 						c.metrics.RedisErrors.Inc()
+						c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 						c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
 					}
 
@@ -247,6 +258,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			if err != nil {
 				c.log.Error(fmt.Sprintf(`Could not get key value: %v`, err))
 				c.metrics.RedisErrors.Inc()
+				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
 				return
 			}
@@ -287,13 +299,12 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			if err != nil {
 				c.log.Error(fmt.Sprintf(`Could not get notification status: %v`, err))
 				c.metrics.RedisErrors.Inc()
+				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
 				return
 			}
 
 			if status == StatusSending {
-				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
-
 				c.log.Info(fmt.Sprintf("Another instance is sending finding: %s", finding.AlertId))
 				return
 			}

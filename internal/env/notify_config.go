@@ -59,7 +59,7 @@ type NotificationConfig struct {
 	Consumers        []*Consumer       `mapstructure:"consumers"`
 }
 
-func ReadNotificationConfig(env string, configPath string) (*NotificationConfig, error) {
+func ReadNotificationConfig(env, configPath string) (*NotificationConfig, error) {
 	v := viper.New()
 
 	if env != `local` {
@@ -179,7 +179,7 @@ func CollectNatsSubjects(cfg *NotificationConfig) []string {
 	}
 
 	out := make([]string, 0, len(natsSubjectsMap))
-	for subject, _ := range natsSubjectsMap {
+	for subject := range natsSubjectsMap {
 		out = append(out, subject)
 	}
 
