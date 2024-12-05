@@ -11,11 +11,11 @@ import (
 type Store struct {
 	Prometheus      *prometheus.Registry
 	BuildInfo       prometheus.Counter
-	PublishedAlerts *prometheus.CounterVec
 	PublishedBlocks *prometheus.CounterVec
 	SentAlerts      *prometheus.CounterVec
 	RedisErrors     prometheus.Counter
 	SummaryHandlers *prometheus.HistogramVec
+	NotifyChannels  *prometheus.CounterVec
 }
 
 const Status = `status`
@@ -40,17 +40,13 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 				"version": runtime.Version(),
 			},
 		}),
-		PublishedAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_finding_published_total", prefix),
-			Help: "The total number of published findings",
-		}, []string{Status}),
 		PublishedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_blocks_published_total", prefix),
 			Help: "The total number of published blocks",
 		}, []string{Status}),
 		SentAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_finding_sent_total", prefix),
-			Help: "The total number of set findings",
+			Help: "The total number of published findings",
 		}, []string{ConsumerName, Status}),
 		RedisErrors: promauto.NewCounter(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_redis_error_total", prefix),
@@ -61,11 +57,14 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			Help:    "Time spent processing request to notification channel",
 			Buckets: prometheus.DefBuckets,
 		}, []string{Channel}),
+		NotifyChannels: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_notification_channel_error_total", prefix),
+			Help: "The total number of network errors of telegram, discord, opsgenie channels",
+		}, []string{Channel, Status}),
 	}
 
 	store.Prometheus.MustRegister(
 		store.BuildInfo,
-		store.PublishedAlerts,
 		store.PublishedBlocks,
 		store.SentAlerts,
 		store.RedisErrors,

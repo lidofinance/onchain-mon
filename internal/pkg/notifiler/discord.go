@@ -25,6 +25,8 @@ type MessagePayload struct {
 	Content string `json:"content"`
 }
 
+const DiscordLabel = `discord`
+
 func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string) *Discord {
 	return &Discord{
 		webhookURL: webhookURL,
@@ -72,13 +74,15 @@ func (d *Discord) send(ctx context.Context, message string) error {
 	defer func() {
 		resp.Body.Close()
 		duration := time.Since(start).Seconds()
-		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: `discord`}).Observe(duration)
+		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: DiscordLabel}).Observe(duration)
 	}()
 
 	if resp.StatusCode != http.StatusNoContent {
+		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from Discord non-204 response code: %v", resp.Status)
 	}
 
+	d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusOk}).Inc()
 	return nil
 }
 
