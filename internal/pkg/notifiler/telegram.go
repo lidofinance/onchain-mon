@@ -34,10 +34,11 @@ func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore 
 
 const MaxTelegramMessageLength = 4096
 const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message"
+const TelegramLabel = `telegram`
 
-func (u *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, u.source)),
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, t.source)),
 		MaxTelegramMessageLength,
 		WarningTelegramMessage,
 	)
@@ -45,19 +46,19 @@ func (u *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	if alert.Severity != databus.SeverityUnknown {
 		m := escapeMarkdownV1(message)
 
-		if sendErr := u.send(ctx, m, true); sendErr != nil {
+		if sendErr := t.send(ctx, m, true); sendErr != nil {
 			message += "\n\nWarning: Could not send msg as markdown"
-			return u.send(ctx, message, false)
+			return t.send(ctx, message, false)
 		}
 
 		return nil
 	}
 
-	return u.send(ctx, message, false)
+	return t.send(ctx, message, false)
 }
 
-func (u *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s", u.botToken, u.chatID, url.QueryEscape(message))
+func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
+	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s", t.botToken, t.chatID, url.QueryEscape(message))
 	if useMarkdown {
 		requestURL += `&parse_mode=markdown`
 	}
@@ -69,25 +70,26 @@ func (u *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 
 	start := time.Now()
 
-	resp, err := u.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send telegram request: %w", err)
 	}
 	defer func() {
 		resp.Body.Close()
 		duration := time.Since(start).Seconds()
-		u.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: `telegram`}).Observe(duration)
+		t.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: TelegramLabel}).Observe(duration)
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println(resp)
+		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from telegram non-200 response code: %v", resp.Status)
 	}
 
+	t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusOk}).Inc()
 	return nil
 }
 
-func (d *Telegram) GetType() string {
+func (t *Telegram) GetType() string {
 	return "Telegram"
 }
 

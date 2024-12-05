@@ -37,7 +37,9 @@ func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 	}
 }
 
-func (u *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+const OpsGenieLabel = `opsgenie`
+
+func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
@@ -51,7 +53,7 @@ func (u *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		return nil
 	}
 
-	message := FormatAlert(alert, u.source)
+	message := FormatAlert(alert, o.source)
 
 	payload := AlertPayload{
 		Message:     alert.Name,
@@ -60,10 +62,10 @@ func (u *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		Priority:    opsGeniePriority,
 	}
 
-	return u.send(ctx, payload)
+	return o.send(ctx, payload)
 }
 
-func (u *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
+func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("could not marshal OpsGenie payload: %w", err)
@@ -78,26 +80,28 @@ func (u *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "GenieKey "+u.opsGenieKey)
+	req.Header.Set("Authorization", "GenieKey "+o.opsGenieKey)
 
 	start := time.Now()
-	resp, err := u.httpClient.Do(req)
+	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send OpsGenie request: %w", err)
 	}
 	defer func() {
 		resp.Body.Close()
 		duration := time.Since(start).Seconds()
-		u.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: `opsgenie`}).Observe(duration)
+		o.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: OpsGenieLabel}).Observe(duration)
 	}()
 
 	if resp.StatusCode != http.StatusAccepted {
+		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from OpsGenie non-202 response code: %v", resp.Status)
 	}
 
+	o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusOk}).Inc()
 	return nil
 }
 
-func (d *OpsGenie) GetType() string {
+func (o *OpsGenie) GetType() string {
 	return "OpsGenie"
 }

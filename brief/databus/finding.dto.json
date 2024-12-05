@@ -37,7 +37,7 @@
       "type": "string"
     }
   },
-  "required": ["severity", "alertId", "name", "description", "botName", "team"],
+  "required": ["severity", "alertId", "name", "description", "botName", "team", "uniqueKey"],
   "definitions": {
     "Severity": {
       "type": "string",

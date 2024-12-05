@@ -57,6 +57,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 			case <-ticker.C:
 				block, err := w.chainSrv.GetLatestBlock(ctx)
 				if err != nil {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 					w.log.Error(fmt.Sprintf("GetLatestBlock error: %v", err))
 					continue
 				}
@@ -67,6 +68,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 
 				blockReceipts, err := w.chainSrv.GetBlockReceipts(ctx, block.Result.Hash)
 				if err != nil {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 					w.log.Error(fmt.Sprintf("GetBlockReceipts error: %v", err))
 					continue
 				}
@@ -110,6 +112,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 
 				payload, marshalErr := json.Marshal(blockDto)
 				if marshalErr != nil {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 					w.log.Error(fmt.Sprintf(`Could not marshal blockDto %s`, marshalErr))
 					continue
 				}
@@ -132,7 +135,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				}
 
 				w.log.Info(fmt.Sprintf(`%d, %s`, blockDto.Number, blockDto.Hash), payloadSize)
-				w.metricsStore.PublishedAlerts.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+				w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
 			}
 		}
 	})

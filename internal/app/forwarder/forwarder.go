@@ -8,8 +8,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 	"github.com/nats-io/nats.go/jetstream"
+
+	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 )
 
 type worker struct {

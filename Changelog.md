@@ -1,3 +1,11 @@
+## 05.12.2024
+1. Remove PublishedAlerts metrics
+2. Added NotifyChannels: `forwarder_notification_channel_error_total`
+3. Inc `feeder_blocks_published_total` for each unsuccessful network request
+
+## 28.11.2024
+1. Field "uniqueKey" is required for getting quorum.
+
 ## 16.10.2024
 1. Added dynamic yaml notification config
 
