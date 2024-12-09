@@ -31,6 +31,9 @@ discord_channels:
   - id: Discord2
     description: Discord channel for all messages >= Low, no quorum
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_2
+  - id: AnalyticsSubscriber
+    description: "Analytics channel for getting only specific findings (filter: WITHDRAWALS-BIG-WITHDRAWAL-REQUEST-BATCH)"
+    webhook_url: YOUR_DISCORD_WEBHOOK_URL_2
 
 opsgenie_channels:
   - id: OpsGenie1
@@ -125,3 +128,19 @@ consumers:
       - findings.protocol.steth
       - findings.protocol.arb
       - findings.dao.opt
+
+  - consumerName: AnalyticsSubscriber
+    type: Discord
+    channel_id: AnalyticsSubscriber
+    severities:
+      - Low
+      - Info
+      - Medium
+      - High
+      - Critical
+    by_quorum: True
+    subjects:
+      - findings.protocol.steth
+    filter:
+      - WITHDRAWALS-BIG-WITHDRAWAL-REQUEST-BATCH
+
