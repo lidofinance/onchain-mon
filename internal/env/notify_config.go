@@ -42,13 +42,15 @@ type OpsGenieChannel struct {
 }
 
 type Consumer struct {
-	ConsumerName string   `mapstructure:"consumerName"`
-	Type         string   `mapstructure:"type"`
-	ChannelID    string   `mapstructure:"channel_id"`
-	Severities   []string `mapstructure:"severities"`
-	ByQuorum     bool     `mapstructure:"by_quorum"`
-	Subjects     []string `mapstructure:"subjects"`
-	SeveritySet  registry.FindingMapping
+	ConsumerName     string   `mapstructure:"consumerName"`
+	Type             string   `mapstructure:"type"`
+	ChannelID        string   `mapstructure:"channel_id"`
+	Severities       []string `mapstructure:"severities"`
+	ByQuorum         bool     `mapstructure:"by_quorum"`
+	Subjects         []string `mapstructure:"subjects"`
+	Filter           []string `mapstructure:"filter"`
+	SeveritySet      registry.FindingMapping
+	FindingFilterMap registry.FindingFilterMap
 }
 
 type NotificationConfig struct {
@@ -150,6 +152,8 @@ func ValidateConfig(cfg *NotificationConfig) error {
 
 	for _, consumer := range cfg.Consumers {
 		severitySet := make(registry.FindingMapping)
+		findingFilter := make(registry.FindingFilterMap)
+
 		for _, severity := range consumer.Severities {
 			if _, exists := validSeverities[databus.Severity(severity)]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown severity level '%s'", consumer.ConsumerName, severity)
@@ -157,7 +161,12 @@ func ValidateConfig(cfg *NotificationConfig) error {
 			severitySet[databus.Severity(severity)] = true
 		}
 
+		for _, alertID := range consumer.Filter {
+			findingFilter[alertID] = true
+		}
+
 		consumer.SeveritySet = severitySet
+		consumer.FindingFilterMap = findingFilter
 	}
 
 	for _, consumer := range cfg.Consumers {
