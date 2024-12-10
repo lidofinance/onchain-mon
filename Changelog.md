@@ -1,3 +1,6 @@
+## 09.12.2024
+1. Dynamic config feature: filter only desired Findings.
+
 ## 05.12.2024
 1. Remove PublishedAlerts metrics
 2. Added NotifyChannels: `forwarder_notification_channel_error_total`

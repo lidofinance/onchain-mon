@@ -33,12 +33,13 @@ type Consumer struct {
 	redisClient *redis.Client
 	repo        *Repo
 
-	name        string
-	subject     string
-	severitySet registry.FindingMapping
-	byQuorum    bool
-	quorumSize  uint
-	notifier    notifiler.FindingSender
+	name             string
+	subject          string
+	severitySet      registry.FindingMapping
+	byQuorum         bool
+	quorumSize       uint
+	findingFilterMap registry.FindingFilterMap
+	notifier         notifiler.FindingSender
 }
 
 func New(
@@ -50,6 +51,7 @@ func New(
 	consumerName,
 	subject string,
 	SeveritySet registry.FindingMapping,
+	findingFilterMap registry.FindingFilterMap,
 	byQuorum bool,
 	quorumSize uint,
 	notifier notifiler.FindingSender,
@@ -61,12 +63,13 @@ func New(
 		redisClient: redisClient,
 		repo:        repo,
 
-		name:        consumerName,
-		subject:     subject,
-		severitySet: SeveritySet,
-		byQuorum:    byQuorum,
-		quorumSize:  quorumSize,
-		notifier:    notifier,
+		name:             consumerName,
+		subject:          subject,
+		severitySet:      SeveritySet,
+		findingFilterMap: findingFilterMap,
+		byQuorum:         byQuorum,
+		quorumSize:       quorumSize,
+		notifier:         notifier,
 	}
 }
 
@@ -116,6 +119,7 @@ func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.C
 				consumerName,
 				subject,
 				consumerCfg.SeveritySet,
+				consumerCfg.FindingFilterMap,
 				consumerCfg.ByQuorum,
 				quorumSize,
 				notificationChannel,
@@ -170,6 +174,13 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		if _, ok := c.severitySet[finding.Severity]; !ok {
 			c.ackMessage(msg)
 			return
+		}
+
+		if len(c.findingFilterMap) > 0 {
+			if _, ok := c.findingFilterMap[finding.AlertId]; !ok {
+				c.ackMessage(msg)
+				return
+			}
 		}
 
 		if c.byQuorum == false {

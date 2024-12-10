@@ -37,3 +37,4 @@ var CodeOwners = map[string]string{
 }
 
 type FindingMapping = map[databus.Severity]bool
+type FindingFilterMap = map[string]bool
