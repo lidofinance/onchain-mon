@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy stable image
     steps:
-      - name: Deploy to production cluster1
+      - name: Deploy to production clusters
         uses: lidofinance/dispatch-workflow@v1
         env:
           APP_ID: ${{ secrets.APP_ID }}
@@ -50,13 +50,4 @@ jobs:
           TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
           TARGET: main
           DISPATCH_BRANCH: main
-          TARGET_WORKFLOW: 'onchain_mon_prod1_deploy.yaml'
-      - name: Deploy to production cluster2
-        uses: lidofinance/dispatch-workflow@v1
-        env:
-          APP_ID: ${{ secrets.APP_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
-          TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
-          TARGET: main
-          DISPATCH_BRANCH: main
-          TARGET_WORKFLOW: 'onchain_mon_prod2_deploy.yaml'
+          TARGET_WORKFLOW: 'onchain_mon_production_deploy.yaml'
