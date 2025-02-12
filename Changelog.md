@@ -1,3 +1,6 @@
+## 07.02.2025
+1. Fix opsGenia status. Send only P1, P2.
+
 ## 09.12.2024
 1. Dynamic config feature: filter only desired Findings.
 

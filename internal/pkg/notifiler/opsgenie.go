@@ -43,12 +43,12 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
-		opsGeniePriority = "P2"
+		opsGeniePriority = "P1"
 	case databus.SeverityHigh:
-		opsGeniePriority = "P3"
+		opsGeniePriority = "P2"
 	}
 
-	// Send only P2 or P3 alerts
+	// Send only P1 or P2 alerts
 	if opsGeniePriority == "" {
 		return nil
 	}
