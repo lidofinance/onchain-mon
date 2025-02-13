@@ -270,7 +270,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			if err != nil {
 				if errors.Is(err, redis.Nil) {
 					c.cache.Remove(countKey)
-					c.log.Info(fmt.Sprintf(`Key(%s) is expired`, countKey))
+					c.log.Warn(fmt.Sprintf(`Key(%s) is expired`, countKey))
 					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 					c.ackMessage(msg)
 					return
