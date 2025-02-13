@@ -32,6 +32,7 @@ type AppConfig struct {
 	RedisURL   string
 	RedisDB    int
 	QuorumSize uint
+	SentryDSN  string
 }
 
 var (
@@ -81,6 +82,7 @@ func Read(configPath string) (*Config, error) {
 				RedisURL:       viper.GetString("REDIS_ADDRESS"),
 				RedisDB:        viper.GetInt("REDIS_DB"),
 				QuorumSize:     viper.GetUint("QUORUM_SIZE"),
+				SentryDSN:      viper.GetString("SENTRY_DSN"),
 			},
 		}
 	})

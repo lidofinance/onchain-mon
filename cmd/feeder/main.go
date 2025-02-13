@@ -34,7 +34,14 @@ func main() {
 		return
 	}
 
-	log := logger.New(&cfg.AppConfig)
+	log, sentryClient, logErr := logger.New(&cfg.AppConfig)
+	if logErr != nil {
+		fmt.Println("New log error:", logErr.Error())
+		return
+	}
+	if sentryClient != nil {
+		defer sentryClient.Flush(2 * time.Second)
+	}
 
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
