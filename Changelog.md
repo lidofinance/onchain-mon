@@ -1,3 +1,6 @@
+## 13.02.2025
+1. Integrated sentry with slog
+
 ## 07.02.2025
 1. Fix opsGenia status. Send only P1, P2.
 

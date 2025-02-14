@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -267,7 +268,15 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 			count, err = c.redisClient.Get(ctx, countKey).Uint64()
 			if err != nil {
-				c.log.Error(fmt.Sprintf(`Could not get key value: %v`, err))
+				if errors.Is(err, redis.Nil) {
+					c.cache.Remove(countKey)
+					c.log.Warn(fmt.Sprintf(`Key(%s) is expired`, countKey))
+					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+					c.ackMessage(msg)
+					return
+				}
+
+				c.log.Error(fmt.Sprintf(`Could not get key(%s) value: %v`, countKey, err))
 				c.metrics.RedisErrors.Inc()
 				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
