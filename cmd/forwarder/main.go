@@ -26,7 +26,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 )
 
-const maxMsgSize = 3 * 1024 * 1024 // 3 Mb
+const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
