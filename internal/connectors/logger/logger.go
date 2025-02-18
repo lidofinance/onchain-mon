@@ -36,6 +36,7 @@ func New(cfg *env.AppConfig) (*slog.Logger, *sentry.Client, error) {
 			Dsn:           cfg.SentryDSN,
 			EnableTracing: false,
 			Environment:   cfg.Env,
+			ServerName:    cfg.Source,
 		})
 		if sentryErr != nil {
 			return nil, nil, sentryErr

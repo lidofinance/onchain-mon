@@ -1,3 +1,6 @@
+## 18.02.2025
+1. Increased MaxMsgSize for Nats for 4Mb
+
 ## 13.02.2025
 1. Integrated sentry with slog
 
