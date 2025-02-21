@@ -1,3 +1,6 @@
+## 21.02.2025
+1. Added zstd compression
+
 ## 18.02.2025
 1. Increased MaxMsgSize for Nats for 4Mb
 

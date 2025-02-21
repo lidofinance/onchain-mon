@@ -1,6 +1,7 @@
 package feeder
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -117,10 +119,20 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
-				payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
+				var cPayload bytes.Buffer
+				zstdWriter, _ := zstd.NewWriter(&cPayload)
+				if _, zstdErr := zstdWriter.Write(payload); zstdErr != nil {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+					w.log.Error(fmt.Sprintf(`Could not compress blockDto by zstd: %s`, zstdErr))
+					continue
+				}
+				zstdWriter.Close()
 
-				prevHashBlock = block.Result.Hash
-				if _, publishErr := w.js.PublishAsync(w.topic, payload,
+				payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
+				cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
+
+				// prevHashBlock = block.Result.Hash
+				if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 					jetstream.WithMsgID(blockDto.Hash),
 					//nolint
 					jetstream.WithRetryAttempts(5),
@@ -134,7 +146,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
-				w.log.Info(fmt.Sprintf(`%d, %s`, blockDto.Number, blockDto.Hash), payloadSize)
+				w.log.Info(fmt.Sprintf(`%d, %s`, blockDto.Number, blockDto.Hash), payloadSize, cPayloadSize)
 				w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
 			}
 		}
