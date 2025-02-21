@@ -131,7 +131,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
 				cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
 
-				// prevHashBlock = block.Result.Hash
+				prevHashBlock = block.Result.Hash
 				if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 					jetstream.WithMsgID(blockDto.Hash),
 					//nolint
