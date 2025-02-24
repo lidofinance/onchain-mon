@@ -119,14 +119,12 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
-				var cPayload bytes.Buffer
-				zstdWriter, _ := zstd.NewWriter(&cPayload)
-				if _, zstdErr := zstdWriter.Write(payload); zstdErr != nil {
+				cPayload, compressErr := compress(payload)
+				if compressErr != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-					w.log.Error(fmt.Sprintf(`Could not compress blockDto by zstd: %s`, zstdErr))
+					w.log.Error(fmt.Sprintf(`Could not compress blockDto by zstd: %s`, compressErr))
 					continue
 				}
-				zstdWriter.Close()
 
 				payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
 				cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
@@ -156,4 +154,16 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 		<-ctx.Done()
 		return nil
 	})
+}
+
+func compress(payload []byte) (*bytes.Buffer, error) {
+	cPayload := &bytes.Buffer{}
+	zstdWriter, _ := zstd.NewWriter(cPayload)
+	defer zstdWriter.Close()
+
+	if _, zstdErr := zstdWriter.Write(payload); zstdErr != nil {
+		return nil, zstdErr
+	}
+
+	return cPayload, nil
 }
