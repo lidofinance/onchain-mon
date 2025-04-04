@@ -1,3 +1,6 @@
+## 04.04.2025
+1. Added env variable CHAIN_SCANNER = {etherscan, hoody.etherscan and etc}
+
 ## 21.02.2025
 1. Added zstd compression
 

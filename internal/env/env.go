@@ -29,10 +29,11 @@ type AppConfig struct {
 	BlockTopic   string
 	FindingTopic string
 
-	RedisURL   string
-	RedisDB    int
-	QuorumSize uint
-	SentryDSN  string
+	RedisURL     string
+	RedisDB      int
+	QuorumSize   uint
+	SentryDSN    string
+	ChainScanner string
 }
 
 var (
@@ -66,6 +67,11 @@ func Read(configPath string) (*Config, error) {
 
 		var re = regexp.MustCompile(`[ -]`)
 
+		chainScanner := viper.GetString("CHAIN_SCANNER")
+		if chainScanner == "" {
+			chainScanner = `etherscan.io`
+		}
+
 		cfg = Config{
 			AppConfig: AppConfig{
 				Name:      viper.GetString("APP_NAME"),
@@ -83,6 +89,7 @@ func Read(configPath string) (*Config, error) {
 				RedisDB:        viper.GetInt("REDIS_DB"),
 				QuorumSize:     viper.GetUint("QUORUM_SIZE"),
 				SentryDSN:      viper.GetString("SENTRY_DSN"),
+				ChainScanner:   chainScanner,
 			},
 		}
 	})

@@ -15,14 +15,15 @@ import (
 )
 
 type Telegram struct {
-	botToken   string
-	chatID     string
-	httpClient *http.Client
-	metrics    *metrics.Store
-	source     string
+	botToken     string
+	chatID       string
+	httpClient   *http.Client
+	metrics      *metrics.Store
+	source       string
+	chainScanner string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string) *Telegram {
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string, chainScanner string) *Telegram {
 	return &Telegram{
 		botToken:   botToken,
 		chatID:     chatID,
@@ -38,7 +39,7 @@ const TelegramLabel = `telegram`
 
 func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, t.source)),
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, t.source, t.chainScanner)),
 		MaxTelegramMessageLength,
 		WarningTelegramMessage,
 	)

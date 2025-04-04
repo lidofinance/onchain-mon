@@ -22,18 +22,20 @@ type AlertPayload struct {
 }
 
 type OpsGenie struct {
-	opsGenieKey string
-	httpClient  *http.Client
-	metrics     *metrics.Store
-	source      string
+	opsGenieKey  string
+	httpClient   *http.Client
+	metrics      *metrics.Store
+	source       string
+	chainScanner string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string, chainScanner string) *OpsGenie {
 	return &OpsGenie{
-		opsGenieKey: opsGenieKey,
-		httpClient:  httpClient,
-		metrics:     metricsStore,
-		source:      source,
+		opsGenieKey:  opsGenieKey,
+		httpClient:   httpClient,
+		metrics:      metricsStore,
+		source:       source,
+		chainScanner: chainScanner,
 	}
 }
 
@@ -53,7 +55,7 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		return nil
 	}
 
-	message := FormatAlert(alert, o.source)
+	message := FormatAlert(alert, o.source, o.chainScanner)
 
 	payload := AlertPayload{
 		Message:     alert.Name,
