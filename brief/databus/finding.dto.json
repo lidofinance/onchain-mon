@@ -41,7 +41,7 @@
   "definitions": {
     "Severity": {
       "type": "string",
-      "enum": ["Unknown", "Info", "Low", "Medium", "High", "Critical"]
+      "enum": ["Info", "Low", "Medium", "High", "Critical"]
     }
   }
 }

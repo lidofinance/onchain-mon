@@ -1,4 +1,7 @@
 ## 21.02.2025
+1. Removed unknown finding's status
+
+## 21.02.2025
 1. Added zstd compression
 
 ## 18.02.2025

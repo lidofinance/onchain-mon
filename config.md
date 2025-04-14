@@ -11,7 +11,6 @@ This section defines the different severity levels used to categorize messages. 
 Example:
 ```yaml
 severity_levels:
-  - id: Unknown
   - id: Info
   - id: Low
   - id: Medium
@@ -28,7 +27,7 @@ Example:
 ```yaml
 telegram_channels:
   - id: Telegram1
-    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    description: "Telegram channel for debug messages (severity: Info, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
   - id: Telegram2
@@ -49,7 +48,7 @@ Example:
 ```yaml
 discord_channels:
   - id: Discord1
-    description: "Discord channel for debug messages (severity: Unknown, no quorum)"
+    description: "Discord channel for debug messages (severity: Info, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 ```
 
@@ -82,7 +81,7 @@ consumers:
     type: Telegram
     channel_id: Telegram1
     severities:
-      - Unknown
+      - Info
     by_quorum: false
     subjects:
       - findings.protocol.steth
@@ -100,7 +99,7 @@ consumers:
 ### Example Consumer Breakdown
 
 1. **TelegramDebug**
-    - Processes messages with severity `Unknown` and sends them to the `Telegram1` channel.
+    - Processes messages with severity `Info` and sends them to the `Telegram1` channel.
     - Does not use a quorum.
     - Listens to subjects: `findings.protocol.steth`, `findings.protocol.arb`, `findings.protocol.opt`.
 
@@ -110,7 +109,7 @@ consumers:
     - Listens to the same subjects as `TelegramDebug`.
 
 3. **DiscordDebug**
-    - Processes messages with severity `Unknown` and sends them to the `Discord1` channel.
+    - Processes messages with severity `Info` and sends them to the `Discord1` channel.
     - Does not use a quorum.
     - Listens to subjects: `findings.protocol.steth`, `findings.protocol.arb`, `findings.protocol.opt`.
 
@@ -118,7 +117,6 @@ consumers:
 
 ```yaml
 severity_levels:
-  - id: Unknown
   - id: Info
   - id: Low
   - id: Medium
@@ -127,7 +125,7 @@ severity_levels:
 
 telegram_channels:
   - id: Telegram1
-    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    description: "Telegram channel for debug messages (severity: Info, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
   - id: Telegram2
@@ -137,7 +135,7 @@ telegram_channels:
 
 discord_channels:
   - id: Discord1
-    description: "Discord channel for debug messages (severity: Unknown, no quorum)"
+    description: "Discord channel for debug messages (severity: Info, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 
 opsgenie_channels:
@@ -150,7 +148,7 @@ consumers:
     type: Telegram
     channel_id: Telegram1
     severities:
-      - Unknown
+      - Info
     by_quorum: false
     subjects:
       - findings.protocol.steth
@@ -161,7 +159,7 @@ consumers:
     type: Discord
     channel_id: Discord1
     severities:
-      - Unknown
+      - Info
     by_quorum: false
     subjects:
       - findings.protocol.steth

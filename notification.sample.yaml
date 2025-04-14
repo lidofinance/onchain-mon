@@ -1,5 +1,4 @@
 severity_levels:
-  - id: Unknown
   - id: Info
   - id: Low
   - id: Medium
@@ -8,7 +7,7 @@ severity_levels:
 
 telegram_channels:
   - id: Telegram1
-    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    description: "Telegram channel for debug messages (severity: Info, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
   - id: Telegram2
@@ -41,22 +40,12 @@ opsgenie_channels:
     api_key: YOUR_OPSGENIE_API_KEY_1
 
 consumers:
-  - consumerName: TelegramDebug
-    type: Telegram
-    channel_id: Telegram1
-    severities:
-      - Unknown
-    by_quorum: false
-    subjects:
-      - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
-
   - consumerName: TelegramForwarder
     type: Telegram
     channel_id: Telegram2
     severities:
       - Low
+      - Info
       - Medium
       - High
       - Critical
@@ -71,6 +60,7 @@ consumers:
     channel_id: Telegram3
     severities:
       - Low
+      - Info
       - Medium
       - High
       - Critical
@@ -92,22 +82,12 @@ consumers:
       - findings.protocol.arb
       - findings.protocol.opt
 
-  - consumerName: DiscordDebug
-    type: Discord
-    channel_id: Discord1
-    severities:
-      - Unknown
-    by_quorum: false
-    subjects:
-      - findings.protocol.steth
-      - findings.protocol.arb
-      - findings.protocol.opt
-
   - consumerName: DiscordForwarder
     type: Discord
     channel_id: Discord2
     severities:
       - Low
+      - Info
       - Medium
       - High
       - Critical
