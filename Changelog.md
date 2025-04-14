@@ -1,3 +1,6 @@
+## 14.04.2025
+1. Remove "Unknown" status from Finding object.
+
 ## 04.04.2025
 1. Added env variable CHAIN_SCANNER = {etherscan, hoody.etherscan and etc}
 

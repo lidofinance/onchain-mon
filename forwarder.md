@@ -59,7 +59,7 @@ At present, **Forwarder** operates in three instances running on three different
   "definitions": {
     "Severity": {
       "type": "string",
-      "enum": ["Unknown", "Info", "Low", "Medium", "High", "Critical"]
+      "enum": ["Info", "Low", "Medium", "High", "Critical"]
     }
   }
 }

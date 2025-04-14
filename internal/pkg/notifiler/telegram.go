@@ -44,18 +44,12 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		WarningTelegramMessage,
 	)
 
-	if alert.Severity != databus.SeverityUnknown {
-		m := escapeMarkdownV1(message)
-
-		if sendErr := t.send(ctx, m, true); sendErr != nil {
-			message += "\n\nWarning: Could not send msg as markdown"
-			return t.send(ctx, message, false)
-		}
-
-		return nil
+	if sendErr := t.send(ctx, escapeMarkdownV1(message), true); sendErr != nil {
+		message += "\n\nWarning: Could not send msg as markdown"
+		return t.send(ctx, message, false)
 	}
 
-	return t.send(ctx, message, false)
+	return nil
 }
 
 func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {

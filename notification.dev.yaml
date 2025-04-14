@@ -1,5 +1,4 @@
 severity_levels:
-  - id: Unknown
   - id: Info
   - id: Low
   - id: Medium
@@ -8,13 +7,13 @@ severity_levels:
 
 telegram_channels:
   - id: Telegram1
-    description: "Telegram channel for debug messages (severity: unknown, no quorum)"
+    description: "Telegram channel for debug messages (severity: Low, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
 
 discord_channels:
   - id: Discord1
-    description: "Discord channel for debug messages (severity: unknown, no quorum)"
+    description: "Discord channel for debug messages (severity: Low, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 
 consumers:
@@ -22,7 +21,6 @@ consumers:
     type: Discord
     channel_id: Discord1
     severities:
-      - Unknown
       - Info
       - Low
       - Medium
@@ -36,7 +34,6 @@ consumers:
     type: Telegram
     channel_id: Telegram1
     severities:
-      - Unknown
       - Info
       - Low
       - Medium

@@ -11,12 +11,11 @@ This section defines the different severity levels used to categorize messages. 
 Example:
 ```yaml
 severity_levels:
-  - id: Unknown
-  - id: Info
-  - id: Low
-  - id: Medium
-  - id: High
   - id: Critical
+  - id: High
+  - id: Medium
+  - id: Low
+  - id: Info
 ```
 
 - **id**: The identifier for the severity level. These values will be used to define which severity levels a consumer should process.
@@ -28,11 +27,11 @@ Example:
 ```yaml
 telegram_channels:
   - id: Telegram1
-    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    description: "Telegram channel for debug messages (severity: Low, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
   - id: Telegram2
-    description: Telegram channel for all messages >= Low, no quorum
+    description: Telegram channel for all messages >= Medium, no quorum
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_2
     chat_id: YOUR_CHAT_ID_2
 ```
@@ -49,7 +48,7 @@ Example:
 ```yaml
 discord_channels:
   - id: Discord1
-    description: "Discord channel for debug messages (severity: Unknown, no quorum)"
+    description: "Discord channel for debug messages (severity: Low, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 ```
 
@@ -82,7 +81,7 @@ consumers:
     type: Telegram
     channel_id: Telegram1
     severities:
-      - Unknown
+      - Low
     by_quorum: false
     subjects:
       - findings.protocol.steth
@@ -118,7 +117,6 @@ consumers:
 
 ```yaml
 severity_levels:
-  - id: Unknown
   - id: Info
   - id: Low
   - id: Medium
@@ -127,7 +125,7 @@ severity_levels:
 
 telegram_channels:
   - id: Telegram1
-    description: "Telegram channel for debug messages (severity: Unknown, no quorum)"
+    description: "Telegram channel for debug messages (severity: Low, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
     chat_id: YOUR_CHAT_ID_1
   - id: Telegram2
@@ -137,7 +135,7 @@ telegram_channels:
 
 discord_channels:
   - id: Discord1
-    description: "Discord channel for debug messages (severity: Unknown, no quorum)"
+    description: "Discord channel for debug messages (severity: Low, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 
 opsgenie_channels:
@@ -150,7 +148,7 @@ consumers:
     type: Telegram
     channel_id: Telegram1
     severities:
-      - Unknown
+      - Low
     by_quorum: false
     subjects:
       - findings.protocol.steth
@@ -161,7 +159,7 @@ consumers:
     type: Discord
     channel_id: Discord1
     severities:
-      - Unknown
+      - Low
     by_quorum: false
     subjects:
       - findings.protocol.steth

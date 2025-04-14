@@ -1,5 +1,4 @@
 severity_levels:
-  - id: Unknown
   - id: Info
   - id: Low
   - id: Medium
@@ -7,10 +6,6 @@ severity_levels:
   - id: Critical
 
 telegram_channels:
-  - id: TelegramProtocolErrors
-    description: "For errors messages (severity: Unknown, no quorum)"
-    bot_token: YOUR_TELEGRAM_BOT_TOKEN_1
-    chat_id: YOUR_CHAT_ID_1
   - id: TelegramProtocolDebug
     description: "For debug messages (severity: >= Low, no quorum)"
     bot_token: YOUR_TELEGRAM_BOT_TOKEN_2
@@ -25,9 +20,6 @@ telegram_channels:
     chat_id: YOUR_CHAT_ID_4
 
 discord_channels:
-  - id: DiscordProtocolErrors
-    description: "For errors messages (severity: Unknown, no quorum)"
-    webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
   - id: DiscordProtocolDebug
     description: "For debug messages (severity: >= Low, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_2
@@ -68,17 +60,6 @@ consumers:
       - findings.protocol.arbitrum
       - findings.protocol.optimism
 
-  - consumerName: TelegramErrors
-    type: Telegram
-    channel_id: TelegramProtocolErrors
-    severities:
-      - Unknown
-    by_quorum: false
-    subjects:
-      - findings.protocol.steth
-      - findings.protocol.arbitrum
-      - findings.protocol.optimism
-
   - consumerName: TelegramDebug
     type: Telegram
     channel_id: TelegramProtocolDebug
@@ -88,17 +69,6 @@ consumers:
       - Medium
       - High
       - Critical
-    by_quorum: false
-    subjects:
-      - findings.protocol.steth
-      - findings.protocol.arbitrum
-      - findings.protocol.optimism
-
-  - consumerName: DiscordErrors
-    type: Discord
-    channel_id: DiscordProtocolErrors
-    severities:
-      - Unknown
     by_quorum: false
     subjects:
       - findings.protocol.steth

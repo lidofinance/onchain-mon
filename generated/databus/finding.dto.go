@@ -84,10 +84,8 @@ const SeverityHigh Severity = "High"
 const SeverityInfo Severity = "Info"
 const SeverityLow Severity = "Low"
 const SeverityMedium Severity = "Medium"
-const SeverityUnknown Severity = "Unknown"
 
 var enumValues_Severity = []interface{}{
-	"Unknown",
 	"Info",
 	"Low",
 	"Medium",
