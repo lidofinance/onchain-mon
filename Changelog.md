@@ -1,6 +1,9 @@
 ## 18.04.2025
 1. Feeder: added int blockDto: "From", "TransactionHash" to each receipt
 
+## 04.04.2025
+1. Added env variable BLOCK_EXPLORER = {etherscan, hoody.etherscan and etc}
+
 ## 21.02.2025
 1. Added zstd compression
 

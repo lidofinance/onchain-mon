@@ -109,7 +109,12 @@ func main() {
 		Timeout:   10 * time.Second,
 	}
 
-	notificationChannels, err := env.NewNotificationChannels(log, notificationConfig, httpClient, metricsStore, cfg.AppConfig.Source)
+	notificationChannels, err := env.NewNotificationChannels(
+		log, notificationConfig, httpClient,
+		metricsStore,
+		cfg.AppConfig.Source,
+		cfg.AppConfig.BlockExplorer,
+	)
 	if err != nil {
 		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
 		return
