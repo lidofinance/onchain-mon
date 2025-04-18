@@ -15,11 +15,11 @@ import (
 )
 
 type Discord struct {
-	webhookURL   string
-	httpClient   *http.Client
-	metrics      *metrics.Store
-	source       string
-	chainScanner string
+	webhookURL    string
+	httpClient    *http.Client
+	metrics       *metrics.Store
+	source        string
+	blockExplorer string
 }
 
 type MessagePayload struct {
@@ -28,13 +28,13 @@ type MessagePayload struct {
 
 const DiscordLabel = `discord`
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string, chainScanner string) *Discord {
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Discord {
 	return &Discord{
-		webhookURL:   webhookURL,
-		httpClient:   httpClient,
-		metrics:      metricsStore,
-		source:       source,
-		chainScanner: chainScanner,
+		webhookURL:    webhookURL,
+		httpClient:    httpClient,
+		metrics:       metricsStore,
+		source:        source,
+		blockExplorer: blockExplorer,
 	}
 }
 
@@ -43,7 +43,7 @@ const WarningDiscordMessage = "Warn: Msg >=2000, pls review description message"
 
 func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source, d.chainScanner)),
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source, d.blockExplorer)),
 		MaxDiscordMsgLength,
 		WarningDiscordMessage,
 	)

@@ -8,7 +8,7 @@ import (
 	"github.com/lidofinance/onchain-mon/generated/databus"
 )
 
-func FormatAlert(alert *databus.FindingDtoJson, source string, chainScanner string) string {
+func FormatAlert(alert *databus.FindingDtoJson, source string, blockExplorer string) string {
 	var (
 		body   string
 		footer string
@@ -22,12 +22,12 @@ func FormatAlert(alert *databus.FindingDtoJson, source string, chainScanner stri
 	quorumTime := time.Now()
 	if alert.BlockNumber != nil && alert.BlockTimestamp != nil {
 		eventToQuorumSecs := int(quorumTime.Unix()) - *alert.BlockTimestamp
-		footer += fmt.Sprintf("Happened ~%d seconds ago at block [%d](https://%s/block/%d/)", eventToQuorumSecs, *alert.BlockNumber, chainScanner, *alert.BlockNumber)
+		footer += fmt.Sprintf("Happened ~%d seconds ago at block [%d](https://%s/block/%d/)", eventToQuorumSecs, *alert.BlockNumber, blockExplorer, *alert.BlockNumber)
 	}
 	footer += fmt.Sprintf("\nTeam %s | %s | %s | quorum at %s by %s", alert.Team, alert.BotName, alert.AlertId, quorumTime.Format("15:04:05.000 MST"), source)
 
 	if alert.TxHash != nil {
-		footer += fmt.Sprintf("\nTx hash: [%s](https://%s/tx/%s/)", shortenHex(*alert.TxHash), chainScanner, *alert.TxHash)
+		footer += fmt.Sprintf("\nTx hash: [%s](https://%s/tx/%s/)", shortenHex(*alert.TxHash), blockExplorer, *alert.TxHash)
 	}
 
 	return fmt.Sprintf("%s%s", body, footer)
