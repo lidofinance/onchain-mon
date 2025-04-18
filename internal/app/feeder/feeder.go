@@ -99,8 +99,10 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					}
 
 					receipts = append(receipts, databus.BlockDtoJsonReceiptsElem{
-						Logs: logs,
-						To:   &receipt.To,
+						Logs:            logs,
+						To:              &receipt.To,
+						From:            receipt.From,
+						TransactionHash: receipt.TransactionHash,
 					})
 				}
 
