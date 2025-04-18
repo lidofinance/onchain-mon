@@ -84,7 +84,7 @@
             }
           }
         },
-        "required": ["logs"]
+        "required": ["logs", "from", "transactionHash"]
       }
     }
   },
