@@ -1,3 +1,6 @@
+## 18.04.2025
+1. Feeder: added int blockDto: "From", "TransactionHash" to each receipt
+
 ## 04.04.2025
 1. Added env variable CHAIN_SCANNER = {etherscan, hoody.etherscan and etc}
 
