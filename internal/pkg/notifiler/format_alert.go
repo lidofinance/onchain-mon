@@ -20,7 +20,7 @@ func FormatAlert(alert *databus.FindingDtoJson, source string) string {
 	}
 
 	quorumTime := time.Now()
-	if alert.BlockNumber != nil {
+	if alert.BlockNumber != nil && alert.BlockTimestamp != nil {
 		eventToQuorumSecs := int(quorumTime.Unix()) - *alert.BlockTimestamp
 		footer += fmt.Sprintf("Happened ~%d seconds ago at block [%d](https://etherscan.io/block/%d/)", eventToQuorumSecs, *alert.BlockNumber, *alert.BlockNumber)
 	}

@@ -1,3 +1,6 @@
+## 18.04.2025
+1. Fix nil BlockTimestamp in footer
+
 ## 21.02.2025
 1. Added zstd compression
 
