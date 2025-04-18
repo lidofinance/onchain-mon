@@ -23,11 +23,17 @@ type BlockDtoJson struct {
 }
 
 type BlockDtoJsonReceiptsElem struct {
+	// From corresponds to the JSON schema field "from".
+	From *string `json:"from,omitempty" yaml:"from,omitempty" mapstructure:"from,omitempty"`
+
 	// Logs corresponds to the JSON schema field "logs".
 	Logs []BlockDtoJsonReceiptsElemLogsElem `json:"logs" yaml:"logs" mapstructure:"logs"`
 
 	// To corresponds to the JSON schema field "to".
 	To *string `json:"to,omitempty" yaml:"to,omitempty" mapstructure:"to,omitempty"`
+
+	// TransactionHash corresponds to the JSON schema field "transactionHash".
+	TransactionHash *string `json:"transactionHash,omitempty" yaml:"transactionHash,omitempty" mapstructure:"transactionHash,omitempty"`
 }
 
 type BlockDtoJsonReceiptsElemLogsElem struct {

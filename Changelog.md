@@ -1,3 +1,6 @@
+## 18.04.2025
+1. Feeder: added int blockDto: "From", "TransactionHash" to each receipt
+
 ## 21.02.2025
 1. Added zstd compression
 

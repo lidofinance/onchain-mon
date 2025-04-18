@@ -25,6 +25,12 @@
           "to": {
             "type": "string"
           },
+          "from": {
+            "type": "string"
+          },
+          "transactionHash": {
+            "type": "string"
+          },
           "logs": {
             "title": "Logs",
             "type": "array",
