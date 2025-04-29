@@ -50,4 +50,4 @@ jobs:
           TARGET_REPO: 'lidofinance/ansible-onchain-mon-infra'
           TARGET: main
           DISPATCH_BRANCH: main
-          TARGET_WORKFLOW: 'onchain_mon_production_deploy.yaml'
+          TARGET_WORKFLOW: 'onchain_mon_deploy_protocol_production.yaml'

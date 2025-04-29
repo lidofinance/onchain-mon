@@ -22,6 +22,7 @@ func NewRepo(redisClient *redis.Client, quorumSize uint) *Repo {
 }
 
 const TTLMins12 = 12 * time.Minute
+const coolDownTemplate = "cooldown:%s"
 
 func (r *Repo) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
 	luaScript := `
@@ -71,4 +72,21 @@ func (r *Repo) GetStatus(ctx context.Context, statusKey string) (Status, error) 
 	}
 
 	return Status(status), nil
+}
+
+func (r *Repo) SetCoolDown(ctx context.Context, key string) error {
+	return r.redisClient.Set(ctx, fmt.Sprintf(coolDownTemplate, key), "", TTLMins30).Err()
+}
+
+func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
+	exists, err := r.redisClient.Exists(ctx, fmt.Sprintf(coolDownTemplate, key)).Result()
+	if err != nil {
+		return false, err
+	}
+
+	if exists == 1 {
+		return true, nil
+	}
+
+	return false, nil
 }
