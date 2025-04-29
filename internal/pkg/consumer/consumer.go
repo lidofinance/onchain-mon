@@ -2,6 +2,8 @@ package consumer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -226,7 +228,10 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			return
 		}
 
-		isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, fmt.Sprintf("%s_%s", finding.BotName, finding.AlertId))
+		hash := sha256.Sum256([]byte(finding.Description))
+		bodyDesc := hex.EncodeToString(hash[:])
+
+		isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, fmt.Sprintf("%s_%s_%s", finding.BotName, finding.AlertId, bodyDesc))
 		if coolDownErr != nil {
 			c.log.Error(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr))
 			c.metrics.RedisErrors.Inc()
@@ -423,7 +428,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						c.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
 					}
 
-					if err := c.repo.SetCoolDown(ctx, fmt.Sprintf("%s_%s", finding.BotName, finding.AlertId)); err != nil {
+					if err := c.repo.SetCoolDown(ctx, fmt.Sprintf("%s_%s_%s", finding.BotName, finding.AlertId, bodyDesc)); err != nil {
 						c.metrics.RedisErrors.Inc()
 						c.log.Error(fmt.Sprintf(`Could not set cool down status: %s`, err.Error()))
 					}
