@@ -79,7 +79,7 @@ func (r *Repo) SetCoolDown(ctx context.Context, key string) error {
 }
 
 func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
-	exists, err := r.redisClient.Exists(ctx, key).Result()
+	exists, err := r.redisClient.Exists(ctx, fmt.Sprintf(coolDownTemplate, key)).Result()
 	if err != nil {
 		return false, err
 	}
