@@ -1,3 +1,6 @@
+## 29.04.2025
+1. Forwarder: added Cool down period for sent findings
+
 ## 18.04.2025
 1. Feeder: added int blockDto: "From", "TransactionHash" to each receipt
 
