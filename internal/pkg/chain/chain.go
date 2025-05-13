@@ -114,3 +114,136 @@ func doRpcRequest[T any](
 		}),
 	)
 }
+
+func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
+	if len(blockHashes) == 0 {
+		return &entity.RpcResponse[[]entity.BlockReceipt]{Result: &[]entity.BlockReceipt{}}, nil
+	}
+
+	return retry.DoWithData(
+		func() (*entity.RpcResponse[[]entity.BlockReceipt], error) {
+			requests := make([]entity.RpcRequest, 0, len(blockHashes))
+			for _, hash := range blockHashes {
+				requests = append(requests, entity.RpcRequest{
+					JsonRpc: "2.0",
+					Method:  "eth_getBlockReceipts",
+					Params:  []any{hash},
+					ID:      hash,
+				})
+			}
+
+			payload, err := json.Marshal(requests)
+			if err != nil {
+				return nil, fmt.Errorf("marshal batch: %w", err)
+			}
+
+			req, err := http.NewRequestWithContext(ctx, "POST", c.jsonRpcUrl, bytes.NewBuffer(payload))
+			if err != nil {
+				return nil, fmt.Errorf("create request: %w", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := c.httpClient.Do(req)
+			if err != nil {
+				return nil, fmt.Errorf("send request: %w", err)
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("read body: %w", err)
+			}
+
+			var rawResponses []entity.RpcResponse[[]entity.BlockReceipt]
+			if err := json.Unmarshal(body, &rawResponses); err != nil {
+				return nil, fmt.Errorf("unmarshal response: %w", err)
+			}
+
+			var combined []entity.BlockReceipt
+			for _, r := range rawResponses {
+				if r.Error != nil {
+					return nil, fmt.Errorf("rpc error: %s", r.Error.Message)
+				}
+				if r.Result != nil {
+					combined = append(combined, *r.Result...)
+				}
+			}
+
+			return &entity.RpcResponse[[]entity.BlockReceipt]{
+				JsonRpc: "2.0",
+				ID:      "batch",
+				Result:  &combined,
+			}, nil
+		},
+		retry.Attempts(5),
+		retry.Delay(750*time.Millisecond),
+		retry.Context(ctx),
+	)
+}
+
+func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity.RpcResponse[[]entity.EthBlock], error) {
+	if from > to {
+		return &entity.RpcResponse[[]entity.EthBlock]{Result: &[]entity.EthBlock{}}, nil
+	}
+
+	return retry.DoWithData(
+		func() (*entity.RpcResponse[[]entity.EthBlock], error) {
+			requests := make([]entity.RpcRequest, 0, to-from+1)
+			for i := from; i <= to; i++ {
+				hexNum := fmt.Sprintf("0x%x", i)
+				requests = append(requests, entity.RpcRequest{
+					JsonRpc: "2.0",
+					Method:  "eth_getBlockByNumber",
+					Params:  []any{hexNum, false},
+					ID:      hexNum,
+				})
+			}
+
+			payload, err := json.Marshal(requests)
+			if err != nil {
+				return nil, fmt.Errorf("marshal batch: %w", err)
+			}
+
+			req, err := http.NewRequestWithContext(ctx, "POST", c.jsonRpcUrl, bytes.NewBuffer(payload))
+			if err != nil {
+				return nil, fmt.Errorf("create request: %w", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := c.httpClient.Do(req)
+			if err != nil {
+				return nil, fmt.Errorf("send request: %w", err)
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("read body: %w", err)
+			}
+
+			var rawResponses []entity.RpcResponse[entity.EthBlock]
+			if err := json.Unmarshal(body, &rawResponses); err != nil {
+				return nil, fmt.Errorf("unmarshal response: %w", err)
+			}
+
+			blocks := make([]entity.EthBlock, 0, len(rawResponses))
+			for _, r := range rawResponses {
+				if r.Error != nil {
+					return nil, fmt.Errorf("rpc error: %s", r.Error.Message)
+				}
+				if r.Result != nil {
+					blocks = append(blocks, *r.Result)
+				}
+			}
+
+			return &entity.RpcResponse[[]entity.EthBlock]{
+				JsonRpc: "2.0",
+				ID:      "block-batch",
+				Result:  &blocks,
+			}, nil
+		},
+		retry.Attempts(5),
+		retry.Delay(750*time.Millisecond),
+		retry.Context(ctx),
+	)
+}
