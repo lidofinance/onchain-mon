@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,8 @@ type chain struct {
 	metrics    *metrics.Store
 }
 
+var EmptyResponseErr = errors.New("empty response")
+
 func NewChain(jsonRpcUrl string, httpClient *http.Client, metricsStore *metrics.Store) *chain {
 	return &chain{
 		jsonRpcUrl: jsonRpcUrl,
@@ -37,6 +40,11 @@ func (c *chain) GetLatestBlock(ctx context.Context) (*entity.RpcResponse[entity.
 
 func (c *chain) GetBlockReceipts(ctx context.Context, blockHash string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
 	return doRpcRequest[[]entity.BlockReceipt](ctx, "eth_getBlockReceipts", []any{blockHash}, c.httpClient, c.metrics, c.jsonRpcUrl)
+}
+
+func (c *chain) FetchBlockByNumber(ctx context.Context, blockNumber int64) (*entity.RpcResponse[entity.EthBlock], error) {
+	hexValue := fmt.Sprintf("0x%x", blockNumber)
+	return doRpcRequest[entity.EthBlock](ctx, "eth_getBlockByNumber", []any{hexValue, false}, c.httpClient, c.metrics, c.jsonRpcUrl)
 }
 
 func doRpcRequest[T any](
@@ -90,7 +98,7 @@ func doRpcRequest[T any](
 			}
 
 			if p.Result == nil {
-				return nil, fmt.Errorf("%s rpcResponse.Result is nil. payload %s", method, string(payload))
+				return nil, fmt.Errorf("%s rpcResponse.Result is nil. payload %s: %w", method, string(payload), EmptyResponseErr)
 			}
 
 			return &p, nil
@@ -98,5 +106,11 @@ func doRpcRequest[T any](
 		retry.Attempts(5),
 		retry.Delay(750*time.Millisecond),
 		retry.Context(ctx),
+		retry.RetryIf(func(err error) bool {
+			if errors.Is(err, EmptyResponseErr) {
+				return false
+			}
+			return true
+		}),
 	)
 }

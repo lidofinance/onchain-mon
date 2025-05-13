@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/lidofinance/onchain-mon/internal/pkg/chain"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -23,6 +25,7 @@ import (
 type ChainSrv interface {
 	GetLatestBlock(ctx context.Context) (*entity.RpcResponse[entity.EthBlock], error)
 	GetBlockReceipts(ctx context.Context, blockHash string) (*entity.RpcResponse[[]entity.BlockReceipt], error)
+	FetchBlockByNumber(ctx context.Context, blockNumber int64) (*entity.RpcResponse[entity.EthBlock], error)
 }
 
 type Feeder struct {
@@ -44,6 +47,7 @@ func New(log *slog.Logger, chainSrv ChainSrv, js jetstream.JetStream, metricsSto
 }
 
 const Per6Sec = 6 * time.Second
+const maxPayloadSize4mb = 4 * 1024 * 1024
 
 func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 	prevHashBlock := ""
@@ -52,16 +56,55 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 		ticker := time.NewTicker(Per6Sec)
 		defer ticker.Stop()
 
+		prevBlockNumber := int64(-1)
+
+		var (
+			block          *entity.RpcResponse[entity.EthBlock]
+			fetchStartTime time.Time
+			err            error
+		)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-ticker.C:
-				block, err := w.chainSrv.GetLatestBlock(ctx)
-				if err != nil {
-					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-					w.log.Error(fmt.Sprintf("GetLatestBlock error: %v", err))
-					continue
+				if prevBlockNumber == -1 {
+					block, err = w.chainSrv.GetLatestBlock(ctx)
+					if err != nil {
+						w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+						w.log.Error(fmt.Sprintf("GetLatestBlock error: %v", err))
+						continue
+					}
+				} else {
+					nextBlockNumber := prevBlockNumber + 1
+					block, err = w.chainSrv.FetchBlockByNumber(ctx, nextBlockNumber)
+					if err != nil {
+						if fetchStartTime.IsZero() {
+							fetchStartTime = time.Now()
+						}
+
+						if !errors.Is(err, chain.EmptyResponseErr) {
+							w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+							w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
+						} else {
+							ticker.Reset(2 * time.Second)
+							w.log.Debug(fmt.Sprintf("Block %d not yet available", nextBlockNumber))
+						}
+
+						if time.Since(fetchStartTime) > 18*time.Second {
+							if prevBlockNumber != -1 {
+								w.log.Warn("Too long without next block, resetting to latest")
+								prevBlockNumber = -1
+								fetchStartTime = time.Time{}
+								w.metricsStore.BlockResets.Inc()
+							}
+						}
+
+						continue
+					}
+
+					fetchStartTime = time.Time{}
 				}
 
 				if block.Result.Hash == prevHashBlock {
@@ -131,6 +174,12 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
 				cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
 
+				if cPayload.Len() > maxPayloadSize4mb {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+					w.log.Error("Payload too large to publish", slog.Int("size", cPayload.Len()))
+					continue
+				}
+
 				prevHashBlock = block.Result.Hash
 				if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 					jetstream.WithMsgID(blockDto.Hash),
@@ -148,6 +197,18 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 
 				w.log.Info(fmt.Sprintf(`%d, %s`, blockDto.Number, blockDto.Hash), payloadSize, cPayloadSize)
 				w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+				prevBlockNumber = block.Result.GetNumber()
+
+				// estimate next block time
+				expectedNextBlockTime := time.Unix(block.Result.GetTimestamp(), 0).Add(12 * time.Second)
+				delay := time.Until(expectedNextBlockTime.Add(500 * time.Millisecond))
+
+				if delay < time.Second {
+					delay = time.Second
+				}
+
+				ticker.Reset(delay)
+				w.log.Debug("Adjusted ticker delay", slog.Duration("delay", delay))
 			}
 		}
 	})

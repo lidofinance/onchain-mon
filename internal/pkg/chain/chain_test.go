@@ -2,7 +2,9 @@ package chain
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -129,6 +131,84 @@ func Test_chain_GetLatestLogs(t *testing.T) {
 			if blocKReceipts[0].BlockHash != tt.args.blockHash {
 				t.Errorf("GetBlockReceipts() got %s, want %s", blocKReceipts[0].BlockHash, tt.args.blockHash)
 				return
+			}
+		})
+	}
+}
+
+func Test_chain_FetchBlockByNumber(t *testing.T) {
+	cfg, envErr := env.Read("../../../.env")
+	if envErr != nil {
+		t.Errorf("Read env error: %s", envErr.Error())
+		return
+	}
+	promRegistry := prometheus.NewRegistry()
+	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
+	type fields struct {
+		jsonRpcUrl string
+		httpClient *http.Client
+		metrics    *metrics.Store
+	}
+	type args struct {
+		ctx         context.Context
+		blockNumber int64
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    int64
+		wantErr error
+	}{
+		{
+			name: "Nil response",
+			fields: fields{
+				jsonRpcUrl: cfg.AppConfig.JsonRpcURL,
+				httpClient: &http.Client{},
+				metrics:    metricsStore,
+			},
+			args: args{
+				ctx:         context.Background(),
+				blockNumber: 92466198,
+			},
+			want:    0,
+			wantErr: EmptyResponseErr,
+		},
+		{
+			name: "success",
+			fields: fields{
+				jsonRpcUrl: cfg.AppConfig.JsonRpcURL,
+				httpClient: &http.Client{},
+				metrics:    metricsStore,
+			},
+			args: args{
+				ctx:         context.Background(),
+				blockNumber: 22466927,
+			},
+			want:    22466927,
+			wantErr: EmptyResponseErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &chain{
+				jsonRpcUrl: tt.fields.jsonRpcUrl,
+				httpClient: tt.fields.httpClient,
+				metrics:    tt.fields.metrics,
+			}
+			got, err := c.FetchBlockByNumber(tt.args.ctx, tt.args.blockNumber)
+			if err != nil && tt.wantErr != nil {
+				if errors.Is(err, tt.wantErr) {
+					return
+				}
+
+				t.Errorf("Wrong expected error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !reflect.DeepEqual(got.Result.GetNumber(), tt.want) {
+				t.Errorf("FetchBlockByNumber() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
