@@ -121,6 +121,9 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				if err != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 					w.log.Error(fmt.Sprintf("GetBlockReceipts error: %v", err))
+
+					prevBlockNumber = block.Result.GetNumber()
+					w.updateTickerAfterBlock(timer, block.Result)
 					continue
 				}
 
