@@ -1,3 +1,7 @@
+## 13.05.2025
+1. Add support for fetching blocks by number and dynamic time
+2. Add support for skipped blocks
+
 ## 29.04.2025
 1. Forwarder: added Cool down period for sent findings.
 
