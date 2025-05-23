@@ -2,6 +2,8 @@ package consumer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -146,6 +148,7 @@ const (
 
 const (
 	TTLMins10 = 10 * time.Minute
+	TTLMins30 = 30 * time.Minute
 	TTLMin1   = 1 * time.Minute
 )
 
@@ -221,6 +224,20 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			)
 
 			c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
+			c.ackMessage(msg)
+			return
+		}
+
+		hash := sha256.Sum256([]byte(finding.Description))
+		bodyDesc := hex.EncodeToString(hash[:])
+
+		isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, fmt.Sprintf("%s_%s_%s", finding.BotName, finding.AlertId, bodyDesc))
+		if coolDownErr != nil {
+			c.log.Error(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr))
+			c.metrics.RedisErrors.Inc()
+		}
+
+		if isCooldownActive {
 			c.ackMessage(msg)
 			return
 		}
@@ -409,6 +426,11 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					if err := c.repo.SeStatusSent(ctx, statusKey); err != nil {
 						c.metrics.RedisErrors.Inc()
 						c.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
+					}
+
+					if err := c.repo.SetCoolDown(ctx, fmt.Sprintf("%s_%s_%s", finding.BotName, finding.AlertId, bodyDesc)); err != nil {
+						c.metrics.RedisErrors.Inc()
+						c.log.Error(fmt.Sprintf(`Could not set cool down status: %s`, err.Error()))
 					}
 				}
 			}
