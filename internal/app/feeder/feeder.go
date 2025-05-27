@@ -102,6 +102,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 							if recoverErr != nil {
 								w.log.Error(fmt.Sprintf("Failed to recover missed blocks %s", recoverErr))
 								prevBlockNumber = -1
+								w.resetTimer(timer)
 							} else {
 								prevBlockNumber = latestRecovered.GetNumber()
 								delay := w.updateTickerAfterBlock(timer, latestRecovered)
