@@ -16,6 +16,7 @@ type Store struct {
 	RedisErrors     prometheus.Counter
 	SummaryHandlers *prometheus.HistogramVec
 	NotifyChannels  *prometheus.CounterVec
+	BlockResets     prometheus.Counter
 }
 
 const Status = `status`
@@ -61,6 +62,10 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			Name: fmt.Sprintf("%s_notification_channel_error_total", prefix),
 			Help: "The total number of network errors of telegram, discord, opsgenie channels",
 		}, []string{Channel, Status}),
+		BlockResets: promauto.NewCounter(prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_block_reset_total", prefix),
+			Help: "The total number of reset blocks",
+		}),
 	}
 
 	store.Prometheus.MustRegister(
