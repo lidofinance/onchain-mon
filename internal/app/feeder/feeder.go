@@ -73,6 +73,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					if err != nil {
 						w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 						w.log.Error(fmt.Sprintf("GetLatestBlock error: %v", err))
+						w.resetTimer(timer)
 						continue
 					}
 				} else {
@@ -83,62 +84,78 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 							fetchStartTime = time.Now()
 						}
 
+						if errors.Is(err, chain.EmptyResponseErr) {
+							w.log.Info(fmt.Sprintf("Block %d is not avaliable", nextBlockNumber))
+							w.resetTimer(timer)
+							continue
+						}
+
 						if !errors.Is(err, chain.EmptyResponseErr) {
 							w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 							w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
-						} else {
-							timer.Reset(2 * time.Second)
-							w.log.Debug(fmt.Sprintf("Block %d not yet available", nextBlockNumber))
 						}
 
 						if time.Since(fetchStartTime) > 2*time.Minute {
 							w.metricsStore.BlockResets.Inc()
 							w.log.Warn("Too long without next block, attempting to recover missed blocks")
-							latestRecovered, err := w.recoverMissedBlocks(ctx, prevBlockNumber)
-							if err != nil {
+							latestRecovered, recoverErr := w.recoverMissedBlocks(ctx, prevBlockNumber)
+							if recoverErr != nil {
+								w.log.Error(fmt.Sprintf("Failed to recover missed blocks %s", recoverErr))
 								prevBlockNumber = -1
-								w.log.Error("Failed to recover missed blocks", err)
+								w.resetTimer(timer)
 							} else {
 								prevBlockNumber = latestRecovered.GetNumber()
-								w.updateTickerAfterBlock(timer, latestRecovered)
-								w.log.Info(fmt.Sprintf("Latest recovered block: %d", (*latestRecovered).GetNumber()))
+								delay := w.updateTickerAfterBlock(timer, latestRecovered)
+								w.log.Info(fmt.Sprintf("Latest recovered block: %d, delay: %s", (*latestRecovered).GetNumber(), slog.Duration("delay", delay)))
 							}
 
+							// Positive branch - we recovered all skipped blocks
 							fetchStartTime = time.Time{}
+							continue
 						}
 
+						w.resetTimer(timer)
 						continue
 					}
 
 					fetchStartTime = time.Time{}
 				}
 
-				if block.Result.GetNumber() == prevBlockNumber {
+				if block == nil || block.Result == nil {
+					w.log.Error("Received nil block or result")
+					w.resetTimer(timer)
 					continue
 				}
 
-				blockReceipts, err := w.chainSrv.GetBlockReceipts(ctx, block.Result.Hash)
-				if err != nil {
-					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-					w.log.Error(fmt.Sprintf("GetBlockReceipts error: %v", err))
+				if block.Result.GetNumber() == prevBlockNumber {
+					w.resetTimer(timer)
+					w.log.Warn(fmt.Sprintf(`got the same block %d as before, skipping`, block.Result.GetNumber()))
+					continue
+				}
 
-					prevBlockNumber = block.Result.GetNumber()
-					w.updateTickerAfterBlock(timer, block.Result)
+				blockReceipts, getReceiptsErr := w.chainSrv.GetBlockReceipts(ctx, block.Result.Hash)
+				if getReceiptsErr != nil {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+					w.log.Error(fmt.Sprintf("GetBlockReceipts error: %v", getReceiptsErr))
+					w.resetTimer(timer)
 					continue
 				}
 
 				blockDto := buildBlockDto(*block.Result, *blockReceipts.Result)
-				w.publishBlock(blockDto)
+				if publishErr := w.publishBlock(blockDto); publishErr != nil {
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+					w.log.Error(fmt.Sprintf(`Could not publish block blockDto: %s`, publishErr))
+					w.resetTimer(timer)
+					continue
+				}
 
+				w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
 				prevBlockNumber = block.Result.GetNumber()
-				w.updateTickerAfterBlock(timer, block.Result)
+				delay := w.updateTickerAfterBlock(timer, block.Result)
+
+				w.log.Info(fmt.Sprintf("%d is published. next block delay %s", blockDto.Number, slog.Duration("delay", delay)))
 			}
 		}
-	})
-
-	g.Go(func() error {
-		<-ctx.Done()
-		return nil
 	})
 }
 
@@ -150,7 +167,7 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 
 	latestNumber := latestBlock.Result.GetNumber()
 	if latestNumber <= fromBlock {
-		return latestBlock.Result, nil
+		return nil, fmt.Errorf(fmt.Sprintf("Latest block number %d is less than fromBlock %d", latestNumber, fromBlock))
 	}
 
 	blocksResp, err := w.chainSrv.FetchBlocksInRange(ctx, fromBlock+1, latestNumber)
@@ -179,7 +196,9 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 		receipts := receiptsByBlock[hash]
 
 		dto := buildBlockDto(block, receipts)
-		w.publishBlock(dto)
+		if publishErr := w.publishBlock(dto); publishErr != nil {
+			return nil, fmt.Errorf("could not publish block: %w", publishErr)
+		}
 		latestPubBlock = &block
 
 		w.log.Info(fmt.Sprintf("Recovered block %d", dto.Number))
@@ -240,39 +259,30 @@ func buildBlockDto(block entity.EthBlock, blockReceipts []entity.BlockReceipt) d
 	}
 }
 
-func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) {
-	payload, err := json.Marshal(blockDto)
-	if err != nil {
-		w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-		w.log.Error(fmt.Sprintf(`Could not marshal blockDto: %s`, err))
-		return
+func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
+	payload, marshalErr := json.Marshal(blockDto)
+	if marshalErr != nil {
+		return fmt.Errorf("could not marshal blockDto: %w", marshalErr)
 	}
 
-	cPayload, err := compress(payload)
-	if err != nil {
-		w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-		w.log.Error(fmt.Sprintf(`Could not compress blockDto by zstd: %s`, err))
-		return
+	cPayload, compressErr := compress(payload)
+	if compressErr != nil {
+		return fmt.Errorf("could not compress blockDto by zstd: %w", compressErr)
 	}
 
-	payloadSize := slog.String("payloadSize", fmt.Sprintf(`%.6f mb`, float64(len(payload))/(1024*1024)))
-	cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
-
-	if _, err := w.js.PublishAsync(w.topic, cPayload.Bytes(),
+	if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 		jetstream.WithMsgID(blockDto.Hash),
 		jetstream.WithRetryAttempts(5),
 		jetstream.WithRetryWait(250*time.Millisecond),
-	); err != nil {
-		w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-		w.log.Error(fmt.Sprintf("Could not publish block %d to JetStream: %v", blockDto.Number, err), payloadSize)
-		return
+	); publishErr != nil {
+		cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
+		return fmt.Errorf("could not publish block %d(cPayload: %s) to JetStream: %w ", blockDto.Number, cPayloadSize, publishErr)
 	}
 
-	w.log.Info(fmt.Sprintf("%d, %s", blockDto.Number, blockDto.Hash), payloadSize, cPayloadSize)
-	w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+	return nil
 }
 
-func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBlock) {
+func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBlock) time.Duration {
 	expectedNextBlockTime := time.Unix(block.GetTimestamp(), 0).Add(12 * time.Second)
 	delay := time.Until(expectedNextBlockTime.Add(500 * time.Millisecond))
 
@@ -281,5 +291,9 @@ func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBloc
 	}
 
 	timer.Reset(delay)
-	w.log.Debug("Adjusted ticker delay", slog.Duration("delay", delay))
+	return delay
+}
+
+func (w *Feeder) resetTimer(timer *time.Timer) {
+	timer.Reset(2 * time.Second)
 }

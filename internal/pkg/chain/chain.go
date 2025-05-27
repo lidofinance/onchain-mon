@@ -103,9 +103,13 @@ func doRpcRequest[T any](
 
 			return &p, nil
 		},
-		retry.Attempts(5),
+		retry.Attempts(6),
 		retry.Delay(750*time.Millisecond),
-		retry.Context(ctx),
+		retry.MaxDelay(5*time.Second),
+		retry.DelayType(retry.CombineDelay(
+			retry.BackOffDelay,
+			retry.RandomDelay,
+		)),
 		retry.RetryIf(func(err error) bool {
 			if errors.Is(err, EmptyResponseErr) {
 				return false
@@ -175,8 +179,13 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 				Result:  &combined,
 			}, nil
 		},
-		retry.Attempts(5),
+		retry.Attempts(6),
 		retry.Delay(750*time.Millisecond),
+		retry.MaxDelay(5*time.Second),
+		retry.DelayType(retry.CombineDelay(
+			retry.BackOffDelay,
+			retry.RandomDelay,
+		)),
 		retry.Context(ctx),
 	)
 }
@@ -242,8 +251,13 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 				Result:  &blocks,
 			}, nil
 		},
-		retry.Attempts(5),
+		retry.Attempts(6),
 		retry.Delay(750*time.Millisecond),
+		retry.MaxDelay(5*time.Second),
+		retry.DelayType(retry.CombineDelay(
+			retry.BackOffDelay,
+			retry.RandomDelay,
+		)),
 		retry.Context(ctx),
 	)
 }
