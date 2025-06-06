@@ -16,7 +16,7 @@
 ## Accept interfaces return *structures | structures
 
 * web app != library
-* accept interfaces - Just remember about solid, polymorphism, testing and testing technics. Those things became possible when
+* accept interfaces - Just remember about solid, polymorphism, testing and testing techniques. Those things became possible when
 * return structures -
     1. web app
         * struct - when object is short-lived, light and placed on the stack (example: dto)
