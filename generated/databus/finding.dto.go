@@ -10,6 +10,9 @@ type FindingDtoJson struct {
 	// AlertId corresponds to the JSON schema field "alertId".
 	AlertId string `json:"alertId" yaml:"alertId" mapstructure:"alertId"`
 
+	// AlertLink corresponds to the JSON schema field "alertLink".
+	AlertLink *string `json:"alertLink,omitempty" yaml:"alertLink,omitempty" mapstructure:"alertLink,omitempty"`
+
 	// BlockNumber corresponds to the JSON schema field "blockNumber".
 	BlockNumber *int `json:"blockNumber,omitempty" yaml:"blockNumber,omitempty" mapstructure:"blockNumber,omitempty"`
 

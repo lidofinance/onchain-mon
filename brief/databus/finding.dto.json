@@ -9,6 +9,9 @@
     "alertId": {
       "type": "string"
     },
+    "alertLink": {
+      "type": "string"
+    },
     "name": {
       "type": "string"
     },

@@ -24,7 +24,14 @@ func FormatAlert(alert *databus.FindingDtoJson, source string, blockExplorer str
 		eventToQuorumSecs := int(quorumTime.Unix()) - *alert.BlockTimestamp
 		footer += fmt.Sprintf("Happened ~%d seconds ago at block [%d](https://%s/block/%d/)", eventToQuorumSecs, *alert.BlockNumber, blockExplorer, *alert.BlockNumber)
 	}
-	footer += fmt.Sprintf("\nTeam %s | %s | %s | quorum at %s by %s", alert.Team, alert.BotName, alert.AlertId, quorumTime.Format("15:04:05.000 MST"), source)
+
+	var alertIdText string
+	if alert.AlertLink != nil && *alert.AlertLink != "" {
+		alertIdText = fmt.Sprintf("[%s](%s)", alert.AlertId, *alert.AlertLink)
+	} else {
+		alertIdText = alert.AlertId
+	}
+	footer += fmt.Sprintf("\nTeam %s | %s | %s | quorum at %s by %s", alert.Team, alert.BotName, alertIdText, quorumTime.Format("15:04:05.000 MST"), source)
 
 	if alert.TxHash != nil {
 		footer += fmt.Sprintf("\nTx hash: [%s](https://%s/tx/%s/)", shortenHex(*alert.TxHash), blockExplorer, *alert.TxHash)
