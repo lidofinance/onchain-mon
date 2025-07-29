@@ -9,14 +9,12 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
 
-// createBaseAlert creates a base alert for testing with all fields filled except AlertLink
 func createBaseAlert() *databus.FindingDtoJson {
 	return &databus.FindingDtoJson{
-		Name:        "Test Alert",
-		Description: "Test alert description",
-		Severity:    databus.SeverityHigh,
-		AlertId:     "TEST-ALERT-ID",
-		// AlertLink intentionally not set - will be set in individual tests
+		Name:           "Test Alert",
+		Description:    "Test alert description",
+		Severity:       databus.SeverityHigh,
+		AlertId:        "TEST-ALERT-ID",
 		BlockTimestamp: pointers.IntPtr(1727965236),
 		BlockNumber:    pointers.IntPtr(20884540),
 		TxHash: pointers.StringPtr(
@@ -27,9 +25,8 @@ func createBaseAlert() *databus.FindingDtoJson {
 	}
 }
 
-// assertContains checks if result contains expected pattern and provides clear error message
 func assertContains(t *testing.T, result, expectedPattern, testContext string) {
-	t.Helper() // Marks this as helper function for better error reporting
+	t.Helper()
 	if !strings.Contains(result, expectedPattern) {
 		t.Errorf(
 			"%s: result missing expected pattern.\nExpected pattern: %s\nActual result: %s",
@@ -40,7 +37,6 @@ func assertContains(t *testing.T, result, expectedPattern, testContext string) {
 	}
 }
 
-// assertNotContains checks if result does NOT contain unexpected pattern
 func assertNotContains(t *testing.T, result, unexpectedPattern, testContext string) {
 	t.Helper()
 	if strings.Contains(result, unexpectedPattern) {
@@ -55,41 +51,35 @@ func assertNotContains(t *testing.T, result, unexpectedPattern, testContext stri
 
 func TestFormatAlert_AlertLink_Nil(t *testing.T) {
 	alert := createBaseAlert()
-	alert.AlertLink = nil // Test case: nil AlertLink
+	alert.AlertLink = nil
 
 	result := notifiler.FormatAlert(alert, "test-source", "etherscan.io")
 
-	// Should show plain AlertId without link
 	assertContains(t, result, "TEST-ALERT-ID", "AlertLink is nil")
 
-	// Should NOT contain markdown link format
 	assertNotContains(t, result, "[TEST-ALERT-ID](", "AlertLink is nil")
 }
 
 func TestFormatAlert_AlertLink_Empty(t *testing.T) {
 	alert := createBaseAlert()
-	alert.AlertLink = pointers.StringPtr("") // Test case: empty AlertLink
+	alert.AlertLink = pointers.StringPtr("")
 
 	result := notifiler.FormatAlert(alert, "test-source", "etherscan.io")
 
-	// Should show plain AlertId without link
 	assertContains(t, result, "TEST-ALERT-ID", "AlertLink is empty")
 
-	// Should NOT contain markdown link format
 	assertNotContains(t, result, "[TEST-ALERT-ID](", "AlertLink is empty")
 }
 
 func TestFormatAlert_AlertLink_Valid(t *testing.T) {
 	githubURL := "https://github.com/search?q=TEST-ALERT-ID"
 	alert := createBaseAlert()
-	alert.AlertLink = pointers.StringPtr(githubURL) // Test case: valid AlertLink
+	alert.AlertLink = pointers.StringPtr(githubURL)
 
 	result := notifiler.FormatAlert(alert, "test-source", "etherscan.io")
 
-	// Should show markdown link format
 	expectedPattern := "[TEST-ALERT-ID](" + githubURL + ")"
 	assertContains(t, result, expectedPattern, "AlertLink is valid URL")
 
-	// Additional verification: ensure proper markdown structure
 	assertContains(t, result, "[TEST-ALERT-ID](", "AlertLink is valid URL")
 }
