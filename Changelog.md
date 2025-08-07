@@ -1,3 +1,7 @@
+## 07.08.2025
+1. Send findings via Redis streams
+2. Updated go-redis/v8 -> go-redis/v9
+
 ## 13.05.2025
 1. Add support for fetching blocks by number and dynamic time
 2. Add support for skipped blocks

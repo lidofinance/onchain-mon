@@ -12,25 +12,28 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type Telegram struct {
-	botToken      string
-	chatID        string
-	httpClient    *http.Client
-	metrics       *metrics.Store
-	source        string
-	blockExplorer string
+	botToken        string
+	chatID          string
+	httpClient      *http.Client
+	metrics         *metrics.Store
+	blockExplorer   string
+	channelID       string
+	redisStreamName string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Telegram {
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string) *Telegram {
 	return &Telegram{
-		botToken:      botToken,
-		chatID:        chatID,
-		httpClient:    httpClient,
-		metrics:       metricsStore,
-		source:        source,
-		blockExplorer: blockExplorer,
+		botToken:        botToken,
+		chatID:          chatID,
+		httpClient:      httpClient,
+		metrics:         metricsStore,
+		blockExplorer:   blockExplorer,
+		channelID:       channelID,
+		redisStreamName: redisStreamName,
 	}
 }
 
@@ -38,9 +41,9 @@ const MaxTelegramMessageLength = 4096
 const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message"
 const TelegramLabel = `telegram`
 
-func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, t.source, t.blockExplorer)),
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, quorumBy, t.blockExplorer)),
 		MaxTelegramMessageLength,
 		WarningTelegramMessage,
 	)
@@ -82,6 +85,11 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 		t.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: TelegramLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
+		return ErrRateLimited
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from telegram non-200 response code: %v", resp.Status)
@@ -91,8 +99,14 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	return nil
 }
 
-func (t *Telegram) GetType() string {
-	return "Telegram"
+func (t *Telegram) GetType() registry.NotificationChannel {
+	return registry.Telegram
+}
+func (t *Telegram) GetChannelID() string {
+	return t.channelID
+}
+func (t *Telegram) GetRedisStreamName() string {
+	return fmt.Sprintf("%s:%s", t.redisStreamName, t.channelID)
 }
 
 // Telegram supports two versions of markdown. V1, V2
