@@ -12,14 +12,17 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type Discord struct {
-	webhookURL    string
-	httpClient    *http.Client
-	metrics       *metrics.Store
-	source        string
-	blockExplorer string
+	webhookURL      string
+	httpClient      *http.Client
+	metrics         *metrics.Store
+	source          string
+	blockExplorer   string
+	channelID       string
+	redisStreamName string
 }
 
 type MessagePayload struct {
@@ -28,13 +31,15 @@ type MessagePayload struct {
 
 const DiscordLabel = `discord`
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Discord {
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string, channelID string, redisStreamName string) *Discord {
 	return &Discord{
-		webhookURL:    webhookURL,
-		httpClient:    httpClient,
-		metrics:       metricsStore,
-		source:        source,
-		blockExplorer: blockExplorer,
+		webhookURL:      webhookURL,
+		httpClient:      httpClient,
+		metrics:         metricsStore,
+		source:          source,
+		blockExplorer:   blockExplorer,
+		channelID:       channelID,
+		redisStreamName: redisStreamName,
 	}
 }
 
@@ -88,6 +93,12 @@ func (d *Discord) send(ctx context.Context, message string) error {
 	return nil
 }
 
-func (d *Discord) GetType() string {
-	return "Discord"
+func (d *Discord) GetType() registry.NotificationChannel {
+	return registry.Discord
+}
+func (d *Discord) GetChannelID() string {
+	return d.channelID
+}
+func (d *Discord) GetRedisStreamName() string {
+	return d.redisStreamName
 }

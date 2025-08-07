@@ -128,6 +128,8 @@ func Test_usecase_SendFinding(t *testing.T) {
 				metricsStore,
 				`local`,
 				`etherscan.io`,
+				`channelId`,
+				`redis-stream-name`,
 			)
 			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)

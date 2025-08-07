@@ -12,25 +12,30 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type Telegram struct {
-	botToken      string
-	chatID        string
-	httpClient    *http.Client
-	metrics       *metrics.Store
-	source        string
-	blockExplorer string
+	botToken        string
+	chatID          string
+	httpClient      *http.Client
+	metrics         *metrics.Store
+	source          string
+	blockExplorer   string
+	channelID       string
+	redisStreamName string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Telegram {
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string, channelID string, redisStreamName string) *Telegram {
 	return &Telegram{
-		botToken:      botToken,
-		chatID:        chatID,
-		httpClient:    httpClient,
-		metrics:       metricsStore,
-		source:        source,
-		blockExplorer: blockExplorer,
+		botToken:        botToken,
+		chatID:          chatID,
+		httpClient:      httpClient,
+		metrics:         metricsStore,
+		source:          source,
+		blockExplorer:   blockExplorer,
+		channelID:       channelID,
+		redisStreamName: redisStreamName,
 	}
 }
 
@@ -91,8 +96,14 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	return nil
 }
 
-func (t *Telegram) GetType() string {
-	return "Telegram"
+func (t *Telegram) GetType() registry.NotificationChannel {
+	return registry.Telegram
+}
+func (t *Telegram) GetChannelID() string {
+	return t.channelID
+}
+func (t *Telegram) GetRedisStreamName() string {
+	return t.redisStreamName
 }
 
 // Telegram supports two versions of markdown. V1, V2

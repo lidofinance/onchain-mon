@@ -11,22 +11,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
-)
-
-const (
-	Telegram = `Telegram`
-	Discord  = `Discord`
-	OpsGenie = `OpsGenie`
 )
 
 type Consumer struct {
@@ -36,6 +30,7 @@ type Consumer struct {
 	redisClient *redis.Client
 	repo        *Repo
 
+	instance         string
 	name             string
 	subject          string
 	severitySet      registry.FindingMapping
@@ -51,6 +46,7 @@ func New(
 	cache *expirable.LRU[string, uint],
 	redisClient *redis.Client,
 	repo *Repo,
+	instance string,
 	consumerName,
 	subject string,
 	SeveritySet registry.FindingMapping,
@@ -66,6 +62,7 @@ func New(
 		redisClient: redisClient,
 		repo:        repo,
 
+		instance:         instance,
 		name:             consumerName,
 		subject:          subject,
 		severitySet:      SeveritySet,
@@ -76,7 +73,7 @@ func New(
 	}
 }
 
-func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.Client, repo *Repo, quorumSize uint, cfg *env.NotificationConfig, notificationChannels *env.NotificationChannels) ([]*Consumer, error) {
+func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.Client, instance string, repo *Repo, quorumSize uint, cfg *env.NotificationConfig, notificationChannels *env.NotificationChannels) ([]*Consumer, error) {
 	var consumers []*Consumer
 
 	for _, consumerCfg := range cfg.Consumers {
@@ -92,19 +89,19 @@ func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.C
 
 			var notificationChannel notifiler.FindingSender
 			switch consumerCfg.Type {
-			case Telegram:
+			case registry.Telegram:
 				channel, exists := notificationChannels.TelegramChannels[consumerCfg.ChannelID]
 				if !exists {
 					return nil, fmt.Errorf("telegram channel with id '%s' not found for consumer '%s'", consumerCfg.ChannelID, consumerCfg.ConsumerName)
 				}
 				notificationChannel = channel
-			case Discord:
+			case registry.Discord:
 				channel, exists := notificationChannels.DiscordChannels[consumerCfg.ChannelID]
 				if !exists {
 					return nil, fmt.Errorf("discord channel with id '%s' not found for consumer '%s'", consumerCfg.ChannelID, consumerCfg.ConsumerName)
 				}
 				notificationChannel = channel
-			case OpsGenie:
+			case registry.OpsGenie:
 				channel, exists := notificationChannels.OpsGenieChannels[consumerCfg.ChannelID]
 				if !exists {
 					return nil, fmt.Errorf("opsgenie channel with id '%s' not found for consumer '%s'", consumerCfg.ChannelID, consumerCfg.ConsumerName)
@@ -119,6 +116,7 @@ func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.C
 
 			consumer := New(
 				log, metrics, cache, redisClient, repo,
+				instance,
 				consumerName,
 				subject,
 				consumerCfg.SeveritySet,
@@ -188,7 +186,8 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		}
 
 		if c.byQuorum == false {
-			if sendErr := c.notifier.SendFinding(ctx, finding); sendErr != nil {
+			_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier)
+			if sendErr != nil {
 				c.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr),
 					slog.Attr{
 						Key:   "alertID",
@@ -199,28 +198,21 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				return
 			}
 
-			msgInfo := fmt.Sprintf("%s: %s-%s set message without quorum", c.name, finding.BotName, finding.AlertId)
+			msgInfo := fmt.Sprintf("%s: put %s without quorum by %s", c.instance, finding.AlertId, finding.BotName)
 			if finding.BlockNumber != nil {
 				msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 			}
 
-			c.log.Info(msgInfo,
-				slog.Attr{
-					Key:   `desc`,
-					Value: slog.StringValue(finding.Description),
-				},
-				slog.Attr{
-					Key:   `name`,
-					Value: slog.StringValue(finding.Name),
-				},
-				slog.Attr{
-					Key:   `alertId`,
-					Value: slog.StringValue(finding.AlertId),
-				},
-				slog.Attr{
-					Key:   `severity`,
-					Value: slog.StringValue(string(finding.Severity)),
-				},
+			c.log.Info(
+				msgInfo,
+				slog.String("alertId", finding.AlertId),
+				slog.String("name", finding.Name),
+				slog.String("desc", finding.Description),
+				slog.String("instance", c.instance),
+				slog.String("consumer", c.name),
+				slog.String("bot-name", finding.BotName),
+				slog.String("severity", string(finding.Severity)),
+				slog.String("uniqueKey", finding.UniqueKey),
 			)
 
 			c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
@@ -309,26 +301,14 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		}
 
 		c.log.Info(msgInfo,
-			slog.Attr{
-				Key:   `desc`,
-				Value: slog.StringValue(finding.Description),
-			},
-			slog.Attr{
-				Key:   `name`,
-				Value: slog.StringValue(finding.Name),
-			},
-			slog.Attr{
-				Key:   `alertId`,
-				Value: slog.StringValue(finding.AlertId),
-			},
-			slog.Attr{
-				Key:   `severity`,
-				Value: slog.StringValue(string(finding.Severity)),
-			},
-			slog.Attr{
-				Key:   `hash`,
-				Value: slog.StringValue(key),
-			},
+			slog.String("alertId", finding.AlertId),
+			slog.String("name", finding.Name),
+			slog.String("desc", finding.Description),
+			slog.String("instance", c.instance),
+			slog.String("consumer", c.name),
+			slog.String("bot-name", finding.BotName),
+			slog.String("severity", string(finding.Severity)),
+			slog.String("uniqueKey", finding.UniqueKey),
 		)
 
 		if uint(count) >= c.quorumSize {
@@ -376,7 +356,8 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				}
 
 				if readyToSend {
-					if sendErr := c.notifier.SendFinding(ctx, finding); sendErr != nil {
+					_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier)
+					if sendErr != nil {
 						c.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr), slog.Attr{
 							Key:   "alertID",
 							Value: slog.StringValue(finding.AlertId),
@@ -408,19 +389,21 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 					c.ackMessage(msg)
 
-					c.log.Info(fmt.Sprintf("%s sent finding to %s %s.%s", c.name, c.notifier.GetType(), finding.BotName, finding.AlertId),
-						slog.Attr{
-							Key:   `alertId`,
-							Value: slog.StringValue(finding.AlertId),
-						},
-						slog.Attr{
-							Key:   `name`,
-							Value: slog.StringValue(finding.Name),
-						},
-						slog.Attr{
-							Key:   `desc`,
-							Value: slog.StringValue(finding.Description),
-						},
+					quorumMsgInfo := fmt.Sprintf("%s pushed finding into %s queue %s[%s]", c.instance, c.notifier.GetType(), finding.BotName, finding.AlertId)
+					if finding.BlockNumber != nil {
+						quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
+					}
+
+					c.log.Info(
+						quorumMsgInfo,
+						slog.String("alertId", finding.AlertId),
+						slog.String("name", finding.Name),
+						slog.String("desc", finding.Description),
+						slog.String("instance", c.instance),
+						slog.String("consumer", c.name),
+						slog.String("bot-name", finding.BotName),
+						slog.String("severity", string(finding.Severity)),
+						slog.String("uniqueKey", finding.UniqueKey),
 					)
 
 					if err := c.repo.SeStatusSent(ctx, statusKey); err != nil {
