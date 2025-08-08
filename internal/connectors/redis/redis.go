@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -32,7 +32,6 @@ func NewRedisClient(ctx context.Context, addr string, db int, log *slog.Logger) 
 				return nil
 			},
 		})
-		rdb = rdb.WithContext(ctx)
 
 		err = rdb.Ping(ctx).Err()
 	})

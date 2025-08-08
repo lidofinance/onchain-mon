@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
+
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 )
 
 type Repo struct {
@@ -89,4 +91,23 @@ func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (r *Repo) AddIntoStream(ctx context.Context, finding []byte, sender notifiler.FindingSender) (string, error) {
+	message := map[string]interface{}{
+		"channelType": string(sender.GetType()),
+		"channelId":   sender.GetChannelID(),
+		"finding":     string(finding),
+	}
+
+	id, err := r.redisClient.XAdd(ctx, &redis.XAddArgs{
+		Stream: sender.GetRedisStreamName(),
+		Values: message,
+	}).Result()
+
+	if err != nil {
+		return "", fmt.Errorf("failed to add message to stream: %v", err)
+	}
+
+	return id, nil
 }

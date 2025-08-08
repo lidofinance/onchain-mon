@@ -12,6 +12,7 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type AlertPayload struct {
@@ -22,20 +23,24 @@ type AlertPayload struct {
 }
 
 type OpsGenie struct {
-	opsGenieKey   string
-	httpClient    *http.Client
-	metrics       *metrics.Store
-	source        string
-	blockExplorer string
+	opsGenieKey     string
+	httpClient      *http.Client
+	metrics         *metrics.Store
+	source          string
+	blockExplorer   string
+	channelID       string
+	redisStreamName string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string, channelID string, redisStreamName string) *OpsGenie {
 	return &OpsGenie{
-		opsGenieKey:   opsGenieKey,
-		httpClient:    httpClient,
-		metrics:       metricsStore,
-		source:        source,
-		blockExplorer: blockExplorer,
+		opsGenieKey:     opsGenieKey,
+		httpClient:      httpClient,
+		metrics:         metricsStore,
+		source:          source,
+		blockExplorer:   blockExplorer,
+		channelID:       channelID,
+		redisStreamName: redisStreamName,
 	}
 }
 
@@ -104,6 +109,14 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 	return nil
 }
 
-func (o *OpsGenie) GetType() string {
-	return "OpsGenie"
+func (o *OpsGenie) GetType() registry.NotificationChannel {
+	return registry.OpsGenie
+}
+
+func (o *OpsGenie) GetChannelID() string {
+	return o.channelID
+}
+
+func (o *OpsGenie) GetRedisStreamName() string {
+	return o.redisStreamName
 }

@@ -86,6 +86,8 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 				metricsStore,
 				`local`,
 				`etherscan.io`,
+				`channelId`,
+				`opsgenie`,
 			)
 			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)

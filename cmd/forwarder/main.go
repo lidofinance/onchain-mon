@@ -15,6 +15,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 
 	"github.com/lidofinance/onchain-mon/internal/app/forwarder"
 	"github.com/lidofinance/onchain-mon/internal/app/server"
@@ -24,6 +25,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/redis"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
@@ -48,13 +50,19 @@ func main() {
 		defer sentryClient.Flush(2 * time.Second)
 	}
 
+	// Must be unique among instances
+	if cfg.AppConfig.Source == "" {
+		log.Error("Env Source must be set and unique among instances")
+		return
+	}
+
 	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, `notification.yaml`)
 	if err != nil {
 		log.Error(fmt.Sprintf("Error loading consumer's config: %v", err))
 		return
 	}
 
-	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, cfg.AppConfig.RedisDB, log)
+	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, log)
 	if err != nil {
 		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
 		return
@@ -114,16 +122,37 @@ func main() {
 		metricsStore,
 		cfg.AppConfig.Source,
 		cfg.AppConfig.BlockExplorer,
+		&cfg.AppConfig.RedisConfig,
 	)
 	if err != nil {
 		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
 		return
 	}
 
+	// Ensure group exists
+	if err = rds.XGroupCreateMkStream(ctx, cfg.AppConfig.RedisConfig.TelegramStreamName, cfg.AppConfig.RedisConfig.TelegramConsumerGroupName, "$").Err(); err != nil {
+		if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+			log.Error(fmt.Sprintf("Error creating %s stream: %v", cfg.AppConfig.RedisConfig.TelegramStreamName, err))
+		}
+	}
+
+	if err = rds.XGroupCreateMkStream(ctx, cfg.AppConfig.RedisConfig.DiscordStreamName, cfg.AppConfig.RedisConfig.DiscordConsumerGroupName, "$").Err(); err != nil {
+		if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+			log.Error(fmt.Sprintf("Error creating %s stream: %v", cfg.AppConfig.RedisConfig.DiscordStreamName, err))
+		}
+	}
+
+	if err = rds.XGroupCreateMkStream(ctx, cfg.AppConfig.RedisConfig.OpsGenieStreamName, cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName, "$").Err(); err != nil {
+		if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+			log.Error(fmt.Sprintf("Error creating %s stream: %v", cfg.AppConfig.RedisConfig.OpsGenieStreamName, err))
+		}
+	}
+
 	consumers, err := consumer.NewConsumers(
 		log,
 		metricsStore,
 		rds,
+		cfg.AppConfig.Source,
 		consumer.NewRepo(rds, cfg.AppConfig.QuorumSize),
 		cfg.AppConfig.QuorumSize,
 		notificationConfig,
@@ -134,11 +163,39 @@ func main() {
 		return
 	}
 
-	worker := forwarder.New(consumers, natStream, log)
-	if err := worker.Run(gCtx, g); err != nil {
-		fmt.Println("Could not start worker error:", err.Error())
+	worker := forwarder.New(cfg.AppConfig.Source, rds, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
+	if err = worker.ConsumeFindings(gCtx, g); err != nil {
+		fmt.Println("Could not findings consumer:", err.Error())
 		return
 	}
+
+	tgLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
+	discordLimiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
+	opsGenieLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+
+	worker.SendFindings(gCtx, g,
+		fmt.Sprintf("telegram-consumer-%s", cfg.AppConfig.Source),
+		cfg.AppConfig.RedisConfig.TelegramStreamName,
+		cfg.AppConfig.RedisConfig.TelegramConsumerGroupName,
+		registry.Telegram,
+		tgLimiter,
+	)
+
+	worker.SendFindings(gCtx, g,
+		fmt.Sprintf("discord-consumer-%s", cfg.AppConfig.Source),
+		cfg.AppConfig.RedisConfig.DiscordStreamName,
+		cfg.AppConfig.RedisConfig.DiscordConsumerGroupName,
+		registry.Discord,
+		discordLimiter,
+	)
+
+	worker.SendFindings(gCtx, g,
+		fmt.Sprintf("opsgenie-consumer-%s", cfg.AppConfig.Source),
+		cfg.AppConfig.RedisConfig.OpsGenieStreamName,
+		cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName,
+		registry.OpsGenie,
+		opsGenieLimiter,
+	)
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
