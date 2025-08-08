@@ -26,18 +26,16 @@ type OpsGenie struct {
 	opsGenieKey     string
 	httpClient      *http.Client
 	metrics         *metrics.Store
-	source          string
 	blockExplorer   string
 	channelID       string
 	redisStreamName string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string, channelID string, redisStreamName string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string) *OpsGenie {
 	return &OpsGenie{
 		opsGenieKey:     opsGenieKey,
 		httpClient:      httpClient,
 		metrics:         metricsStore,
-		source:          source,
 		blockExplorer:   blockExplorer,
 		channelID:       channelID,
 		redisStreamName: redisStreamName,
@@ -46,7 +44,7 @@ func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metr
 
 const OpsGenieLabel = `opsgenie`
 
-func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
@@ -60,7 +58,7 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		return nil
 	}
 
-	message := FormatAlert(alert, o.source, o.blockExplorer)
+	message := FormatAlert(alert, quorumBy, o.blockExplorer)
 
 	payload := AlertPayload{
 		Message:     alert.Name,

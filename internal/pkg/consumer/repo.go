@@ -93,11 +93,12 @@ func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) AddIntoStream(ctx context.Context, finding []byte, sender notifiler.FindingSender) (string, error) {
+func (r *Repo) AddIntoStream(ctx context.Context, finding []byte, sender notifiler.FindingSender, source string) (string, error) {
 	message := map[string]interface{}{
 		"channelType": string(sender.GetType()),
 		"channelId":   sender.GetChannelID(),
 		"finding":     string(finding),
+		"quorumBy":    source,
 	}
 
 	id, err := r.redisClient.XAdd(ctx, &redis.XAddArgs{

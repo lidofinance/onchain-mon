@@ -120,7 +120,6 @@ func main() {
 	notificationChannels, err := env.NewNotificationChannels(
 		log, notificationConfig, httpClient,
 		metricsStore,
-		cfg.AppConfig.Source,
 		cfg.AppConfig.BlockExplorer,
 		&cfg.AppConfig.RedisConfig,
 	)

@@ -144,6 +144,13 @@ func (w *worker) SendFindings(
 							continue
 						}
 
+						quorumBy, ok := msg.Values["quorumBy"].(string)
+						if !ok {
+							w.log.Error("Missing quorumBy")
+							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
+							continue
+						}
+
 						var sender notifiler.FindingSender
 						switch channelType {
 						case registry.Telegram:
@@ -168,8 +175,8 @@ func (w *worker) SendFindings(
 							continue
 						}
 
-						if err := sender.SendFinding(ctx, &finding); err != nil {
-							var waitTime time.Duration
+						if err := sender.SendFinding(ctx, &finding, quorumBy); err != nil {
+							/*var waitTime time.Duration
 							switch channelType {
 							case registry.Telegram:
 								waitTime = 30 * time.Minute
@@ -177,10 +184,10 @@ func (w *worker) SendFindings(
 								waitTime = 15 * time.Second
 							case registry.OpsGenie:
 								waitTime = 5 * time.Second
-							}
+							}*/
 
 							w.log.Warn(
-								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again. Sleep(%.0f)", w.instance, channelType, finding.AlertId, waitTime.Seconds()),
+								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again", w.instance, channelType, finding.AlertId),
 								slog.String("err", err.Error()),
 								slog.String("alertId", finding.AlertId),
 								slog.String("name", finding.Name),
@@ -200,7 +207,7 @@ func (w *worker) SendFindings(
 							// Went worker to sleep for a some time
 							// No reason to flood TG, DG or OpsGenie.
 							// Msg limit is reached
-							time.Sleep(waitTime)
+							// time.Sleep(waitTime)
 							continue
 						}
 

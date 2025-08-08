@@ -186,7 +186,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		}
 
 		if c.byQuorum == false {
-			_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier)
+			_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
 			if sendErr != nil {
 				c.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr),
 					slog.Attr{
@@ -208,7 +208,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				slog.String("alertId", finding.AlertId),
 				slog.String("name", finding.Name),
 				slog.String("desc", finding.Description),
-				slog.String("instance", c.instance),
+				slog.String("setBy", c.instance),
 				slog.String("consumer", c.name),
 				slog.String("bot-name", finding.BotName),
 				slog.String("severity", string(finding.Severity)),
@@ -304,7 +304,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			slog.String("alertId", finding.AlertId),
 			slog.String("name", finding.Name),
 			slog.String("desc", finding.Description),
-			slog.String("instance", c.instance),
+			slog.String("setBy", c.instance),
 			slog.String("consumer", c.name),
 			slog.String("bot-name", finding.BotName),
 			slog.String("severity", string(finding.Severity)),
@@ -356,7 +356,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				}
 
 				if readyToSend {
-					_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier)
+					_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
 					if sendErr != nil {
 						c.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr), slog.Attr{
 							Key:   "alertID",
@@ -399,7 +399,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						slog.String("alertId", finding.AlertId),
 						slog.String("name", finding.Name),
 						slog.String("desc", finding.Description),
-						slog.String("instance", c.instance),
+						slog.String("setBy", c.instance),
 						slog.String("consumer", c.name),
 						slog.String("bot-name", finding.BotName),
 						slog.String("severity", string(finding.Severity)),
