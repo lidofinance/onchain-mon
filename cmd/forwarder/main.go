@@ -128,25 +128,6 @@ func main() {
 		return
 	}
 
-	// Ensure group exists
-	if err = rds.XGroupCreateMkStream(ctx, cfg.AppConfig.RedisConfig.TelegramStreamName, cfg.AppConfig.RedisConfig.TelegramConsumerGroupName, "$").Err(); err != nil {
-		if err.Error() != `BUSYGROUP Consumer Group name already exists` {
-			log.Error(fmt.Sprintf("Error creating %s stream: %v", cfg.AppConfig.RedisConfig.TelegramStreamName, err))
-		}
-	}
-
-	if err = rds.XGroupCreateMkStream(ctx, cfg.AppConfig.RedisConfig.DiscordStreamName, cfg.AppConfig.RedisConfig.DiscordConsumerGroupName, "$").Err(); err != nil {
-		if err.Error() != `BUSYGROUP Consumer Group name already exists` {
-			log.Error(fmt.Sprintf("Error creating %s stream: %v", cfg.AppConfig.RedisConfig.DiscordStreamName, err))
-		}
-	}
-
-	if err = rds.XGroupCreateMkStream(ctx, cfg.AppConfig.RedisConfig.OpsGenieStreamName, cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName, "$").Err(); err != nil {
-		if err.Error() != `BUSYGROUP Consumer Group name already exists` {
-			log.Error(fmt.Sprintf("Error creating %s stream: %v", cfg.AppConfig.RedisConfig.OpsGenieStreamName, err))
-		}
-	}
-
 	consumers, err := consumer.NewConsumers(
 		log,
 		metricsStore,
@@ -163,38 +144,74 @@ func main() {
 	}
 
 	worker := forwarder.New(cfg.AppConfig.Source, rds, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
+
+	for channelID, _ := range notificationChannels.TelegramChannels {
+		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.TelegramStreamName, channelID)
+		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.TelegramConsumerGroupName, channelID)
+
+		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+			}
+		}
+
+		tgLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
+
+		worker.SendFindings(gCtx, g,
+			fmt.Sprintf("telegram-consumer-%s-%s", cfg.AppConfig.Source, channelID),
+			cfg.AppConfig.RedisConfig.TelegramStreamName,
+			cfg.AppConfig.RedisConfig.TelegramConsumerGroupName,
+			registry.Telegram,
+			tgLimiter,
+		)
+	}
+
+	for channelID, _ := range notificationChannels.DiscordChannels {
+		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.DiscordStreamName, channelID)
+		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.DiscordConsumerGroupName, channelID)
+
+		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+			}
+		}
+
+		discordLimiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
+
+		worker.SendFindings(gCtx, g,
+			fmt.Sprintf("discord-consumer-%s-%s", cfg.AppConfig.Source, channelID),
+			cfg.AppConfig.RedisConfig.DiscordStreamName,
+			cfg.AppConfig.RedisConfig.DiscordConsumerGroupName,
+			registry.Discord,
+			discordLimiter,
+		)
+	}
+
+	for channelID, _ := range notificationChannels.OpsGenieChannels {
+		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.OpsGenieStreamName, channelID)
+		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName, channelID)
+
+		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+			}
+		}
+
+		opsGenieLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+
+		worker.SendFindings(gCtx, g,
+			fmt.Sprintf("opsgenie-consumer-%s-%s", cfg.AppConfig.Source, channelID),
+			cfg.AppConfig.RedisConfig.OpsGenieStreamName,
+			cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName,
+			registry.OpsGenie,
+			opsGenieLimiter,
+		)
+	}
+
 	if err = worker.ConsumeFindings(gCtx, g); err != nil {
 		fmt.Println("Could not findings consumer:", err.Error())
 		return
 	}
-
-	tgLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
-	discordLimiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
-	opsGenieLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
-
-	worker.SendFindings(gCtx, g,
-		fmt.Sprintf("telegram-consumer-%s", cfg.AppConfig.Source),
-		cfg.AppConfig.RedisConfig.TelegramStreamName,
-		cfg.AppConfig.RedisConfig.TelegramConsumerGroupName,
-		registry.Telegram,
-		tgLimiter,
-	)
-
-	worker.SendFindings(gCtx, g,
-		fmt.Sprintf("discord-consumer-%s", cfg.AppConfig.Source),
-		cfg.AppConfig.RedisConfig.DiscordStreamName,
-		cfg.AppConfig.RedisConfig.DiscordConsumerGroupName,
-		registry.Discord,
-		discordLimiter,
-	)
-
-	worker.SendFindings(gCtx, g,
-		fmt.Sprintf("opsgenie-consumer-%s", cfg.AppConfig.Source),
-		cfg.AppConfig.RedisConfig.OpsGenieStreamName,
-		cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName,
-		registry.OpsGenie,
-		opsGenieLimiter,
-	)
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)

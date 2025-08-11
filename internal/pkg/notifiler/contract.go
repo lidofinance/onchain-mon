@@ -2,7 +2,7 @@ package notifiler
 
 import (
 	"context"
-
+	"errors"
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
@@ -13,3 +13,5 @@ type FindingSender interface {
 	GetChannelID() string
 	GetRedisStreamName() string
 }
+
+var ErrRateLimited = errors.New("reach request limit")

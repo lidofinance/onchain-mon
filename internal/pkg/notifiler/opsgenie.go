@@ -98,6 +98,11 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 		o.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: OpsGenieLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
+		return ErrRateLimited
+	}
+
 	if resp.StatusCode != http.StatusAccepted {
 		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from OpsGenie non-202 response code: %v", resp.Status)
@@ -116,5 +121,5 @@ func (o *OpsGenie) GetChannelID() string {
 }
 
 func (o *OpsGenie) GetRedisStreamName() string {
-	return o.redisStreamName
+	return fmt.Sprintf("%s:%s", o.redisStreamName, o.channelID)
 }
