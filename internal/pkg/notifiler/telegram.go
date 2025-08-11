@@ -85,6 +85,11 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 		t.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: TelegramLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
+		return ErrRateLimited
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from telegram non-200 response code: %v", resp.Status)
@@ -101,7 +106,7 @@ func (t *Telegram) GetChannelID() string {
 	return t.channelID
 }
 func (t *Telegram) GetRedisStreamName() string {
-	return t.redisStreamName
+	return fmt.Sprintf("%s:%s", t.redisStreamName, t.channelID)
 }
 
 // Telegram supports two versions of markdown. V1, V2

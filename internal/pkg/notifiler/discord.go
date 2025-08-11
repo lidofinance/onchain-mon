@@ -82,6 +82,11 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: DiscordLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
+		return ErrRateLimited
+	}
+
 	if resp.StatusCode != http.StatusNoContent {
 		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from Discord non-204 response code: %v", resp.Status)
@@ -98,5 +103,5 @@ func (d *Discord) GetChannelID() string {
 	return d.channelID
 }
 func (d *Discord) GetRedisStreamName() string {
-	return d.redisStreamName
+	return fmt.Sprintf("%s:%s", d.redisStreamName, d.channelID)
 }

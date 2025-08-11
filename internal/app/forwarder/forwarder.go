@@ -176,16 +176,6 @@ func (w *worker) SendFindings(
 						}
 
 						if err := sender.SendFinding(ctx, &finding, quorumBy); err != nil {
-							/*var waitTime time.Duration
-							switch channelType {
-							case registry.Telegram:
-								waitTime = 30 * time.Minute
-							case registry.Discord:
-								waitTime = 15 * time.Second
-							case registry.OpsGenie:
-								waitTime = 5 * time.Second
-							}*/
-
 							w.log.Warn(
 								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again", w.instance, channelType, finding.AlertId),
 								slog.String("err", err.Error()),
@@ -204,10 +194,6 @@ func (w *worker) SendFindings(
 								Values: msg.Values,
 							})
 
-							// Went worker to sleep for a some time
-							// No reason to flood TG, DG or OpsGenie.
-							// Msg limit is reached
-							// time.Sleep(waitTime)
 							continue
 						}
 

@@ -186,16 +186,41 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		}
 
 		if c.byQuorum == false {
-			_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
-			if sendErr != nil {
-				c.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr),
-					slog.Attr{
-						Key:   "alertID",
-						Value: slog.StringValue(finding.AlertId),
-					})
-				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-				c.nackMessage(msg)
-				return
+			if sendErr := c.notifier.SendFinding(ctx, finding, c.instance); sendErr != nil {
+				if errors.Is(sendErr, notifiler.ErrRateLimited) {
+					_, putOnStreamErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
+					if putOnStreamErr != nil {
+						c.log.Error(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr),
+							slog.String("alertId", finding.AlertId),
+							slog.String("name", finding.Name),
+							slog.String("desc", finding.Description),
+							slog.String("setBy", c.instance),
+							slog.String("consumer", c.name),
+							slog.String("bot-name", finding.BotName),
+							slog.String("severity", string(finding.Severity)),
+							slog.String("uniqueKey", finding.UniqueKey),
+						)
+
+						c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+						c.nackMessage(msg)
+						return
+					}
+				} else {
+					c.log.Error(fmt.Sprintf(`Could not send debug-finding: %v`, sendErr),
+						slog.String("alertId", finding.AlertId),
+						slog.String("name", finding.Name),
+						slog.String("desc", finding.Description),
+						slog.String("setBy", c.instance),
+						slog.String("consumer", c.name),
+						slog.String("bot-name", finding.BotName),
+						slog.String("severity", string(finding.Severity)),
+						slog.String("uniqueKey", finding.UniqueKey),
+					)
+
+					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+					c.nackMessage(msg)
+					return
+				}
 			}
 
 			msgInfo := fmt.Sprintf("%s: put %s without quorum by %s", c.instance, finding.AlertId, finding.BotName)
@@ -356,55 +381,79 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				}
 
 				if readyToSend {
-					_, sendErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
-					if sendErr != nil {
-						c.log.Error(fmt.Sprintf(`Could not send bot-finding: %v`, sendErr), slog.Attr{
-							Key:   "alertID",
-							Value: slog.StringValue(finding.AlertId),
-						})
+					// Sends via notification channel {Tg, Discord, OpsGenia}
+					if sendErr := c.notifier.SendFinding(ctx, finding, c.instance); sendErr != nil {
+						// When we found 429 - put finding into redis-queue for delayed sending
+						if errors.Is(sendErr, notifiler.ErrRateLimited) {
+							_, putOnStreamErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
+							if putOnStreamErr != nil {
+								c.log.Error(fmt.Sprintf(`Could not push msg into redis queue: %v`, putOnStreamErr),
+									slog.String("alertId", finding.AlertId),
+									slog.String("name", finding.Name),
+									slog.String("desc", finding.Description),
+									slog.String("setBy", c.instance),
+									slog.String("consumer", c.name),
+									slog.String("bot-name", finding.BotName),
+									slog.String("severity", string(finding.Severity)),
+									slog.String("uniqueKey", finding.UniqueKey),
+								)
 
-						count, err := c.redisClient.Decr(ctx, countKey).Result()
-						if err != nil {
-							c.metrics.RedisErrors.Inc()
-							c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
-						} else if count <= 0 {
-							if err = c.redisClient.Del(ctx, countKey).Err(); err != nil {
-								c.metrics.RedisErrors.Inc()
-								c.log.Error(fmt.Sprintf(`Could not delete countKey %s: %v`, countKey, err))
+								c.failAndNack(ctx, msg, countKey, statusKey)
+								return
 							}
+
+							quorumMsgInfo := fmt.Sprintf("%s pushed quorum-finding into %s stream %s[%s]", c.instance, c.notifier.GetChannelID(), finding.BotName, finding.AlertId)
+							if finding.BlockNumber != nil {
+								quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
+							}
+
+							c.log.Info(
+								quorumMsgInfo,
+								slog.String("alertId", finding.AlertId),
+								slog.String("name", finding.Name),
+								slog.String("desc", finding.Description),
+								slog.String("setBy", c.instance),
+								slog.String("consumer", c.name),
+								slog.String("bot-name", finding.BotName),
+								slog.String("severity", string(finding.Severity)),
+								slog.String("uniqueKey", finding.UniqueKey),
+							)
+						} else {
+							c.log.Error(fmt.Sprintf(`Could not send quorum-finding: %v`, sendErr),
+								slog.String("alertId", finding.AlertId),
+								slog.String("name", finding.Name),
+								slog.String("desc", finding.Description),
+								slog.String("setBy", c.instance),
+								slog.String("consumer", c.name),
+								slog.String("bot-name", finding.BotName),
+								slog.String("severity", string(finding.Severity)),
+								slog.String("uniqueKey", finding.UniqueKey),
+							)
+
+							c.failAndNack(ctx, msg, countKey, statusKey)
+							return
+						}
+					} else {
+						quorumMsgInfo := fmt.Sprintf("%s[%s] send finding %s[%s]", c.instance, c.notifier.GetType(), finding.BotName, finding.AlertId)
+						if finding.BlockNumber != nil {
+							quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 						}
 
-						if err = c.redisClient.Del(ctx, statusKey).Err(); err != nil {
-							c.metrics.RedisErrors.Inc()
-							c.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
-						}
-
-						c.cache.Remove(countKey)
-
-						c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-						c.nackMessage(msg)
-						return
+						c.log.Info(
+							quorumMsgInfo,
+							slog.String("alertId", finding.AlertId),
+							slog.String("name", finding.Name),
+							slog.String("desc", finding.Description),
+							slog.String("setBy", c.instance),
+							slog.String("consumer", c.name),
+							slog.String("bot-name", finding.BotName),
+							slog.String("severity", string(finding.Severity)),
+							slog.String("uniqueKey", finding.UniqueKey),
+						)
 					}
 
 					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 					c.ackMessage(msg)
-
-					quorumMsgInfo := fmt.Sprintf("%s pushed finding into %s queue %s[%s]", c.instance, c.notifier.GetType(), finding.BotName, finding.AlertId)
-					if finding.BlockNumber != nil {
-						quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
-					}
-
-					c.log.Info(
-						quorumMsgInfo,
-						slog.String("alertId", finding.AlertId),
-						slog.String("name", finding.Name),
-						slog.String("desc", finding.Description),
-						slog.String("setBy", c.instance),
-						slog.String("consumer", c.name),
-						slog.String("bot-name", finding.BotName),
-						slog.String("severity", string(finding.Severity)),
-						slog.String("uniqueKey", finding.UniqueKey),
-					)
 
 					if err := c.repo.SeStatusSent(ctx, statusKey); err != nil {
 						c.metrics.RedisErrors.Inc()
@@ -437,4 +486,34 @@ func (c *Consumer) ackMessage(msg jetstream.Msg) {
 	if ackErr := msg.Ack(); ackErr != nil {
 		c.log.Error(fmt.Sprintf(`Could not ack msg: %v`, ackErr))
 	}
+}
+
+func (c *Consumer) failAndNack(
+	ctx context.Context,
+	msg jetstream.Msg,
+	countKey, statusKey string,
+) {
+	if count, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
+		c.metrics.RedisErrors.Inc()
+		c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
+	} else if count <= 0 {
+		if err := c.redisClient.Del(ctx, countKey).Err(); err != nil {
+			c.metrics.RedisErrors.Inc()
+			c.log.Error(fmt.Sprintf(`Could not delete countKey %s: %v`, countKey, err))
+		}
+	}
+
+	if err := c.redisClient.Del(ctx, statusKey).Err(); err != nil {
+		c.metrics.RedisErrors.Inc()
+		c.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
+	}
+
+	c.cache.Remove(countKey)
+
+	c.metrics.SentAlerts.With(prometheus.Labels{
+		metrics.ConsumerName: c.name,
+		metrics.Status:       metrics.StatusFail,
+	}).Inc()
+
+	c.nackMessage(msg)
 }
