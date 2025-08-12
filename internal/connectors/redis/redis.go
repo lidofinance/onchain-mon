@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v8"
 )
 
 var (
@@ -25,14 +25,14 @@ func NewRedisClient(ctx context.Context, addr string, db int, log *slog.Logger) 
 			MinRetryBackoff: 500 * time.Millisecond,
 			MaxRetryBackoff: 5 * time.Second,
 			DialTimeout:     5 * time.Second,
-			ReadTimeout:     2 * time.Minute,
+			ReadTimeout:     3 * time.Second,
 			WriteTimeout:    3 * time.Second,
 			OnConnect: func(_ context.Context, _ *redis.Conn) error {
 				log.Info("Redis connected")
 				return nil
 			},
-			MinIdleConns: 10,
 		})
+		rdb = rdb.WithContext(ctx)
 
 		err = rdb.Ping(ctx).Err()
 	})
