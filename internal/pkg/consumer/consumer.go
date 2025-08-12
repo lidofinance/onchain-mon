@@ -252,18 +252,6 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		hash := sha256.Sum256([]byte(finding.Description))
 		bodyDesc := hex.EncodeToString(hash[:])
 
-		isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name))
-		if coolDownErr != nil {
-			c.log.Error(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr))
-			c.metrics.RedisErrors.Inc()
-		}
-
-		if isCooldownActive {
-			c.log.Info(fmt.Sprintf("Got isCooldownActive by %s", finding.AlertId))
-			c.ackMessage(msg)
-			return
-		}
-
 		key := finding.UniqueKey
 		countKey := fmt.Sprintf(countTemplate, c.name, key)
 		statusKey := fmt.Sprintf(statusTemplate, c.name, key)
@@ -377,6 +365,19 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 
 			if status == StatusNotSend {
+				// same alert by content but may different blockNumber
+				isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name))
+				if coolDownErr != nil {
+					c.log.Error(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr))
+					c.metrics.RedisErrors.Inc()
+				}
+
+				if isCooldownActive {
+					c.log.Info(fmt.Sprintf("Got isCooldownActive by %s", finding.AlertId))
+					c.ackMessage(msg)
+					return
+				}
+
 				readyToSend, err := c.repo.SetSendingStatus(ctx, countKey, statusKey)
 				if err != nil {
 					c.log.Error(fmt.Sprintf(`Could not check notification status for AlertID: %s: %v`, finding.AlertId, err))
