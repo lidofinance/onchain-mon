@@ -159,8 +159,8 @@ func main() {
 
 		worker.SendFindings(gCtx, g,
 			fmt.Sprintf("telegram-consumer-%s-%s", cfg.AppConfig.Source, channelID),
-			cfg.AppConfig.RedisConfig.TelegramStreamName,
-			cfg.AppConfig.RedisConfig.TelegramConsumerGroupName,
+			streamName,
+			groupName,
 			registry.Telegram,
 			tgLimiter,
 		)
@@ -180,8 +180,8 @@ func main() {
 
 		worker.SendFindings(gCtx, g,
 			fmt.Sprintf("discord-consumer-%s-%s", cfg.AppConfig.Source, channelID),
-			cfg.AppConfig.RedisConfig.DiscordStreamName,
-			cfg.AppConfig.RedisConfig.DiscordConsumerGroupName,
+			streamName,
+			groupName,
 			registry.Discord,
 			discordLimiter,
 		)
@@ -201,8 +201,8 @@ func main() {
 
 		worker.SendFindings(gCtx, g,
 			fmt.Sprintf("opsgenie-consumer-%s-%s", cfg.AppConfig.Source, channelID),
-			cfg.AppConfig.RedisConfig.OpsGenieStreamName,
-			cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName,
+			streamName,
+			groupName,
 			registry.OpsGenie,
 			opsGenieLimiter,
 		)
