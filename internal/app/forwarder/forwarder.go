@@ -103,10 +103,17 @@ func (w *worker) SendFindings(
 	limiter *rate.Limiter,
 ) {
 	g.Go(func() error {
+		redisPingTicker := time.NewTicker(30 * time.Second)
+		defer redisPingTicker.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
+			case <-redisPingTicker.C:
+				if err := w.rdb.Ping(ctx).Err(); err != nil {
+					w.log.Error(fmt.Sprintf("Redis PING failed %s", err.Error()))
+				}
 			default:
 				streams, err := w.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
 					Group:    groupName,
@@ -120,7 +127,7 @@ func (w *worker) SendFindings(
 					if errors.Is(err, redis.Nil) {
 						continue
 					}
-					w.log.Error("Could not read stream", slog.String("stream", streamName), slog.String("err", err.Error()))
+					w.log.Error(fmt.Sprintf("Could not read stream %s. err: %s", streamName, err.Error()))
 					continue
 				}
 
@@ -132,7 +139,7 @@ func (w *worker) SendFindings(
 
 						ct, ok := msg.Values["channelType"].(string)
 						if !ok || ct != string(channelType) {
-							w.log.Error("Invalid or mismatched channelType", slog.String("got", ct), slog.String("expected", string(channelType)))
+							w.log.Error(fmt.Sprintf("Invalid or mismatched channelType got %s expected %s", ct, string(channelType)))
 							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
 							continue
 						}
@@ -170,7 +177,7 @@ func (w *worker) SendFindings(
 
 						var finding databus.FindingDtoJson
 						if err := json.Unmarshal([]byte(findingStr), &finding); err != nil {
-							w.log.Error("Failed to unmarshal finding", slog.String("err", err.Error()))
+							w.log.Error(fmt.Sprintf("Failed to unmarshal finding %s", err.Error()))
 							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
 							continue
 						}
