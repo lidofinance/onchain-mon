@@ -12,7 +12,6 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
-	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type AlertPayload struct {
@@ -23,28 +22,26 @@ type AlertPayload struct {
 }
 
 type OpsGenie struct {
-	opsGenieKey     string
-	httpClient      *http.Client
-	metrics         *metrics.Store
-	blockExplorer   string
-	channelID       string
-	redisStreamName string
+	opsGenieKey   string
+	httpClient    *http.Client
+	metrics       *metrics.Store
+	source        string
+	blockExplorer string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *OpsGenie {
 	return &OpsGenie{
-		opsGenieKey:     opsGenieKey,
-		httpClient:      httpClient,
-		metrics:         metricsStore,
-		blockExplorer:   blockExplorer,
-		channelID:       channelID,
-		redisStreamName: redisStreamName,
+		opsGenieKey:   opsGenieKey,
+		httpClient:    httpClient,
+		metrics:       metricsStore,
+		source:        source,
+		blockExplorer: blockExplorer,
 	}
 }
 
 const OpsGenieLabel = `opsgenie`
 
-func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
+func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
@@ -58,7 +55,7 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		return nil
 	}
 
-	message := FormatAlert(alert, quorumBy, o.blockExplorer)
+	message := FormatAlert(alert, o.source, o.blockExplorer)
 
 	payload := AlertPayload{
 		Message:     alert.Name,
@@ -98,11 +95,6 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 		o.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: OpsGenieLabel}).Observe(duration)
 	}()
 
-	if resp.StatusCode == http.StatusTooManyRequests {
-		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
-		return ErrRateLimited
-	}
-
 	if resp.StatusCode != http.StatusAccepted {
 		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from OpsGenie non-202 response code: %v", resp.Status)
@@ -112,14 +104,6 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 	return nil
 }
 
-func (o *OpsGenie) GetType() registry.NotificationChannel {
-	return registry.OpsGenie
-}
-
-func (o *OpsGenie) GetChannelID() string {
-	return o.channelID
-}
-
-func (o *OpsGenie) GetRedisStreamName() string {
-	return fmt.Sprintf("%s:%s", o.redisStreamName, o.channelID)
+func (o *OpsGenie) GetType() string {
+	return "OpsGenie"
 }
