@@ -12,14 +12,16 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type Discord struct {
-	webhookURL    string
-	httpClient    *http.Client
-	metrics       *metrics.Store
-	source        string
-	blockExplorer string
+	webhookURL      string
+	httpClient      *http.Client
+	metrics         *metrics.Store
+	blockExplorer   string
+	channelID       string
+	redisStreamName string
 }
 
 type MessagePayload struct {
@@ -28,22 +30,23 @@ type MessagePayload struct {
 
 const DiscordLabel = `discord`
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Discord {
+func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string) *Discord {
 	return &Discord{
-		webhookURL:    webhookURL,
-		httpClient:    httpClient,
-		metrics:       metricsStore,
-		source:        source,
-		blockExplorer: blockExplorer,
+		webhookURL:      webhookURL,
+		httpClient:      httpClient,
+		metrics:         metricsStore,
+		blockExplorer:   blockExplorer,
+		channelID:       channelID,
+		redisStreamName: redisStreamName,
 	}
 }
 
 const MaxDiscordMsgLength = 2000
 const WarningDiscordMessage = "Warn: Msg >=2000, pls review description message"
 
-func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, d.source, d.blockExplorer)),
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, quorumBy, d.blockExplorer)),
 		MaxDiscordMsgLength,
 		WarningDiscordMessage,
 	)
@@ -79,6 +82,11 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: DiscordLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
+		return ErrRateLimited
+	}
+
 	if resp.StatusCode != http.StatusNoContent {
 		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from Discord non-204 response code: %v", resp.Status)
@@ -88,6 +96,12 @@ func (d *Discord) send(ctx context.Context, message string) error {
 	return nil
 }
 
-func (d *Discord) GetType() string {
-	return "Discord"
+func (d *Discord) GetType() registry.NotificationChannel {
+	return registry.Discord
+}
+func (d *Discord) GetChannelID() string {
+	return d.channelID
+}
+func (d *Discord) GetRedisStreamName() string {
+	return fmt.Sprintf("%s:%s", d.redisStreamName, d.channelID)
 }

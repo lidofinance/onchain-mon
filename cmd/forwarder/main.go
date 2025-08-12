@@ -15,6 +15,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 
 	"github.com/lidofinance/onchain-mon/internal/app/forwarder"
 	"github.com/lidofinance/onchain-mon/internal/app/server"
@@ -24,6 +25,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/redis"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
@@ -48,13 +50,19 @@ func main() {
 		defer sentryClient.Flush(2 * time.Second)
 	}
 
+	// Must be unique among instances
+	if cfg.AppConfig.Source == "" {
+		log.Error("Env Source must be set and unique among instances")
+		return
+	}
+
 	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, `notification.yaml`)
 	if err != nil {
 		log.Error(fmt.Sprintf("Error loading consumer's config: %v", err))
 		return
 	}
 
-	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, cfg.AppConfig.RedisDB, log)
+	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, log)
 	if err != nil {
 		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
 		return
@@ -112,8 +120,8 @@ func main() {
 	notificationChannels, err := env.NewNotificationChannels(
 		log, notificationConfig, httpClient,
 		metricsStore,
-		cfg.AppConfig.Source,
 		cfg.AppConfig.BlockExplorer,
+		&cfg.AppConfig.RedisConfig,
 	)
 	if err != nil {
 		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
@@ -124,6 +132,7 @@ func main() {
 		log,
 		metricsStore,
 		rds,
+		cfg.AppConfig.Source,
 		consumer.NewRepo(rds, cfg.AppConfig.QuorumSize),
 		cfg.AppConfig.QuorumSize,
 		notificationConfig,
@@ -134,9 +143,73 @@ func main() {
 		return
 	}
 
-	worker := forwarder.New(consumers, natStream, log)
-	if err := worker.Run(gCtx, g); err != nil {
-		fmt.Println("Could not start worker error:", err.Error())
+	worker := forwarder.New(cfg.AppConfig.Source, rds, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
+
+	for channelID, _ := range notificationChannels.TelegramChannels {
+		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.TelegramStreamName, channelID)
+		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.TelegramConsumerGroupName, channelID)
+
+		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+			}
+		}
+
+		tgLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
+
+		worker.SendFindings(gCtx, g,
+			fmt.Sprintf("telegram-consumer-%s-%s", cfg.AppConfig.Source, channelID),
+			streamName,
+			groupName,
+			registry.Telegram,
+			tgLimiter,
+		)
+	}
+
+	for channelID, _ := range notificationChannels.DiscordChannels {
+		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.DiscordStreamName, channelID)
+		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.DiscordConsumerGroupName, channelID)
+
+		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+			}
+		}
+
+		discordLimiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
+
+		worker.SendFindings(gCtx, g,
+			fmt.Sprintf("discord-consumer-%s-%s", cfg.AppConfig.Source, channelID),
+			streamName,
+			groupName,
+			registry.Discord,
+			discordLimiter,
+		)
+	}
+
+	for channelID, _ := range notificationChannels.OpsGenieChannels {
+		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.OpsGenieStreamName, channelID)
+		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName, channelID)
+
+		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+			}
+		}
+
+		opsGenieLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+
+		worker.SendFindings(gCtx, g,
+			fmt.Sprintf("opsgenie-consumer-%s-%s", cfg.AppConfig.Source, channelID),
+			streamName,
+			groupName,
+			registry.OpsGenie,
+			opsGenieLimiter,
+		)
+	}
+
+	if err = worker.ConsumeFindings(gCtx, g); err != nil {
+		fmt.Println("Could not findings consumer:", err.Error())
 		return
 	}
 
