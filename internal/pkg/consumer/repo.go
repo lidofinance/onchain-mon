@@ -2,6 +2,8 @@ package consumer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -77,11 +79,13 @@ func (r *Repo) GetStatus(ctx context.Context, statusKey string) (Status, error) 
 }
 
 func (r *Repo) SetCoolDown(ctx context.Context, key string) error {
-	return r.redisClient.Set(ctx, fmt.Sprintf(coolDownTemplate, key), "", TTLMins30).Err()
+	hash := sha256.Sum256([]byte(key))
+	return r.redisClient.Set(ctx, fmt.Sprintf(coolDownTemplate, hex.EncodeToString(hash[:])), "", TTLMins30).Err()
 }
 
 func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
-	exists, err := r.redisClient.Exists(ctx, fmt.Sprintf(coolDownTemplate, key)).Result()
+	hash := sha256.Sum256([]byte(key))
+	exists, err := r.redisClient.Exists(ctx, fmt.Sprintf(coolDownTemplate, hex.EncodeToString(hash[:]))).Result()
 	if err != nil {
 		return false, err
 	}

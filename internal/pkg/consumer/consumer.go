@@ -158,6 +158,10 @@ func (c *Consumer) GetTopic() string {
 	return c.subject
 }
 
+func getCoolDownKey(botName string, alertId string, alertBody string, natsConsumerName string) string {
+	return fmt.Sprintf("%s_%s_%s_%s", botName, alertId, alertBody, natsConsumerName)
+}
+
 func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg) {
 	return func(msg jetstream.Msg) {
 		finding := new(databus.FindingDtoJson)
@@ -248,13 +252,14 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		hash := sha256.Sum256([]byte(finding.Description))
 		bodyDesc := hex.EncodeToString(hash[:])
 
-		isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, fmt.Sprintf("%s_%s_%s", finding.BotName, finding.AlertId, bodyDesc))
+		isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name))
 		if coolDownErr != nil {
 			c.log.Error(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr))
 			c.metrics.RedisErrors.Inc()
 		}
 
 		if isCooldownActive {
+			c.log.Info(fmt.Sprintf("Got isCooldownActive by %s", finding.AlertId))
 			c.ackMessage(msg)
 			return
 		}
@@ -460,7 +465,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						c.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
 					}
 
-					if err := c.repo.SetCoolDown(ctx, fmt.Sprintf("%s_%s_%s", finding.BotName, finding.AlertId, bodyDesc)); err != nil {
+					if err := c.repo.SetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name)); err != nil {
 						c.metrics.RedisErrors.Inc()
 						c.log.Error(fmt.Sprintf(`Could not set cool down status: %s`, err.Error()))
 					}
