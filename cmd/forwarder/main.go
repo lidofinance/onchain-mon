@@ -55,18 +55,51 @@ func main() {
 		return
 	}
 
+	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
+	transport := &http.Transport{
+		MaxIdleConns:          30,
+		MaxIdleConnsPerHost:   5,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
 	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, `notification.yaml`)
 	if err != nil {
 		log.Error(fmt.Sprintf("Error loading consumer's config: %v", err))
 		return
 	}
 
-	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, log)
+	notificationChannels, err := env.NewNotificationChannels(
+		log, notificationConfig, httpClient,
+		metricsStore,
+		cfg.AppConfig.BlockExplorer,
+		&cfg.AppConfig.RedisConfig,
+	)
+	if err != nil {
+		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
+		return
+	}
+
+	natsConsumerCount := 0
+	for _, consumerCfg := range notificationConfig.Consumers {
+		natsConsumerCount += len(consumerCfg.Subjects)
+	}
+
+	rds, err := redis.NewRedisClient(cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, log, natsConsumerCount)
 	if err != nil {
 		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
 		return
 	}
 	defer rds.Close()
+
+	redisStreamClient, err := redis.NewStreamClient(cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, notificationChannels.Count(), log)
 
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
@@ -84,7 +117,6 @@ func main() {
 	log.Info("Nats jetStream connected")
 
 	r := chi.NewRouter()
-	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	app := server.New(&cfg.AppConfig, notificationConfig, log, metricsStore, js, natsClient)
 
@@ -103,30 +135,6 @@ func main() {
 	}
 	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", natsStreamName))
 
-	transport := &http.Transport{
-		MaxIdleConns:          30,
-		MaxIdleConnsPerHost:   5,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	httpClient := &http.Client{
-		Transport: transport,
-		Timeout:   10 * time.Second,
-	}
-
-	notificationChannels, err := env.NewNotificationChannels(
-		log, notificationConfig, httpClient,
-		metricsStore,
-		cfg.AppConfig.BlockExplorer,
-		&cfg.AppConfig.RedisConfig,
-	)
-	if err != nil {
-		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
-		return
-	}
-
 	consumers, err := consumer.NewConsumers(
 		log,
 		metricsStore,
@@ -142,10 +150,9 @@ func main() {
 		return
 	}
 
-	worker := forwarder.New(cfg.AppConfig.Source, rds, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
+	worker := forwarder.New(cfg.AppConfig.Source, rds, redisStreamClient, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
 
 	for _, sender := range notificationChannels.TelegramChannels {
-
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
@@ -162,7 +169,6 @@ func main() {
 	}
 
 	for _, sender := range notificationChannels.DiscordChannels {
-
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))

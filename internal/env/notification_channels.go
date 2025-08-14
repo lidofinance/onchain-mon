@@ -64,3 +64,7 @@ func NewNotificationChannels(log *slog.Logger, cfg *NotificationConfig, httpClie
 
 	return channels, nil
 }
+
+func (n *NotificationChannels) Count() int {
+	return len(n.TelegramChannels) + len(n.DiscordChannels) + len(n.OpsGenieChannels)
+}

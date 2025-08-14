@@ -8,11 +8,10 @@ import (
 	"log/slog"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
-
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/env"
@@ -21,9 +20,10 @@ import (
 )
 
 type worker struct {
-	instance  string
-	rdb       *redis.Client
-	consumers []*consumer.Consumer
+	instance          string
+	rdb               *redis.Client
+	streamRedisClient *redis.Client
+	consumers         []*consumer.Consumer
 
 	stream jetstream.Stream
 	log    *slog.Logger
@@ -35,6 +35,7 @@ type worker struct {
 func New(
 	instance string,
 	rdb *redis.Client,
+	streamRedisClient *redis.Client,
 	consumers []*consumer.Consumer,
 	stream jetstream.Stream,
 	log *slog.Logger,
@@ -44,6 +45,7 @@ func New(
 	w := &worker{
 		instance:             instance,
 		rdb:                  rdb,
+		streamRedisClient:    streamRedisClient,
 		consumers:            consumers,
 		stream:               stream,
 		log:                  log,
@@ -100,6 +102,9 @@ func (w *worker) SendFindings(
 	limiter *rate.Limiter,
 ) {
 	g.Go(func() error {
+		conn := w.streamRedisClient.Conn()
+		defer conn.Close()
+
 		redisPingTicker := time.NewTicker(30 * time.Second)
 		defer redisPingTicker.Stop()
 
@@ -107,24 +112,21 @@ func (w *worker) SendFindings(
 			select {
 			case <-ctx.Done():
 				return nil
-			case <-redisPingTicker.C:
-				if err := w.rdb.Ping(ctx).Err(); err != nil {
-					w.log.Error(fmt.Sprintf("Redis PING failed %s", err.Error()))
-				}
 			default:
-				streams, err := w.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
+				streams, err := conn.XReadGroup(ctx, &redis.XReadGroupArgs{
 					Group:    sender.GetRedisConsumerGroupName(),
 					Consumer: consumerName,
 					Streams:  []string{sender.GetRedisStreamName(), ">"},
-					Count:    1,
-					Block:    1 * time.Second,
+					Count:    10,
+					Block:    5 * time.Second,
 				}).Result()
 
 				if err != nil {
 					if errors.Is(err, redis.Nil) {
 						continue
 					}
-					w.log.Error(fmt.Sprintf("Could not read stream %s. err: %s", sender.GetRedisStreamName(), err.Error()))
+
+					time.Sleep(200 * time.Millisecond)
 					continue
 				}
 
@@ -137,21 +139,21 @@ func (w *worker) SendFindings(
 						quorumBy, ok := msg.Values["quorumBy"].(string)
 						if !ok {
 							w.log.Error("Missing quorumBy")
-							_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
 
 						findingStr, ok := msg.Values["finding"].(string)
 						if !ok {
 							w.log.Error("Missing finding field")
-							_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
 
 						var finding databus.FindingDtoJson
 						if err := json.Unmarshal([]byte(findingStr), &finding); err != nil {
 							w.log.Error(fmt.Sprintf("Failed to unmarshal finding %s", err.Error()))
-							_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
 
@@ -169,10 +171,11 @@ func (w *worker) SendFindings(
 							)
 
 							// Requeue for retry
-							_ = w.rdb.XAdd(ctx, &redis.XAddArgs{
+							_ = conn.XAdd(ctx, &redis.XAddArgs{
 								Stream: sender.GetRedisStreamName(),
 								Values: msg.Values,
 							})
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 
 							continue
 						}
@@ -188,7 +191,7 @@ func (w *worker) SendFindings(
 							slog.String("uniqueKey", finding.UniqueKey),
 						)
 
-						_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+						_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 					}
 				}
 			}
