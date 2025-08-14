@@ -25,7 +25,6 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/redis"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
-	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
@@ -145,65 +144,52 @@ func main() {
 
 	worker := forwarder.New(cfg.AppConfig.Source, rds, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
 
-	for channelID, _ := range notificationChannels.TelegramChannels {
-		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.TelegramStreamName, channelID)
-		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.TelegramConsumerGroupName, channelID)
+	for _, sender := range notificationChannels.TelegramChannels {
 
-		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
-				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
 			}
 		}
 
 		tgLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 		worker.SendFindings(gCtx, g,
-			fmt.Sprintf("telegram-consumer-%s-%s", cfg.AppConfig.Source, channelID),
-			streamName,
-			groupName,
-			registry.Telegram,
+			fmt.Sprintf("telegram-consumer-%s-%s", cfg.AppConfig.Source, sender.GetChannelID()),
+			sender,
 			tgLimiter,
 		)
 	}
 
-	for channelID, _ := range notificationChannels.DiscordChannels {
-		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.DiscordStreamName, channelID)
-		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.DiscordConsumerGroupName, channelID)
+	for _, sender := range notificationChannels.DiscordChannels {
 
-		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
-				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
 			}
 		}
 
 		discordLimiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
 
 		worker.SendFindings(gCtx, g,
-			fmt.Sprintf("discord-consumer-%s-%s", cfg.AppConfig.Source, channelID),
-			streamName,
-			groupName,
-			registry.Discord,
+			fmt.Sprintf("discord-consumer-%s-%s", cfg.AppConfig.Source, sender.GetChannelID()),
+			sender,
 			discordLimiter,
 		)
 	}
 
-	for channelID, _ := range notificationChannels.OpsGenieChannels {
-		streamName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.OpsGenieStreamName, channelID)
-		groupName := fmt.Sprintf("%s:%s", cfg.AppConfig.RedisConfig.OpsGeniaConsumerGroupName, channelID)
-
-		if err = rds.XGroupCreateMkStream(ctx, streamName, groupName, "$").Err(); err != nil {
+	for _, sender := range notificationChannels.OpsGenieChannels {
+		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
-				log.Error(fmt.Sprintf("Error creating %s stream: %v", streamName, err))
+				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
 			}
 		}
 
 		opsGenieLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
 
 		worker.SendFindings(gCtx, g,
-			fmt.Sprintf("opsgenie-consumer-%s-%s", cfg.AppConfig.Source, channelID),
-			streamName,
-			groupName,
-			registry.OpsGenie,
+			fmt.Sprintf("opsgenie-consumer-%s-%s", cfg.AppConfig.Source, sender.GetChannelID()),
+			sender,
 			opsGenieLimiter,
 		)
 	}

@@ -23,22 +23,24 @@ type AlertPayload struct {
 }
 
 type OpsGenie struct {
-	opsGenieKey     string
-	httpClient      *http.Client
-	metrics         *metrics.Store
-	blockExplorer   string
-	channelID       string
-	redisStreamName string
+	opsGenieKey            string
+	httpClient             *http.Client
+	metrics                *metrics.Store
+	blockExplorer          string
+	channelID              string
+	redisStreamName        string
+	redisConsumerGroupName string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string, redisConsumerGroupName string) *OpsGenie {
 	return &OpsGenie{
-		opsGenieKey:     opsGenieKey,
-		httpClient:      httpClient,
-		metrics:         metricsStore,
-		blockExplorer:   blockExplorer,
-		channelID:       channelID,
-		redisStreamName: redisStreamName,
+		opsGenieKey:            opsGenieKey,
+		httpClient:             httpClient,
+		metrics:                metricsStore,
+		blockExplorer:          blockExplorer,
+		channelID:              channelID,
+		redisStreamName:        redisStreamName,
+		redisConsumerGroupName: redisConsumerGroupName,
 	}
 }
 
@@ -122,4 +124,7 @@ func (o *OpsGenie) GetChannelID() string {
 
 func (o *OpsGenie) GetRedisStreamName() string {
 	return fmt.Sprintf("%s:%s", o.redisStreamName, o.channelID)
+}
+func (o *OpsGenie) GetRedisConsumerGroupName() string {
+	return fmt.Sprintf("%s:%s", o.redisConsumerGroupName, o.channelID)
 }

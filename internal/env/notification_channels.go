@@ -31,6 +31,7 @@ func NewNotificationChannels(log *slog.Logger, cfg *NotificationConfig, httpClie
 			blockExplorer,
 			tgChannel.ID,
 			redisConfig.TelegramStreamName,
+			redisConfig.TelegramConsumerGroupName,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", tgChannel.ID, tgChannel.Description))
 	}
@@ -43,6 +44,7 @@ func NewNotificationChannels(log *slog.Logger, cfg *NotificationConfig, httpClie
 			blockExplorer,
 			discordChannel.ID,
 			redisConfig.DiscordStreamName,
+			redisConfig.DiscordConsumerGroupName,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", discordChannel.ID, discordChannel.Description))
 	}
@@ -55,6 +57,7 @@ func NewNotificationChannels(log *slog.Logger, cfg *NotificationConfig, httpClie
 			blockExplorer,
 			opsGenieChannel.ID,
 			redisConfig.OpsGenieStreamName,
+			redisConfig.OpsGeniaConsumerGroupName,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", opsGenieChannel.ID, opsGenieChannel.Description))
 	}
