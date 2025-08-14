@@ -164,9 +164,6 @@ func getCoolDownKey(botName string, alertId string, alertBody string, natsConsum
 
 func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg) {
 	return func(msg jetstream.Msg) {
-		redisCong := c.redisClient.Conn()
-		defer redisCong.Close()
-
 		finding := new(databus.FindingDtoJson)
 
 		if alertErr := json.Unmarshal(msg.Data(), finding); alertErr != nil {
