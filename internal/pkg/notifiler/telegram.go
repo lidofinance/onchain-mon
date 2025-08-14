@@ -16,24 +16,26 @@ import (
 )
 
 type Telegram struct {
-	botToken        string
-	chatID          string
-	httpClient      *http.Client
-	metrics         *metrics.Store
-	blockExplorer   string
-	channelID       string
-	redisStreamName string
+	botToken               string
+	chatID                 string
+	httpClient             *http.Client
+	metrics                *metrics.Store
+	blockExplorer          string
+	channelID              string
+	redisStreamName        string
+	redisConsumerGroupName string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string) *Telegram {
+func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string, redisConsumerGroupName string) *Telegram {
 	return &Telegram{
-		botToken:        botToken,
-		chatID:          chatID,
-		httpClient:      httpClient,
-		metrics:         metricsStore,
-		blockExplorer:   blockExplorer,
-		channelID:       channelID,
-		redisStreamName: redisStreamName,
+		botToken:               botToken,
+		chatID:                 chatID,
+		httpClient:             httpClient,
+		metrics:                metricsStore,
+		blockExplorer:          blockExplorer,
+		channelID:              channelID,
+		redisStreamName:        redisStreamName,
+		redisConsumerGroupName: redisConsumerGroupName,
 	}
 }
 
@@ -107,6 +109,9 @@ func (t *Telegram) GetChannelID() string {
 }
 func (t *Telegram) GetRedisStreamName() string {
 	return fmt.Sprintf("%s:%s", t.redisStreamName, t.channelID)
+}
+func (t *Telegram) GetRedisConsumerGroupName() string {
+	return fmt.Sprintf("%s:%s", t.redisConsumerGroupName, t.channelID)
 }
 
 // Telegram supports two versions of markdown. V1, V2

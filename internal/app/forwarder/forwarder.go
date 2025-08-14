@@ -18,7 +18,6 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
-	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type worker struct {
@@ -97,9 +96,7 @@ func (w *worker) SendFindings(
 	ctx context.Context,
 	g *errgroup.Group,
 	consumerName string,
-	streamName string,
-	groupName string,
-	channelType registry.NotificationChannel,
+	sender notifiler.FindingSender,
 	limiter *rate.Limiter,
 ) {
 	g.Go(func() error {
@@ -116,9 +113,9 @@ func (w *worker) SendFindings(
 				}
 			default:
 				streams, err := w.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
-					Group:    groupName,
+					Group:    sender.GetRedisConsumerGroupName(),
 					Consumer: consumerName,
-					Streams:  []string{streamName, ">"},
+					Streams:  []string{sender.GetRedisStreamName(), ">"},
 					Count:    1,
 					Block:    1 * time.Second,
 				}).Result()
@@ -127,64 +124,40 @@ func (w *worker) SendFindings(
 					if errors.Is(err, redis.Nil) {
 						continue
 					}
-					w.log.Error(fmt.Sprintf("Could not read stream %s. err: %s", streamName, err.Error()))
+					w.log.Error(fmt.Sprintf("Could not read stream %s. err: %s", sender.GetRedisStreamName(), err.Error()))
 					continue
 				}
 
 				for _, str := range streams {
 					for _, msg := range str.Messages {
 						if limiter != nil && limiter.Wait(ctx) != nil {
-							w.log.Info(fmt.Sprintf("Reached limit of message %s limit. sleeping", string(channelType)))
-						}
-
-						ct, ok := msg.Values["channelType"].(string)
-						if !ok || ct != string(channelType) {
-							w.log.Error(fmt.Sprintf("Invalid or mismatched channelType got %s expected %s", ct, string(channelType)))
-							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
-							continue
-						}
-
-						channelID, ok := msg.Values["channelId"].(string)
-						if !ok {
-							w.log.Error("Missing channelId")
-							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
-							continue
+							w.log.Info(fmt.Sprintf("Reached limit of message %s limit. sleeping", string(sender.GetType())))
 						}
 
 						quorumBy, ok := msg.Values["quorumBy"].(string)
 						if !ok {
 							w.log.Error("Missing quorumBy")
-							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
+							_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
-						}
-
-						var sender notifiler.FindingSender
-						switch channelType {
-						case registry.Telegram:
-							sender = w.notificationChannels.TelegramChannels[channelID]
-						case registry.Discord:
-							sender = w.notificationChannels.DiscordChannels[channelID]
-						case registry.OpsGenie:
-							sender = w.notificationChannels.OpsGenieChannels[channelID]
 						}
 
 						findingStr, ok := msg.Values["finding"].(string)
 						if !ok {
 							w.log.Error("Missing finding field")
-							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
+							_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
 
 						var finding databus.FindingDtoJson
 						if err := json.Unmarshal([]byte(findingStr), &finding); err != nil {
 							w.log.Error(fmt.Sprintf("Failed to unmarshal finding %s", err.Error()))
-							_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
+							_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
 
 						if err := sender.SendFinding(ctx, &finding, quorumBy); err != nil {
 							w.log.Warn(
-								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again", w.instance, channelType, finding.AlertId),
+								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again", w.instance, sender.GetType(), finding.AlertId),
 								slog.String("err", err.Error()),
 								slog.String("alertId", finding.AlertId),
 								slog.String("name", finding.Name),
@@ -197,7 +170,7 @@ func (w *worker) SendFindings(
 
 							// Requeue for retry
 							_ = w.rdb.XAdd(ctx, &redis.XAddArgs{
-								Stream: streamName,
+								Stream: sender.GetRedisStreamName(),
 								Values: msg.Values,
 							})
 
@@ -205,7 +178,7 @@ func (w *worker) SendFindings(
 						}
 
 						w.log.Info(
-							fmt.Sprintf("%s[%s] sent finding[%s]", w.instance, channelType, finding.AlertId),
+							fmt.Sprintf("%s[%s] sent finding[%s]", w.instance, sender.GetType(), finding.AlertId),
 							slog.String("alertId", finding.AlertId),
 							slog.String("name", finding.Name),
 							slog.String("desc", finding.Description),
@@ -215,7 +188,7 @@ func (w *worker) SendFindings(
 							slog.String("uniqueKey", finding.UniqueKey),
 						)
 
-						_ = w.rdb.XAck(ctx, streamName, groupName, msg.ID).Err()
+						_ = w.rdb.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 					}
 				}
 			}

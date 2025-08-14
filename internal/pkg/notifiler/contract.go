@@ -12,6 +12,7 @@ type FindingSender interface {
 	GetType() registry.NotificationChannel
 	GetChannelID() string
 	GetRedisStreamName() string
+	GetRedisConsumerGroupName() string
 }
 
 var ErrRateLimited = errors.New("reach request limit")
