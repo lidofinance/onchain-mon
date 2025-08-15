@@ -62,8 +62,7 @@ func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 		con, err := w.stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 			Durable:           consumer.GetName(),
 			AckPolicy:         jetstream.AckExplicitPolicy,
-			MaxAckPending:     20,
-			AckWait:           5 * time.Second,
+			MaxAckPending:     5,
 			FilterSubjects:    []string{consumer.GetTopic()},
 			DeliverPolicy:     jetstream.DeliverNewPolicy,
 			MaxDeliver:        10,
@@ -167,7 +166,7 @@ func (w *worker) SendFindings(
 								slog.String("severity", string(finding.Severity)),
 								slog.String("uniqueKey", finding.UniqueKey),
 							)
-
+							
 							// Requeue for retry
 							_ = conn.XAdd(ctx, &redis.XAddArgs{
 								Stream: sender.GetRedisStreamName(),
