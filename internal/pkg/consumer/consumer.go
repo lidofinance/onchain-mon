@@ -284,10 +284,9 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 						c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
 					}
-
-					c.nackMessage(msg)
-					return
 				}
+				c.nackMessage(msg)
+				return
 			}
 		} else {
 			v, _ := c.cache.Get(countKey)
@@ -340,7 +339,8 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 
 			if status == StatusSending {
-				c.log.Info(fmt.Sprintf("Another instance is sending finding: %s", finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] - another instance is sending finding: %s", c.instance, c.notifier.GetType(), finding.AlertId))
+				c.nackMessage(msg)
 				return
 			}
 
@@ -360,7 +360,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					c.metrics.RedisErrors.Inc()
 				}
 
-				c.log.Info(fmt.Sprintf("Another instance already sent finding: %s", finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] - another instance already sent finding: %s", c.instance, c.notifier.GetType(), finding.AlertId))
 				return
 			}
 

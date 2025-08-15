@@ -62,7 +62,8 @@ func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 		con, err := w.stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 			Durable:           consumer.GetName(),
 			AckPolicy:         jetstream.AckExplicitPolicy,
-			MaxAckPending:     1,
+			MaxAckPending:     20,
+			AckWait:           5 * time.Second,
 			FilterSubjects:    []string{consumer.GetTopic()},
 			DeliverPolicy:     jetstream.DeliverNewPolicy,
 			MaxDeliver:        10,
@@ -104,9 +105,6 @@ func (w *worker) SendFindings(
 	g.Go(func() error {
 		conn := w.streamRedisClient.Conn()
 		defer conn.Close()
-
-		redisPingTicker := time.NewTicker(30 * time.Second)
-		defer redisPingTicker.Stop()
 
 		for {
 			select {
