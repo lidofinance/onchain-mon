@@ -3,6 +3,7 @@ package notifiler
 import (
 	"context"
 	"errors"
+
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )

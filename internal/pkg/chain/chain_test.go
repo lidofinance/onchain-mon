@@ -173,7 +173,7 @@ func Test_chain_FetchBlockByNumber(t *testing.T) {
 				blockNumber: 92466198,
 			},
 			want:    0,
-			wantErr: EmptyResponseErr,
+			wantErr: ErrEmptyResponse,
 		},
 		{
 			name: "success",
@@ -187,7 +187,7 @@ func Test_chain_FetchBlockByNumber(t *testing.T) {
 				blockNumber: 22466927,
 			},
 			want:    22466927,
-			wantErr: EmptyResponseErr,
+			wantErr: ErrEmptyResponse,
 		},
 	}
 	for _, tt := range tests {

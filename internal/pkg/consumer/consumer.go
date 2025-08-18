@@ -25,7 +25,7 @@ import (
 
 type Consumer struct {
 	log         *slog.Logger
-	metrics     *metrics.Store
+	mtrs        *metrics.Store
 	cache       *expirable.LRU[string, uint]
 	redisClient *redis.Client
 	repo        *Repo
@@ -40,16 +40,18 @@ type Consumer struct {
 	notifier         notifiler.FindingSender
 }
 
+const LRUCacheExpiration = time.Minute * 10
+
 func New(
 	log *slog.Logger,
-	metrics *metrics.Store,
+	mtrs *metrics.Store,
 	cache *expirable.LRU[string, uint],
 	redisClient *redis.Client,
 	repo *Repo,
 	instance string,
 	consumerName,
 	subject string,
-	SeveritySet registry.FindingMapping,
+	severitySet registry.FindingMapping,
 	findingFilterMap registry.FindingFilterMap,
 	byQuorum bool,
 	quorumSize uint,
@@ -57,7 +59,7 @@ func New(
 ) *Consumer {
 	return &Consumer{
 		log:         log,
-		metrics:     metrics,
+		mtrs:        mtrs,
 		cache:       cache,
 		redisClient: redisClient,
 		repo:        repo,
@@ -65,7 +67,7 @@ func New(
 		instance:         instance,
 		name:             consumerName,
 		subject:          subject,
-		severitySet:      SeveritySet,
+		severitySet:      severitySet,
 		findingFilterMap: findingFilterMap,
 		byQuorum:         byQuorum,
 		quorumSize:       quorumSize,
@@ -73,7 +75,16 @@ func New(
 	}
 }
 
-func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.Client, instance string, repo *Repo, quorumSize uint, cfg *env.NotificationConfig, notificationChannels *env.NotificationChannels) ([]*Consumer, error) {
+func NewConsumers(
+	log *slog.Logger,
+	mtr *metrics.Store,
+	redisClient *redis.Client,
+	instance string,
+	repo *Repo,
+	quorumSize uint,
+	cfg *env.NotificationConfig,
+	notificationChannels *env.NotificationChannels,
+) ([]*Consumer, error) {
 	var consumers []*Consumer
 
 	for _, consumerCfg := range cfg.Consumers {
@@ -112,10 +123,10 @@ func NewConsumers(log *slog.Logger, metrics *metrics.Store, redisClient *redis.C
 			}
 
 			const LruSize = 125
-			cache := expirable.NewLRU[string, uint](LruSize, nil, time.Minute*10)
+			cache := expirable.NewLRU[string, uint](LruSize, nil, LRUCacheExpiration)
 
 			consumer := New(
-				log, metrics, cache, redisClient, repo,
+				log, mtr, cache, redisClient, repo,
 				instance,
 				consumerName,
 				subject,
@@ -158,7 +169,7 @@ func (c *Consumer) GetTopic() string {
 	return c.subject
 }
 
-func getCoolDownKey(botName string, alertId string, alertBody string, natsConsumerName string) string {
+func getCoolDownKey(botName, alertId, alertBody, natsConsumerName string) string {
 	return fmt.Sprintf("%s_%s_%s_%s", botName, alertId, alertBody, natsConsumerName)
 }
 
@@ -168,7 +179,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 		if alertErr := json.Unmarshal(msg.Data(), finding); alertErr != nil {
 			c.log.Error(fmt.Sprintf(`Broken message: %v`, alertErr))
-			c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+			c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 			c.terminateMessage(msg)
 			return
 		}
@@ -189,39 +200,21 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 		}
 
-		if c.byQuorum == false {
+		if !c.byQuorum {
 			if sendErr := c.notifier.SendFinding(ctx, finding, c.instance); sendErr != nil {
 				if errors.Is(sendErr, notifiler.ErrRateLimited) {
 					_, putOnStreamErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
 					if putOnStreamErr != nil {
-						c.log.Error(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr),
-							slog.String("alertId", finding.AlertId),
-							slog.String("name", finding.Name),
-							slog.String("desc", finding.Description),
-							slog.String("setBy", c.instance),
-							slog.String("consumer", c.name),
-							slog.String("bot-name", finding.BotName),
-							slog.String("severity", string(finding.Severity)),
-							slog.String("uniqueKey", finding.UniqueKey),
-						)
+						c.logError(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr), finding)
 
-						c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+						c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 						c.nackMessage(msg)
 						return
 					}
 				} else {
-					c.log.Error(fmt.Sprintf(`Could not send debug-finding: %v`, sendErr),
-						slog.String("alertId", finding.AlertId),
-						slog.String("name", finding.Name),
-						slog.String("desc", finding.Description),
-						slog.String("setBy", c.instance),
-						slog.String("consumer", c.name),
-						slog.String("bot-name", finding.BotName),
-						slog.String("severity", string(finding.Severity)),
-						slog.String("uniqueKey", finding.UniqueKey),
-					)
+					c.logError(fmt.Sprintf(`Could not send debug-finding: %v`, sendErr), finding)
 
-					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 					c.nackMessage(msg)
 					return
 				}
@@ -244,7 +237,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				slog.String("uniqueKey", finding.UniqueKey),
 			)
 
-			c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
+			c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 			c.ackMessage(msg)
 			return
 		}
@@ -266,23 +259,25 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 			count, err = c.redisClient.Incr(ctx, countKey).Uint64()
 			if err != nil {
-				c.log.Error(fmt.Sprintf(`Could not increase key value: %v`, err))
-				c.metrics.RedisErrors.Inc()
-				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+				c.logError(fmt.Sprintf(`Could not increase key value: %v`, err), finding)
+
+				c.mtrs.RedisErrors.Inc()
+				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
 				return
 			}
 
 			if count == 1 {
 				if err := c.redisClient.Expire(ctx, countKey, TTLMins10).Err(); err != nil {
-					c.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
-					c.metrics.RedisErrors.Inc()
-					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+					c.logError(fmt.Sprintf(`Could not set expire time: %v`, err), finding)
+
+					c.mtrs.RedisErrors.Inc()
+					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 
 					if _, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
-						c.metrics.RedisErrors.Inc()
-						c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-						c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
+						c.logError(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err), finding)
+						c.mtrs.RedisErrors.Inc()
+						c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 					}
 				}
 				c.nackMessage(msg)
@@ -297,14 +292,14 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				if errors.Is(err, redis.Nil) {
 					c.cache.Remove(countKey)
 					c.log.Warn(fmt.Sprintf(`Key(%s) is expired`, countKey))
-					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 					c.ackMessage(msg)
 					return
 				}
 
-				c.log.Error(fmt.Sprintf(`Could not get key(%s) value: %v`, countKey, err))
-				c.metrics.RedisErrors.Inc()
-				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+				c.logError(fmt.Sprintf(`Could not get key(%s) value: %v`, countKey, err), finding)
+				c.mtrs.RedisErrors.Inc()
+				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
 				return
 			}
@@ -312,7 +307,9 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 		touchTimes, _ := c.cache.Get(countKey)
 
-		msgInfo := fmt.Sprintf("%s: %s-%s read %d times. %s...%s", c.name, finding.BotName, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:])
+		msgInfo := fmt.Sprintf("%s: %s-%s read %d times. %s...%s",
+			c.name, finding.BotName, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:],
+		)
 		if finding.BlockNumber != nil {
 			msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 		}
@@ -331,9 +328,10 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		if uint(count) >= c.quorumSize {
 			status, err := c.repo.GetStatus(ctx, statusKey)
 			if err != nil {
-				c.log.Error(fmt.Sprintf(`Could not get notification status: %v`, err))
-				c.metrics.RedisErrors.Inc()
-				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+				c.logError(fmt.Sprintf(`Could not get notification status: %v`, err), finding)
+
+				c.mtrs.RedisErrors.Inc()
+				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackMessage(msg)
 				return
 			}
@@ -345,19 +343,19 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 
 			if status == StatusSent {
-				c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
+				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 				c.ackMessage(msg)
 
 				c.cache.Remove(countKey)
 
 				if err := c.redisClient.Expire(ctx, countKey, TTLMin1).Err(); err != nil {
-					c.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
-					c.metrics.RedisErrors.Inc()
+					c.logError(fmt.Sprintf(`Could not set expire time for countKey: %v`, err), finding)
+					c.mtrs.RedisErrors.Inc()
 				}
 
 				if err := c.redisClient.Expire(ctx, statusKey, TTLMin1).Err(); err != nil {
-					c.log.Error(fmt.Sprintf(`Could not set expire time: %v`, err))
-					c.metrics.RedisErrors.Inc()
+					c.logError(fmt.Sprintf(`Could not set expire time: %v for statusKey`, err), finding)
+					c.mtrs.RedisErrors.Inc()
 				}
 
 				c.log.Info(fmt.Sprintf("%s[%s] - another instance already sent finding: %s", c.instance, c.notifier.GetType(), finding.AlertId))
@@ -368,8 +366,8 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				// same alert by content but may different blockNumber
 				isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name))
 				if coolDownErr != nil {
-					c.log.Error(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr))
-					c.metrics.RedisErrors.Inc()
+					c.logError(fmt.Sprintf(`Could not get cool-down status: %v`, coolDownErr), finding)
+					c.mtrs.RedisErrors.Inc()
 				}
 
 				if isCooldownActive {
@@ -380,8 +378,9 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 				readyToSend, err := c.repo.SetSendingStatus(ctx, countKey, statusKey)
 				if err != nil {
-					c.log.Error(fmt.Sprintf(`Could not check notification status for AlertID: %s: %v`, finding.AlertId, err))
-					c.metrics.RedisErrors.Inc()
+					c.logError(fmt.Sprintf(`Could not check notification status for AlertID: %s: %v`, finding.AlertId, err), finding)
+
+					c.mtrs.RedisErrors.Inc()
 					c.nackMessage(msg)
 					return
 				}
@@ -393,22 +392,14 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						if errors.Is(sendErr, notifiler.ErrRateLimited) {
 							_, putOnStreamErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
 							if putOnStreamErr != nil {
-								c.log.Error(fmt.Sprintf(`Could not push msg into redis queue: %v`, putOnStreamErr),
-									slog.String("alertId", finding.AlertId),
-									slog.String("name", finding.Name),
-									slog.String("desc", finding.Description),
-									slog.String("setBy", c.instance),
-									slog.String("consumer", c.name),
-									slog.String("bot-name", finding.BotName),
-									slog.String("severity", string(finding.Severity)),
-									slog.String("uniqueKey", finding.UniqueKey),
-								)
-
+								c.logError(fmt.Sprintf(`Could not push msg into redis queue: %v`, putOnStreamErr), finding)
 								c.failAndNack(ctx, msg, countKey, statusKey)
 								return
 							}
 
-							quorumMsgInfo := fmt.Sprintf("%s pushed quorum-finding into %s stream %s[%s]", c.instance, c.notifier.GetChannelID(), finding.BotName, finding.AlertId)
+							quorumMsgInfo := fmt.Sprintf("%s pushed quorum-finding into %s stream %s[%s]",
+								c.instance, c.notifier.GetChannelID(), finding.BotName, finding.AlertId,
+							)
 							if finding.BlockNumber != nil {
 								quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 							}
@@ -425,17 +416,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 								slog.String("uniqueKey", finding.UniqueKey),
 							)
 						} else {
-							c.log.Error(fmt.Sprintf(`Could not send quorum-finding: %v`, sendErr),
-								slog.String("alertId", finding.AlertId),
-								slog.String("name", finding.Name),
-								slog.String("desc", finding.Description),
-								slog.String("setBy", c.instance),
-								slog.String("consumer", c.name),
-								slog.String("bot-name", finding.BotName),
-								slog.String("severity", string(finding.Severity)),
-								slog.String("uniqueKey", finding.UniqueKey),
-							)
-
+							c.logError(fmt.Sprintf(`Could not send quorum-finding: %v`, sendErr), finding)
 							c.failAndNack(ctx, msg, countKey, statusKey)
 							return
 						}
@@ -458,17 +439,17 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						)
 					}
 
-					c.metrics.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
+					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 					c.ackMessage(msg)
 
 					if err := c.repo.SeStatusSent(ctx, statusKey); err != nil {
-						c.metrics.RedisErrors.Inc()
-						c.log.Error(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()))
+						c.logError(fmt.Sprintf(`Could not set notification StatusSent: %s`, err.Error()), finding)
+						c.mtrs.RedisErrors.Inc()
 					}
 
 					if err := c.repo.SetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name)); err != nil {
-						c.metrics.RedisErrors.Inc()
-						c.log.Error(fmt.Sprintf(`Could not set cool down status: %s`, err.Error()))
+						c.logError(fmt.Sprintf(`Could not set cool down status: %s`, err.Error()), finding)
+						c.mtrs.RedisErrors.Inc()
 					}
 				}
 			}
@@ -500,26 +481,39 @@ func (c *Consumer) failAndNack(
 	countKey, statusKey string,
 ) {
 	if count, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
-		c.metrics.RedisErrors.Inc()
+		c.mtrs.RedisErrors.Inc()
 		c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
 	} else if count <= 0 {
 		if err := c.redisClient.Del(ctx, countKey).Err(); err != nil {
-			c.metrics.RedisErrors.Inc()
+			c.mtrs.RedisErrors.Inc()
 			c.log.Error(fmt.Sprintf(`Could not delete countKey %s: %v`, countKey, err))
 		}
 	}
 
 	if err := c.redisClient.Del(ctx, statusKey).Err(); err != nil {
-		c.metrics.RedisErrors.Inc()
+		c.mtrs.RedisErrors.Inc()
 		c.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
 	}
 
 	c.cache.Remove(countKey)
 
-	c.metrics.SentAlerts.With(prometheus.Labels{
+	c.mtrs.SentAlerts.With(prometheus.Labels{
 		metrics.ConsumerName: c.name,
 		metrics.Status:       metrics.StatusFail,
 	}).Inc()
 
 	c.nackMessage(msg)
+}
+
+func (c *Consumer) logError(errMsg string, finding *databus.FindingDtoJson) {
+	c.log.Error(errMsg,
+		slog.String("alertId", finding.AlertId),
+		slog.String("name", finding.Name),
+		slog.String("desc", finding.Description),
+		slog.String("setBy", c.instance),
+		slog.String("consumer", c.name),
+		slog.String("bot-name", finding.BotName),
+		slog.String("severity", string(finding.Severity)),
+		slog.String("uniqueKey", finding.UniqueKey),
+	)
 }

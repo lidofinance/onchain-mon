@@ -2,8 +2,10 @@
 
 package databus
 
-import "encoding/json"
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type BlockDtoJson struct {
 	// Hash corresponds to the JSON schema field "hash".

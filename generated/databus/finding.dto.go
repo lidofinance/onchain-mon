@@ -2,9 +2,11 @@
 
 package databus
 
-import "encoding/json"
-import "fmt"
-import "reflect"
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+)
 
 type FindingDtoJson struct {
 	// AlertId corresponds to the JSON schema field "alertId".

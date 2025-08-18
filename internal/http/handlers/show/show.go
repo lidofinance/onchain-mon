@@ -99,5 +99,6 @@ func (h *handler) Handler(w http.ResponseWriter, _ *http.Request) {
 	err = tmpl.Execute(w, data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }

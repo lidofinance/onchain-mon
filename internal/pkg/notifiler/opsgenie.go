@@ -32,7 +32,13 @@ type OpsGenie struct {
 	redisConsumerGroupName string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string, redisConsumerGroupName string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string,
+	httpClient *http.Client, metricsStore *metrics.Store,
+	blockExplorer,
+	channelID,
+	redisStreamName,
+	redisConsumerGroupName string,
+) *OpsGenie {
 	return &OpsGenie{
 		opsGenieKey:            opsGenieKey,
 		httpClient:             httpClient,

@@ -23,7 +23,6 @@ type AppConfig struct {
 	NatsDefaultURL string
 	MetricsPrefix  string
 
-	//nolint
 	JsonRpcURL string
 
 	BlockTopic   string

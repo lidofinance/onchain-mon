@@ -6,7 +6,14 @@ generate-docker:
 
 .PHONY: tools
 tools:
-	cd tools && go mod vendor && go mod tidy && go mod verify && go generate -tags tools
+	cd tools && go mod vendor && go mod tidy && go mod verify
+	@echo "Installing dev tools into ./bin ..."
+	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.4.0
+	GOBIN=$(PWD)/bin go install github.com/vektra/mockery/v3@v3.5.3
+	GOBIN=$(PWD)/bin go install golang.org/x/tools/cmd/goimports@v0.36.0
+	GOBIN=$(PWD)/bin go install github.com/atombender/go-jsonschema@v0.20.0
+	GOBIN=$(PWD)/bin go install github.com/psampaz/go-mod-outdated@v0.9.0
+	GOBIN=$(PWD)/bin go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
 .PHONY: vendor
 vendor:
@@ -29,19 +36,25 @@ fix-lint:
 	bin/golangci-lint run --config=.golangci.yml --fix ./cmd... ./internal/...
 
 .PHONY: format
-format: imports fmt vet fix-lint
+format: imports fmt vet
 
 .PHONY: lint
 lint:
 	bin/golangci-lint run --config=.golangci.yml ./cmd... ./internal/...
 
-outdated-deps:
-	go list -u -m -json -mod=readonly all
-.PHONY: outdated-deps
+outdated:
+	@echo "Checking for outdated modules..."
+	go list -u -m -json all | ./bin/go-mod-outdated -update -direct
+.PHONY: outdated
 
 generate-databus-objects:
 	for file in ./brief/databus/*.dto.json; do \
 		base_name=$$(basename $$file .dto.json); \
-		bin/jsonschema -p databus -o generated/databus/$$base_name.dto.go $$file; \
+		bin/go-jsonschema -p databus -o generated/databus/$$base_name.dto.go $$file; \
 	done
 .PHONY: generate-databus-objects
+
+.PHONY: vulncheck
+vulncheck:
+	@echo "Running govulncheck..."
+	./bin/govulncheck

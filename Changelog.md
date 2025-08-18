@@ -1,3 +1,8 @@
+## 18.08.2025
+1. Update to go1.25
+2. Update dependencies
+3. Fix linters, format warnings
+
 ## 07.08.2025
 1. Send findings via Redis streams
 2. Updated go-redis/v8 -> go-redis/v9

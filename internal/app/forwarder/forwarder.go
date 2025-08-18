@@ -56,6 +56,8 @@ func New(
 	return w
 }
 
+const StreamWorkerSleepInterval = 200 * time.Millisecond
+
 func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 	connections := make([]jetstream.ConsumeContext, 0, len(w.consumers))
 	for _, consumer := range w.consumers {
@@ -123,7 +125,7 @@ func (w *worker) SendFindings(
 						continue
 					}
 
-					time.Sleep(200 * time.Millisecond)
+					time.Sleep(StreamWorkerSleepInterval)
 					continue
 				}
 
@@ -166,7 +168,7 @@ func (w *worker) SendFindings(
 								slog.String("severity", string(finding.Severity)),
 								slog.String("uniqueKey", finding.UniqueKey),
 							)
-							
+
 							// Requeue for retry
 							_ = conn.XAdd(ctx, &redis.XAddArgs{
 								Stream: sender.GetRedisStreamName(),

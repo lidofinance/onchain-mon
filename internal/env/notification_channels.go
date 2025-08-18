@@ -15,7 +15,14 @@ type NotificationChannels struct {
 	OpsGenieChannels map[string]*notifiler.OpsGenie
 }
 
-func NewNotificationChannels(log *slog.Logger, cfg *NotificationConfig, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, redisConfig *RedisConfig) (*NotificationChannels, error) {
+func NewNotificationChannels(
+	log *slog.Logger,
+	cfg *NotificationConfig,
+	httpClient *http.Client,
+	metricsStore *metrics.Store,
+	blockExplorer string,
+	redisConfig *RedisConfig,
+) (*NotificationChannels, error) {
 	channels := &NotificationChannels{
 		TelegramChannels: make(map[string]*notifiler.Telegram),
 		DiscordChannels:  make(map[string]*notifiler.Discord),
