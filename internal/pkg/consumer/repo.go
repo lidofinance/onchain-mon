@@ -98,7 +98,7 @@ func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
 }
 
 func (r *Repo) AddIntoStream(ctx context.Context, finding []byte, sender notifiler.FindingSender, source string) (string, error) {
-	message := map[string]interface{}{
+	message := map[string]any{
 		"finding":  string(finding),
 		"quorumBy": source,
 	}

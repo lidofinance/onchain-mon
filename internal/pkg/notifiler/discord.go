@@ -31,7 +31,11 @@ type MessagePayload struct {
 
 const DiscordLabel = `discord`
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string, redisConsumerGroupName string) *Discord {
+func NewDiscord(
+	webhookURL string, httpClient *http.Client,
+	metricsStore *metrics.Store, blockExplorer, channelID,
+	redisStreamName, redisConsumerGroupName string,
+) *Discord {
 	return &Discord{
 		webhookURL:             webhookURL,
 		httpClient:             httpClient,

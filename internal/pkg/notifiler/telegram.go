@@ -26,7 +26,11 @@ type Telegram struct {
 	redisConsumerGroupName string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, blockExplorer string, channelID string, redisStreamName string, redisConsumerGroupName string) *Telegram {
+func NewTelegram(botToken, chatID string,
+	httpClient *http.Client, metricsStore *metrics.Store,
+	blockExplorer, channelID,
+	redisStreamName, redisConsumerGroupName string,
+) *Telegram {
 	return &Telegram{
 		botToken:               botToken,
 		chatID:                 chatID,
@@ -65,7 +69,12 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 }
 
 func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s", t.botToken, t.chatID, url.QueryEscape(message))
+	requestURL := fmt.Sprintf(
+		"https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s",
+		t.botToken,
+		t.chatID,
+		url.QueryEscape(message),
+	)
 	if useMarkdown {
 		requestURL += `&parse_mode=markdown`
 	}

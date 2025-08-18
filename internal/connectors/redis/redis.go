@@ -53,13 +53,15 @@ func NewRedisClient(addr string, db int, log *slog.Logger, poolSize int) (*redis
 	return writeClient, err
 }
 
-func NewStreamClient(addr string, db int, streamWorkers int, log *slog.Logger) (*redis.Client, error) {
+const MinPoolSize = 20
+
+func NewStreamClient(addr string, db, streamWorkers int, log *slog.Logger) (*redis.Client, error) {
 	var err error
 
 	streamClientOnce.Do(func() {
 		pool := streamWorkers + 8
-		if pool < 20 {
-			pool = 20
+		if pool < MinPoolSize {
+			pool = MinPoolSize
 		}
 		streamClient = redis.NewClient(&redis.Options{
 			Addr: addr,

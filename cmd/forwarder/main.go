@@ -28,7 +28,9 @@ import (
 )
 
 const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
+const ConsumerGroupExists = "BUSYGROUP Consumer Group name already exists"
 
+//nolint:funlen
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	defer stop()
@@ -99,7 +101,17 @@ func main() {
 	}
 	defer rds.Close()
 
-	redisStreamClient, err := redis.NewStreamClient(cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, notificationChannels.Count(), log)
+	redisStreamClient, err := redis.NewStreamClient(
+		cfg.AppConfig.RedisConfig.URL,
+		cfg.AppConfig.RedisConfig.DB,
+		notificationChannels.Count(),
+		log,
+	)
+	if err != nil {
+		log.Error(fmt.Sprintf(`create redis stream client error: %v`, err))
+		return
+	}
+	defer redisStreamClient.Close()
 
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
@@ -150,11 +162,18 @@ func main() {
 		return
 	}
 
-	worker := forwarder.New(cfg.AppConfig.Source, rds, redisStreamClient, consumers, natStream, log, &cfg.AppConfig.RedisConfig, notificationChannels)
+	worker := forwarder.New(
+		cfg.AppConfig.Source,
+		rds,
+		redisStreamClient,
+		consumers, natStream, log,
+		&cfg.AppConfig.RedisConfig,
+		notificationChannels,
+	)
 
 	for _, sender := range notificationChannels.TelegramChannels {
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
-			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
 			}
 		}
@@ -170,7 +189,7 @@ func main() {
 
 	for _, sender := range notificationChannels.DiscordChannels {
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
-			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
 			}
 		}
@@ -186,7 +205,7 @@ func main() {
 
 	for _, sender := range notificationChannels.OpsGenieChannels {
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
-			if err.Error() != `BUSYGROUP Consumer Group name already exists` {
+			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
 			}
 		}
