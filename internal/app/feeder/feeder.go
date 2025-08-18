@@ -16,10 +16,9 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/lidofinance/onchain-mon/internal/pkg/chain"
-
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/pkg/chain"
 	"github.com/lidofinance/onchain-mon/internal/pkg/chain/entity"
 )
 
