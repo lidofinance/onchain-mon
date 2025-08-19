@@ -183,7 +183,8 @@ func (w *worker) SendFindings(
 						if sendErr := sender.SendFinding(ctx, &finding, quorumBy); sendErr != nil {
 							count, incErr := conn.Incr(ctx, redisKey).Uint64()
 							if incErr != nil {
-								w.log.Error(fmt.Sprintf(`Could not increase countKey for %s: %v`, sender.GetRedisStreamName(), err), finding)
+								w.log.Error(fmt.Sprintf(`Could not increase countKey for %s: %v`, sender.GetRedisStreamName(), err),
+									slog.String("alertId", finding.AlertId))
 								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 								_ = conn.Del(ctx, redisKey).Err()
 								continue

@@ -3,6 +3,7 @@ package notifiler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,7 +29,7 @@ type Telegram struct {
 	redisConsumerGroupName string
 }
 
-var tgRes struct {
+type tgRes struct {
 	Ok          bool   `json:"ok"`
 	ErrorCode   int    `json:"error_code"`
 	Description string `json:"description"`
@@ -65,17 +66,22 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		WarningTelegramMessage,
 	)
 
-	if alert.Severity == databus.SeverityUnknown {
-		return t.send(ctx, message, false)
+	if alert.Severity != databus.SeverityUnknown {
+		m := escapeMarkdownV1(message)
+
+		if sendErr := t.send(ctx, m, true); sendErr != nil {
+			if errors.Is(sendErr, ErrRateLimited) {
+				return sendErr
+			}
+
+			message += "\n\nWarning: Could not send msg as markdown"
+			return t.send(ctx, message, false)
+		}
+
+		return nil
 	}
 
-	m := escapeMarkdownV1(message)
-	if sendErr := t.send(ctx, m, true); sendErr != nil {
-		message += "\n\nWarning: Could not send msg as markdown"
-		return t.send(ctx, message, false)
-	}
-
-	return nil
+	return t.send(ctx, message, false)
 }
 
 func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
@@ -106,24 +112,25 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 			Observe(time.Since(start).Seconds())
 	}()
 
+	var resp tgRes
 	body, _ := io.ReadAll(rawResp.Body)
-	_ = json.Unmarshal(body, &tgRes)
+	_ = json.Unmarshal(body, &resp)
 
-	if rawResp.StatusCode == http.StatusTooManyRequests || tgRes.ErrorCode == http.StatusTooManyRequests {
+	if rawResp.StatusCode == http.StatusTooManyRequests || resp.ErrorCode == http.StatusTooManyRequests {
 		t.metrics.NotifyChannels.
 			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
 			Inc()
 
-		return fmt.Errorf("429 - Retray after: %ds: %w", tgRes.Parameters.RetryAfter, ErrRateLimited)
+		return fmt.Errorf("429 - Retray after: %ds: %w", resp.Parameters.RetryAfter, ErrRateLimited)
 	}
 
-	if rawResp.StatusCode != http.StatusOK || !tgRes.Ok {
+	if rawResp.StatusCode != http.StatusOK || !resp.Ok {
 		t.metrics.NotifyChannels.
 			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
 			Inc()
 
-		if tgRes.Description != "" || tgRes.ErrorCode != 0 {
-			return fmt.Errorf("telegram error: %s (%d)", tgRes.Description, tgRes.ErrorCode)
+		if resp.Description != "" || resp.ErrorCode != 0 {
+			return fmt.Errorf("telegram error: %s (%d)", resp.Description, resp.ErrorCode)
 		}
 		return fmt.Errorf("received from telegram non-200 response code: %v", rawResp.Status)
 	}
