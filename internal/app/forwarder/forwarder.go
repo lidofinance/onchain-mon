@@ -2,6 +2,8 @@ package forwarder
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,6 +62,7 @@ func New(
 const StreamWorkerSleepInterval = 200 * time.Millisecond
 const TelegramRelaxTime = 30 * time.Second
 const RelaxTime = 5 * time.Second
+const MaxAttempts = 10
 
 func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 	connections := make([]jetstream.ConsumeContext, 0, len(w.consumers))
@@ -173,7 +176,26 @@ func (w *worker) SendFindings(
 							continue
 						}
 
+						key := fmt.Sprintf("%s_%s_%s_%s", sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), quorumBy, finding.UniqueKey)
+						hash := sha256.Sum256([]byte(key))
+						redisKey := fmt.Sprintf(`dropMsg:%s`, hex.EncodeToString(hash[:]))
+
 						if sendErr := sender.SendFinding(ctx, &finding, quorumBy); sendErr != nil {
+							count, incErr := conn.Incr(ctx, redisKey).Uint64()
+							if incErr != nil {
+								w.log.Error(fmt.Sprintf(`Could not increase countKey for %s: %v`, sender.GetRedisStreamName(), err), finding)
+								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+								_ = conn.Del(ctx, redisKey).Err()
+								continue
+							}
+
+							if count >= MaxAttempts {
+								w.log.Error(fmt.Sprintf("Archived maximum attempts for sending message %s", finding.AlertId))
+								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+								_ = conn.Del(ctx, redisKey).Err()
+								continue
+							}
+
 							// Requeue for retry
 							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							if errors.Is(sendErr, notifiler.ErrRateLimited) {
@@ -217,6 +239,7 @@ func (w *worker) SendFindings(
 						)
 
 						_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+						_ = conn.Del(ctx, redisKey).Err()
 					}
 				}
 			}
