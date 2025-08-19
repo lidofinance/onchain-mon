@@ -173,6 +173,9 @@ func main() {
 	)
 
 	for _, sender := range notificationChannels.TelegramChannels {
+		_ = rds.XGroupDestroy(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName()).Err()
+		_ = rds.Del(ctx, sender.GetRedisStreamName()).Err()
+
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
