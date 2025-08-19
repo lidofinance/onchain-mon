@@ -94,8 +94,6 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 		return fmt.Errorf("could not create telegram request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
 	start := time.Now()
 	rawResp, err := t.httpClient.Do(req)
 	if err != nil {
