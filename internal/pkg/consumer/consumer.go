@@ -161,12 +161,18 @@ const (
 	TTLMin1   = 1 * time.Minute
 )
 
+const NackDelayMsg = 3 * time.Second
+
 func (c *Consumer) GetName() string {
 	return c.name
 }
 
 func (c *Consumer) GetTopic() string {
 	return c.subject
+}
+
+func (c *Consumer) ByQuorum() bool {
+	return c.byQuorum
 }
 
 func getCoolDownKey(botName, alertId, alertBody, natsConsumerName string) string {
@@ -208,14 +214,14 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 						c.logError(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr), finding)
 
 						c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-						c.nackMessage(msg)
+						c.nackDelayMessage(msg, NackDelayMsg)
 						return
 					}
 				} else {
 					c.logError(fmt.Sprintf(`Could not send debug-finding: %v`, sendErr), finding)
 
 					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-					c.nackMessage(msg)
+					c.nackDelayMessage(msg, NackDelayMsg)
 					return
 				}
 			}
@@ -466,6 +472,12 @@ func (c *Consumer) terminateMessage(msg jetstream.Msg) {
 func (c *Consumer) nackMessage(msg jetstream.Msg) {
 	if nackErr := msg.Nak(); nackErr != nil {
 		c.log.Error(fmt.Sprintf(`Could not nack msg: %v`, nackErr))
+	}
+}
+
+func (c *Consumer) nackDelayMessage(msg jetstream.Msg, delay time.Duration) {
+	if nackErr := msg.NakWithDelay(delay); nackErr != nil {
+		c.log.Error(fmt.Sprintf(`Could not nack with delay msg: %v`, nackErr))
 	}
 }
 

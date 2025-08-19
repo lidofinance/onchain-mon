@@ -61,14 +61,28 @@ const StreamWorkerSleepInterval = 200 * time.Millisecond
 func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 	connections := make([]jetstream.ConsumeContext, 0, len(w.consumers))
 	for _, consumer := range w.consumers {
+		maxAckPending := 1
+		if consumer.ByQuorum() {
+			maxAckPending = 6
+		}
+
 		con, err := w.stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-			Durable:           consumer.GetName(),
-			AckPolicy:         jetstream.AckExplicitPolicy,
-			MaxAckPending:     5,
+			Durable:   consumer.GetName(),
+			AckPolicy: jetstream.AckExplicitPolicy,
+			// Telegram limit: ~20 msgs/min per bot
+			// We run 3 instances that handle 6 messages in parallel = 18 sends max (safe 18 <= 20)
+			// Extra messages are rate-limited and queued to Redis Streams for retry
+			MaxAckPending:     maxAckPending,
+			AckWait:           30 * time.Second,
 			FilterSubjects:    []string{consumer.GetTopic()},
 			DeliverPolicy:     jetstream.DeliverNewPolicy,
 			MaxDeliver:        10,
 			InactiveThreshold: 2 * time.Hour,
+			BackOff: []time.Duration{
+				1 * time.Second, 2 * time.Second,
+				4 * time.Second, 8 * time.Second,
+				16 * time.Second, 30 * time.Second,
+			},
 		})
 
 		if err != nil {
