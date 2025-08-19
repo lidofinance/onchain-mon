@@ -74,7 +74,7 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 				return sendErr
 			}
 
-			message += fmt.Sprintf("\n\nWarning: Could not send msg as markdown: %s", sendErr.Error())
+			message += "\n\nWarning: Could not send msg as markdown"
 			return t.send(ctx, message, false)
 		}
 
