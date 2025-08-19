@@ -79,25 +79,20 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 }
 
 func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	form := url.Values{}
-	form.Set("chat_id", "-"+t.chatID)
-	form.Set("text", message)
-	form.Set("disable_web_page_preview", "true")
-	form.Set("disable_notification", "true")
+	requestURL := fmt.Sprintf(
+		"https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s",
+		t.botToken,
+		t.chatID,
+		url.QueryEscape(message),
+	)
 	if useMarkdown {
-		form.Set("parse_mode", "Markdown")
+		requestURL += `&parse_mode=markdown`
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		"https://api.telegram.org/bot"+t.botToken+"/sendMessage",
-		strings.NewReader(form.Encode()),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("could not create telegram request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	start := time.Now()
 	rawResp, err := t.httpClient.Do(req)
