@@ -2,7 +2,9 @@ package notifiler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,6 +26,15 @@ type Telegram struct {
 	channelID              string
 	redisStreamName        string
 	redisConsumerGroupName string
+}
+
+var tgRes struct {
+	Ok          bool   `json:"ok"`
+	ErrorCode   int    `json:"error_code"`
+	Description string `json:"description"`
+	Parameters  struct {
+		RetryAfter int `json:"retry_after"`
+	} `json:"parameters"`
 }
 
 func NewTelegram(botToken, chatID string,
@@ -54,59 +65,77 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		WarningTelegramMessage,
 	)
 
-	if alert.Severity != databus.SeverityUnknown {
-		m := escapeMarkdownV1(message)
-
-		if sendErr := t.send(ctx, m, true); sendErr != nil {
-			message += "\n\nWarning: Could not send msg as markdown"
-			return t.send(ctx, message, false)
-		}
-
-		return nil
+	if alert.Severity == databus.SeverityUnknown {
+		return t.send(ctx, message, false)
 	}
 
-	return t.send(ctx, message, false)
+	m := escapeMarkdownV1(message)
+	if sendErr := t.send(ctx, m, true); sendErr != nil {
+		message += "\n\nWarning: Could not send msg as markdown"
+		return t.send(ctx, message, false)
+	}
+
+	return nil
 }
 
 func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	requestURL := fmt.Sprintf(
-		"https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s",
-		t.botToken,
-		t.chatID,
-		url.QueryEscape(message),
-	)
+	form := url.Values{}
+	form.Set("chat_id", "-"+t.chatID)
+	form.Set("text", message)
+	form.Set("disable_web_page_preview", "true")
+	form.Set("disable_notification", "true")
 	if useMarkdown {
-		requestURL += `&parse_mode=markdown`
+		form.Set("parse_mode", "Markdown")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, http.NoBody)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"https://api.telegram.org/bot"+t.botToken+"/sendMessage",
+		strings.NewReader(form.Encode()),
+	)
 	if err != nil {
 		return fmt.Errorf("could not create telegram request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	start := time.Now()
-
-	resp, err := t.httpClient.Do(req)
+	rawResp, err := t.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send telegram request: %w", err)
 	}
 	defer func() {
-		resp.Body.Close()
-		duration := time.Since(start).Seconds()
-		t.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: TelegramLabel}).Observe(duration)
+		rawResp.Body.Close()
+		t.metrics.SummaryHandlers.
+			With(prometheus.Labels{metrics.Channel: TelegramLabel}).
+			Observe(time.Since(start).Seconds())
 	}()
 
-	if resp.StatusCode == http.StatusTooManyRequests {
-		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
-		return ErrRateLimited
+	body, _ := io.ReadAll(rawResp.Body)
+	_ = json.Unmarshal(body, &tgRes)
+
+	if rawResp.StatusCode == http.StatusTooManyRequests || tgRes.ErrorCode == http.StatusTooManyRequests {
+		t.metrics.NotifyChannels.
+			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
+			Inc()
+
+		return fmt.Errorf("429 - Retray after: %ds: %w", tgRes.Parameters.RetryAfter, ErrRateLimited)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
-		return fmt.Errorf("received from telegram non-200 response code: %v", resp.Status)
+	if rawResp.StatusCode != http.StatusOK || !tgRes.Ok {
+		t.metrics.NotifyChannels.
+			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
+			Inc()
+
+		if tgRes.Description != "" || tgRes.ErrorCode != 0 {
+			return fmt.Errorf("telegram error: %s (%d)", tgRes.Description, tgRes.ErrorCode)
+		}
+		return fmt.Errorf("received from telegram non-200 response code: %v", rawResp.Status)
 	}
 
-	t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusOk}).Inc()
+	t.metrics.NotifyChannels.
+		With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusOk}).
+		Inc()
 	return nil
 }
 

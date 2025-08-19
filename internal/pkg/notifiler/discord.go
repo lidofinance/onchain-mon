@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -90,6 +92,15 @@ func (d *Discord) send(ctx context.Context, message string) error {
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
+		if v := resp.Header.Get("X-RateLimit-Reset-After"); v != "" {
+			resetAfter, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			if err != nil {
+				return ErrRateLimited
+			}
+
+			return fmt.Errorf("429 - Retray after: %ds: %w", int(resetAfter), ErrRateLimited)
+		}
+
 		return ErrRateLimited
 	}
 

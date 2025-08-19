@@ -60,10 +60,12 @@ func main() {
 	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	transport := &http.Transport{
-		MaxIdleConns:          30,
-		MaxIdleConnsPerHost:   5,
+		MaxIdleConns:          64,
+		MaxIdleConnsPerHost:   16,
+		MaxConnsPerHost:       12,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 5 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 

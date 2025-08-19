@@ -17,6 +17,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type worker struct {
@@ -57,6 +58,8 @@ func New(
 }
 
 const StreamWorkerSleepInterval = 200 * time.Millisecond
+const TelegramRelaxTime = 30 * time.Second
+const RelaxTime = 5 * time.Second
 
 func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 	connections := make([]jetstream.ConsumeContext, 0, len(w.consumers))
@@ -170,10 +173,26 @@ func (w *worker) SendFindings(
 							continue
 						}
 
-						if err := sender.SendFinding(ctx, &finding, quorumBy); err != nil {
+						if sendErr := sender.SendFinding(ctx, &finding, quorumBy); sendErr != nil {
+							// Requeue for retry
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+							if errors.Is(sendErr, notifiler.ErrRateLimited) {
+								// specially block goroutine, No sense for sending findings when we reached limits
+								if sender.GetType() == registry.Telegram {
+									time.Sleep(TelegramRelaxTime)
+								} else {
+									time.Sleep(RelaxTime)
+								}
+
+								_ = conn.XAdd(ctx, &redis.XAddArgs{
+									Stream: sender.GetRedisStreamName(),
+									Values: msg.Values,
+								})
+							}
+
 							w.log.Warn(
 								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again", w.instance, sender.GetType(), finding.AlertId),
-								slog.String("err", err.Error()),
+								slog.String("err", sendErr.Error()),
 								slog.String("alertId", finding.AlertId),
 								slog.String("name", finding.Name),
 								slog.String("desc", finding.Description),
@@ -182,13 +201,6 @@ func (w *worker) SendFindings(
 								slog.String("severity", string(finding.Severity)),
 								slog.String("uniqueKey", finding.UniqueKey),
 							)
-
-							// Requeue for retry
-							_ = conn.XAdd(ctx, &redis.XAddArgs{
-								Stream: sender.GetRedisStreamName(),
-								Values: msg.Values,
-							})
-							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 
 							continue
 						}
