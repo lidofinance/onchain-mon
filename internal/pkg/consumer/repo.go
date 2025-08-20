@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 )
 
@@ -26,6 +28,7 @@ func NewRepo(redisClient *redis.Client, quorumSize uint) *Repo {
 }
 
 const TTLMins12 = 12 * time.Minute
+const DedupKeyTTL = 15 * time.Minute
 const coolDownTemplate = "cooldown:%s"
 
 func (r *Repo) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
@@ -97,18 +100,44 @@ func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
 	return false, nil
 }
 
-func (r *Repo) AddIntoStream(ctx context.Context, finding []byte, sender notifiler.FindingSender, source string) (string, error) {
+func (r *Repo) AddIntoStream(
+	ctx context.Context,
+	finding *databus.FindingDtoJson,
+	sender notifiler.FindingSender,
+	source string,
+	byQuorum bool,
+) (string, error) {
+	flag := "0"
+	if byQuorum {
+		flag = "1"
+	}
+
+	bb, _ := json.Marshal(finding)
+
 	message := map[string]any{
-		"finding":  string(finding),
-		"quorumBy": source,
+		"finding":  string(bb),
+		"byQuorum": flag,
+		"source":   source,
+	}
+
+	rawKey := finding.UniqueKey + "-" + source + "-" + flag
+	hash := sha256.Sum256([]byte(rawKey))
+	dedupKey := "dedup:" + hex.EncodeToString(hash[:])
+
+	ok, err := r.redisClient.SetNX(ctx, dedupKey, 1, DedupKeyTTL).Result()
+	if err != nil {
+		return "", fmt.Errorf("failed to set dedup key: %v", err)
+	}
+	if !ok {
+		return "", nil
 	}
 
 	id, err := r.redisClient.XAdd(ctx, &redis.XAddArgs{
 		Stream: sender.GetRedisStreamName(),
 		Values: message,
 	}).Result()
-
 	if err != nil {
+		_ = r.redisClient.Del(ctx, dedupKey).Err()
 		return "", fmt.Errorf("failed to add message to stream: %v", err)
 	}
 

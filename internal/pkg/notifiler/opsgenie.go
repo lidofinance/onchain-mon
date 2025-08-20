@@ -30,6 +30,7 @@ type OpsGenie struct {
 	channelID              string
 	redisStreamName        string
 	redisConsumerGroupName string
+	source                 string
 }
 
 func NewOpsgenie(opsGenieKey string,
@@ -37,7 +38,8 @@ func NewOpsgenie(opsGenieKey string,
 	blockExplorer,
 	channelID,
 	redisStreamName,
-	redisConsumerGroupName string,
+	redisConsumerGroupName,
+	source string,
 ) *OpsGenie {
 	return &OpsGenie{
 		opsGenieKey:            opsGenieKey,
@@ -47,10 +49,12 @@ func NewOpsgenie(opsGenieKey string,
 		channelID:              channelID,
 		redisStreamName:        redisStreamName,
 		redisConsumerGroupName: redisConsumerGroupName,
+		source:                 source,
 	}
 }
 
 const OpsGenieLabel = `opsgenie`
+const OpsGenieRetryAfter = 5 * time.Second
 
 func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	opsGeniePriority := ""
@@ -108,7 +112,10 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
-		return ErrRateLimited
+		return &RateLimitedError{
+			ResetAfter: OpsGenieRetryAfter,
+			Err:        ErrRateLimited,
+		}
 	}
 
 	if resp.StatusCode != http.StatusAccepted {
@@ -129,8 +136,8 @@ func (o *OpsGenie) GetChannelID() string {
 }
 
 func (o *OpsGenie) GetRedisStreamName() string {
-	return fmt.Sprintf("%s:%s", o.redisStreamName, o.channelID)
+	return fmt.Sprintf("%s:%s:%s", o.redisStreamName, o.channelID, o.source)
 }
 func (o *OpsGenie) GetRedisConsumerGroupName() string {
-	return fmt.Sprintf("%s:%s", o.redisConsumerGroupName, o.channelID)
+	return fmt.Sprintf("%s:%s:%s", o.redisConsumerGroupName, o.channelID, o.source)
 }

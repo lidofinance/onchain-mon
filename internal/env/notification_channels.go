@@ -22,6 +22,7 @@ func NewNotificationChannels(
 	metricsStore *metrics.Store,
 	blockExplorer string,
 	redisConfig *RedisConfig,
+	source string,
 ) (*NotificationChannels, error) {
 	channels := &NotificationChannels{
 		TelegramChannels: make(map[string]*notifiler.Telegram),
@@ -39,6 +40,7 @@ func NewNotificationChannels(
 			tgChannel.ID,
 			redisConfig.TelegramStreamName,
 			redisConfig.TelegramConsumerGroupName,
+			source,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", tgChannel.ID, tgChannel.Description))
 	}
@@ -52,6 +54,7 @@ func NewNotificationChannels(
 			discordChannel.ID,
 			redisConfig.DiscordStreamName,
 			redisConfig.DiscordConsumerGroupName,
+			source,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", discordChannel.ID, discordChannel.Description))
 	}
@@ -65,6 +68,7 @@ func NewNotificationChannels(
 			opsGenieChannel.ID,
 			redisConfig.OpsGenieStreamName,
 			redisConfig.OpsGeniaConsumerGroupName,
+			source,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", opsGenieChannel.ID, opsGenieChannel.Description))
 	}
