@@ -1,0 +1,278 @@
+x-logging: &default-logging
+  options:
+    max-size: "50m"
+    max-file: "10"
+
+services:
+  # ---------- Shared Redis ----------
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    command: [ "redis-server", "--appendonly", "yes" ]
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - redis-net
+    logging: *default-logging
+
+  # ========== CELL 1 ==========
+  nats-1:
+    image: nats:2.10.20-alpine3.20
+    container_name: nats-1
+    command: >-
+      -js -c /etc/nats/nats.conf
+    environment:
+      JS_STORAGE_DIR: /data/jetstream
+    volumes:
+      - ./nats/jetstream-1:/data/jetstream
+      - ./nats/nats.conf:/etc/nats/nats.conf
+    restart: unless-stopped
+    networks: [cell1-net]
+    logging: *default-logging
+
+  forwarder-1:
+    image: lidofinance/onchain-mon:stable
+    container_name: forwarder-1
+    build: ./
+    command: [ "./forwarder" ]
+    restart: always
+    env_file: [ .env ]
+    environment:
+      READ_ENV_FROM_SHELL: "true"
+      ENV: ${ENV}
+      APP_NAME: ${APP_NAME}
+      PORT: ${PORT}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      NATS_DEFAULT_URL: http://nats-1:4222
+      REDIS_ADDRESS: redis:6379
+      REDIS_DB: ${REDIS_DB}
+      QUORUM_SIZE: ${QUORUM_SIZE}
+      SOURCE: local-1
+    depends_on: [redis, nats-1]
+    networks: [cell1-net, redis-net]
+    volumes:
+      - ./notification.yaml:/etc/forwarder/notification.yaml
+    logging: *default-logging
+
+  feeder-1:
+    image: lidofinance/onchain-mon:stable
+    container_name: feeder-1
+    build: ./
+    command: [ "./feeder" ]
+    restart: always
+    env_file: [ .env ]
+    environment:
+      READ_ENV_FROM_SHELL: "true"
+      ENV: ${ENV}
+      APP_NAME: ${APP_NAME}
+      PORT: ${PORT}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      NATS_DEFAULT_URL: http://nats-1:4222
+      REDIS_ADDRESS: redis:6379
+      BLOCK_TOPIC: blocks.mainnet.l1
+      SOURCE: local-1
+    depends_on: [redis, nats-1]
+    networks: [cell1-net, redis-net]
+    logging: *default-logging
+
+  steth-1:
+    image: monitoring/steth-v2:latest
+    container_name: ethereum-steth-v2-1
+    restart: unless-stopped
+    env_file: [ .env ]
+    environment:
+      HOME: /tmp
+      YARN_CACHE_FOLDER: /tmp/.yarn-cache
+      npm_config_prefix: /tmp/.yarn-global
+      APP_NAME: ethereum-steth-v2
+      INSTANCE: local-1
+      ETHEREUM_RPC_URL: ${JSON_RPC_URL}
+      NATS_SERVER_URL: http://nats-1:4222
+      NATS_LISTEN_TOPIC: ${BLOCK_TOPIC}
+      NATS_PUBLISH_TOPIC: ${STETH_NATS_PUBLISH_TOPIC}
+      CHAIN_ID: "1"
+      DB_FILEPATH: /data/steth.sqlite
+    depends_on: [nats-1]
+    networks: [cell1-net]
+    logging: *default-logging
+    volumes:
+      - ./steth-db/1:/data
+
+  # ========== CELL 2 ==========
+  nats-2:
+    image: nats:2.10.20-alpine3.20
+    container_name: nats-2
+    command: >-
+      -js -c /etc/nats/nats.conf
+    environment:
+      JS_STORAGE_DIR: /data/jetstream
+    volumes:
+      - ./nats/jetstream-2:/data/jetstream
+      - ./nats/nats.conf:/etc/nats/nats.conf
+    restart: unless-stopped
+    networks: [cell2-net]
+    logging: *default-logging
+
+  forwarder-2:
+    image: lidofinance/onchain-mon:stable
+    container_name: forwarder-2
+    build: ./
+    command: [ "./forwarder" ]
+    restart: always
+    env_file: [ .env ]
+    environment:
+      READ_ENV_FROM_SHELL: "true"
+      ENV: ${ENV}
+      APP_NAME: ${APP_NAME}
+      PORT: ${PORT}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      NATS_DEFAULT_URL: http://nats-2:4222
+      REDIS_ADDRESS: redis:6379
+      REDIS_DB: ${REDIS_DB}
+      QUORUM_SIZE: ${QUORUM_SIZE}
+      SOURCE: local-2
+    depends_on: [redis, nats-2]
+    networks: [cell2-net, redis-net]
+    volumes:
+      - ./notification.yaml:/etc/forwarder/notification.yaml
+    logging: *default-logging
+
+  feeder-2:
+    image: lidofinance/onchain-mon:stable
+    container_name: feeder-2
+    build: ./
+    command: [ "./feeder" ]
+    restart: always
+    env_file: [ .env ]
+    environment:
+      READ_ENV_FROM_SHELL: "true"
+      ENV: ${ENV}
+      APP_NAME: ${APP_NAME}
+      PORT: ${PORT}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      NATS_DEFAULT_URL: http://nats-2:4222
+      REDIS_ADDRESS: redis:6379
+      BLOCK_TOPIC: blocks.mainnet.l1
+      SOURCE: local-2
+    depends_on: [redis, nats-2]
+    networks: [cell2-net, redis-net]
+    logging: *default-logging
+
+  steth-2:
+    image: monitoring/steth-v2:latest
+    container_name: ethereum-steth-v2-2
+    restart: unless-stopped
+    env_file: [ .env ]
+    environment:
+      HOME: /tmp
+      YARN_CACHE_FOLDER: /tmp/.yarn-cache
+      npm_config_prefix: /tmp/.yarn-global
+      APP_NAME: ethereum-steth-v2
+      INSTANCE: local-2
+      ETHEREUM_RPC_URL: ${JSON_RPC_URL}
+      NATS_SERVER_URL: http://nats-2:4222
+      NATS_LISTEN_TOPIC: ${BLOCK_TOPIC}
+      NATS_PUBLISH_TOPIC: ${STETH_NATS_PUBLISH_TOPIC}
+      CHAIN_ID: "1"
+      DB_FILEPATH: /data/steth.sqlite
+    depends_on: [nats-2]
+    networks: [cell2-net]
+    logging: *default-logging
+    volumes:
+      - ./steth-db/2:/data
+
+  # ========== CELL 3 ==========
+  nats-3:
+    image: nats:2.10.20-alpine3.20
+    container_name: nats-3
+    command: >-
+      -js -c /etc/nats/nats.conf
+    environment:
+      JS_STORAGE_DIR: /data/jetstream
+    volumes:
+      - ./nats/jetstream-3:/data/jetstream
+      - ./nats/nats.conf:/etc/nats/nats.conf
+    restart: unless-stopped
+    networks: [cell3-net]
+    logging: *default-logging
+
+  forwarder-3:
+    image: lidofinance/onchain-mon:stable
+    container_name: forwarder-3
+    build: ./
+    command: [ "./forwarder" ]
+    restart: always
+    env_file: [ .env ]
+    environment:
+      READ_ENV_FROM_SHELL: "true"
+      ENV: ${ENV}
+      APP_NAME: ${APP_NAME}
+      PORT: ${PORT}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      NATS_DEFAULT_URL: http://nats-3:4222
+      REDIS_ADDRESS: redis:6379
+      REDIS_DB: ${REDIS_DB}
+      QUORUM_SIZE: ${QUORUM_SIZE}
+      SOURCE: local-3
+    depends_on: [redis, nats-3]
+    networks: [cell3-net, redis-net]
+    volumes:
+      - ./notification.yaml:/etc/forwarder/notification.yaml
+    logging: *default-logging
+
+  feeder-3:
+    image: lidofinance/onchain-mon:stable
+    container_name: feeder-3
+    build: ./
+    command: [ "./feeder" ]
+    restart: always
+    env_file: [ .env ]
+    environment:
+      READ_ENV_FROM_SHELL: "true"
+      ENV: ${ENV}
+      APP_NAME: ${APP_NAME}
+      PORT: ${PORT}
+      LOG_FORMAT: ${LOG_FORMAT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      NATS_DEFAULT_URL: http://nats-3:4222
+      REDIS_ADDRESS: redis:6379
+      BLOCK_TOPIC: blocks.mainnet.l1
+      SOURCE: local-3
+    depends_on: [redis, nats-3]
+    networks: [cell3-net, redis-net]
+    logging: *default-logging
+
+  steth-3:
+    env_file: [ .env ]
+    image: monitoring/steth-v2:latest
+    container_name: ethereum-steth-v2-3
+    restart: unless-stopped
+    environment:
+      HOME: /tmp
+      YARN_CACHE_FOLDER: /tmp/.yarn-cache
+      npm_config_prefix: /tmp/.yarn-global
+      APP_NAME: ethereum-steth-v2
+      INSTANCE: local-3
+      ETHEREUM_RPC_URL: ${JSON_RPC_URL}
+      NATS_SERVER_URL: http://nats-3:4222
+      NATS_LISTEN_TOPIC: ${BLOCK_TOPIC}
+      NATS_PUBLISH_TOPIC: ${STETH_NATS_PUBLISH_TOPIC}
+      CHAIN_ID: "1"
+      DB_FILEPATH: /data/steth.sqlite
+    depends_on: [nats-3]
+    networks: [cell3-net]
+    logging: *default-logging
+    volumes:
+      - ./steth-db/3:/data
+
+networks:
+  redis-net: { driver: bridge }
+  cell1-net: { driver: bridge }
+  cell2-net: { driver: bridge }
+  cell3-net: { driver: bridge }

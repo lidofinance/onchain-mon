@@ -13,13 +13,11 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
-	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type worker struct {
@@ -63,6 +61,8 @@ const StreamWorkerSleepInterval = 200 * time.Millisecond
 const TelegramRelaxTime = 30 * time.Second
 const RelaxTime = 5 * time.Second
 const MaxAttempts = 10
+const MaxAttemptsTLL = 10 * time.Minute
+const IdempotentKeyTTL = 30 * time.Minute
 
 func (w *worker) ConsumeFindings(ctx context.Context, g *errgroup.Group) error {
 	connections := make([]jetstream.ConsumeContext, 0, len(w.consumers))
@@ -121,8 +121,9 @@ func (w *worker) SendFindings(
 	g *errgroup.Group,
 	consumerName string,
 	sender notifiler.FindingSender,
-	limiter *rate.Limiter,
 ) {
+	w.log.Info(fmt.Sprintf("%s in %s by %s is started", consumerName, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName()))
+
 	g.Go(func() error {
 		conn := w.streamRedisClient.Conn()
 		defer conn.Close()
@@ -137,7 +138,7 @@ func (w *worker) SendFindings(
 					Consumer: consumerName,
 					Streams:  []string{sender.GetRedisStreamName(), ">"},
 					Count:    10,
-					Block:    5 * time.Second,
+					Block:    1 * time.Second,
 				}).Result()
 
 				if err != nil {
@@ -151,20 +152,23 @@ func (w *worker) SendFindings(
 
 				for _, str := range streams {
 					for _, msg := range str.Messages {
-						if limiter != nil && limiter.Wait(ctx) != nil {
-							w.log.Info(fmt.Sprintf("Reached limit of message %s limit. sleeping", string(sender.GetType())))
+						byQuorum, ok := msg.Values["byQuorum"].(string)
+						if !ok {
+							w.log.Error("Missing `byQuorum` field")
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+							continue
 						}
 
-						quorumBy, ok := msg.Values["quorumBy"].(string)
+						source, ok := msg.Values["source"].(string)
 						if !ok {
-							w.log.Error("Missing quorumBy")
+							w.log.Error("Missing `source` field")
 							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
 
 						findingStr, ok := msg.Values["finding"].(string)
 						if !ok {
-							w.log.Error("Missing finding field")
+							w.log.Error("Missing `finding` field")
 							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
 							continue
 						}
@@ -176,45 +180,31 @@ func (w *worker) SendFindings(
 							continue
 						}
 
-						key := fmt.Sprintf("%s_%s_%s_%s", sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), quorumBy, finding.UniqueKey)
+						key := fmt.Sprintf("%s_%s_%s", sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), finding.UniqueKey)
+						// When a finding is built by quorum, we must avoid adding extra keys,
+						// since it should remain unique across workers on different replicas.
+						if byQuorum == "0" {
+							key += "_" + source
+						}
+
 						hash := sha256.Sum256([]byte(key))
-						redisKey := fmt.Sprintf(`dropMsg:%s`, hex.EncodeToString(hash[:]))
+						attemptsKey := fmt.Sprintf(`dropMsg:%s`, hex.EncodeToString(hash[:]))
+						idempotentKey := `published:` + hex.EncodeToString(hash[:])
 
-						if sendErr := sender.SendFinding(ctx, &finding, quorumBy); sendErr != nil {
-							count, incErr := conn.Incr(ctx, redisKey).Uint64()
-							if incErr != nil {
-								w.log.Error(fmt.Sprintf(`Could not increase countKey for %s: %v`, sender.GetRedisStreamName(), err),
-									slog.String("alertId", finding.AlertId))
-								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
-								_ = conn.Del(ctx, redisKey).Err()
-								continue
-							}
-
-							if count >= MaxAttempts {
-								w.log.Error(fmt.Sprintf("Archived maximum attempts for sending message %s", finding.AlertId))
-								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
-								_ = conn.Del(ctx, redisKey).Err()
-								continue
-							}
-
-							// Requeue for retry
+						ok, err := conn.SetNX(ctx, idempotentKey, 1, IdempotentKeyTTL).Result()
+						if err != nil {
+							w.log.Error("redis SetNX failed", slog.String("err", err.Error()))
 							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
-							if errors.Is(sendErr, notifiler.ErrRateLimited) {
-								// specially block goroutine, No sense for sending findings when we reached limits
-								if sender.GetType() == registry.Telegram {
-									time.Sleep(TelegramRelaxTime)
-								} else {
-									time.Sleep(RelaxTime)
-								}
+							continue
+						}
+						if !ok {
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+							continue
+						}
 
-								_ = conn.XAdd(ctx, &redis.XAddArgs{
-									Stream: sender.GetRedisStreamName(),
-									Values: msg.Values,
-								})
-							}
-
-							w.log.Warn(
-								fmt.Sprintf("%s[%s] could not sent finding[%s]. Put onto queue again", w.instance, sender.GetType(), finding.AlertId),
+						if sendErr := sender.SendFinding(ctx, &finding, source); sendErr != nil {
+							w.log.Error(
+								fmt.Sprintf("%s[%s] could not sent finding[%s]", w.instance, sender.GetType(), finding.AlertId),
 								slog.String("err", sendErr.Error()),
 								slog.String("alertId", finding.AlertId),
 								slog.String("name", finding.Name),
@@ -224,6 +214,59 @@ func (w *worker) SendFindings(
 								slog.String("severity", string(finding.Severity)),
 								slog.String("uniqueKey", finding.UniqueKey),
 							)
+
+							count, incErr := conn.Incr(ctx, attemptsKey).Uint64()
+							w.log.Info(fmt.Sprintf("Count %d ", count))
+
+							if incErr == nil && count == 1 {
+								conn.Expire(ctx, attemptsKey, MaxAttemptsTLL)
+							}
+
+							if incErr != nil {
+								w.log.Error(fmt.Sprintf(`Could not increase countKey for %s: %v`, sender.GetRedisStreamName(), err),
+									slog.String("alertId", finding.AlertId))
+								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+								_ = conn.Del(ctx, attemptsKey).Err()
+								_ = conn.Del(ctx, idempotentKey).Err()
+								continue
+							}
+
+							if count >= MaxAttempts {
+								w.log.Error(fmt.Sprintf("Achieved maximum attempts for sending message %s", finding.AlertId))
+								_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+								_ = conn.Del(ctx, attemptsKey).Err()
+								_ = conn.Del(ctx, idempotentKey).Err()
+								continue
+							}
+
+							_ = conn.Del(ctx, idempotentKey).Err()
+							// Requeue for retry
+							_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
+
+							var rle *notifiler.RateLimitedError
+							if errors.As(sendErr, &rle) {
+								backoff := rle.ResetAfter + 500*time.Millisecond
+								time.Sleep(backoff)
+
+								if err = conn.XAdd(ctx, &redis.XAddArgs{
+									Stream: sender.GetRedisStreamName(),
+									Values: msg.Values,
+								}).Err(); err != nil {
+									w.log.Error(fmt.Sprintf("Failed to reput message to redis stream %s: %v", sender.GetRedisStreamName(), err))
+								}
+
+								w.log.Info(
+									fmt.Sprintf("%s[%s] put finding[%s] onto queue again", w.instance, sender.GetType(), finding.AlertId),
+									slog.String("err", sendErr.Error()),
+									slog.String("alertId", finding.AlertId),
+									slog.String("name", finding.Name),
+									slog.String("desc", finding.Description),
+									slog.String("instance", w.instance),
+									slog.String("bot-name", finding.BotName),
+									slog.String("severity", string(finding.Severity)),
+									slog.String("uniqueKey", finding.UniqueKey),
+								)
+							}
 
 							continue
 						}
@@ -239,8 +282,10 @@ func (w *worker) SendFindings(
 							slog.String("uniqueKey", finding.UniqueKey),
 						)
 
-						_ = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err()
-						_ = conn.Del(ctx, redisKey).Err()
+						if err = conn.XAck(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), msg.ID).Err(); err != nil {
+							w.log.Error("redis XAck failed", slog.String("err", err.Error()))
+						}
+						_ = conn.Del(ctx, attemptsKey).Err()
 					}
 				}
 			}

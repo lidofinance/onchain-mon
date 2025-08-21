@@ -207,26 +207,16 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		}
 
 		if !c.byQuorum {
-			if sendErr := c.notifier.SendFinding(ctx, finding, c.instance); sendErr != nil {
-				if errors.Is(sendErr, notifiler.ErrRateLimited) {
-					_, putOnStreamErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
-					if putOnStreamErr != nil {
-						c.logError(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr), finding)
+			_, putOnStreamErr := c.repo.AddIntoStream(ctx, finding, c.notifier, c.instance, false)
+			if putOnStreamErr != nil {
+				c.logError(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr), finding)
 
-						c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-						c.nackDelayMessage(msg, NackDelayMsg)
-						return
-					}
-				} else {
-					c.logError(fmt.Sprintf(`Could not send debug-finding: %v`, sendErr), finding)
-
-					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-					c.nackDelayMessage(msg, NackDelayMsg)
-					return
-				}
+				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+				c.nackDelayMessage(msg, NackDelayMsg)
+				return
 			}
 
-			msgInfo := fmt.Sprintf("%s: put %s without quorum by %s", c.instance, finding.AlertId, finding.BotName)
+			msgInfo := fmt.Sprintf("%s: put %s into redis-debug-queue", c.instance, finding.AlertId)
 			if finding.BlockNumber != nil {
 				msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 			}
@@ -396,7 +386,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					if sendErr := c.notifier.SendFinding(ctx, finding, c.instance); sendErr != nil {
 						// When we found 429 - put finding into redis-queue for delayed sending
 						if errors.Is(sendErr, notifiler.ErrRateLimited) {
-							_, putOnStreamErr := c.repo.AddIntoStream(ctx, msg.Data(), c.notifier, c.instance)
+							_, putOnStreamErr := c.repo.AddIntoStream(ctx, finding, c.notifier, c.instance, true)
 							if putOnStreamErr != nil {
 								c.logError(fmt.Sprintf(`Could not push msg into redis queue: %v`, putOnStreamErr), finding)
 								c.failAndNack(ctx, msg, countKey, statusKey)

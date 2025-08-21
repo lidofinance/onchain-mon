@@ -15,7 +15,6 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 
 	"github.com/lidofinance/onchain-mon/internal/app/forwarder"
 	"github.com/lidofinance/onchain-mon/internal/app/server"
@@ -84,6 +83,7 @@ func main() {
 		metricsStore,
 		cfg.AppConfig.BlockExplorer,
 		&cfg.AppConfig.RedisConfig,
+		cfg.AppConfig.Source,
 	)
 	if err != nil {
 		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
@@ -173,21 +173,19 @@ func main() {
 	)
 
 	for _, sender := range notificationChannels.TelegramChannels {
-		_ = rds.XGroupDestroy(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName()).Err()
-		_ = rds.Del(ctx, sender.GetRedisStreamName()).Err()
-
+		//nolint:gocritic - cause usefull for cleaning streams, consumer groups
+		// _ = rds.XGroupDestroy(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName()).Err()
+		// _ = rds.Del(ctx, sender.GetRedisStreamName()).Err()
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
+				return
 			}
 		}
 
-		tgLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
-
 		worker.SendFindings(gCtx, g,
-			fmt.Sprintf("telegram-consumer-%s-%s", cfg.AppConfig.Source, sender.GetChannelID()),
+			fmt.Sprintf("telegram-consumer-%s-%s", sender.GetChannelID(), cfg.AppConfig.Source),
 			sender,
-			tgLimiter,
 		)
 	}
 
@@ -195,15 +193,13 @@ func main() {
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
+				return
 			}
 		}
 
-		discordLimiter := rate.NewLimiter(rate.Every(2*time.Second), 1)
-
 		worker.SendFindings(gCtx, g,
-			fmt.Sprintf("discord-consumer-%s-%s", cfg.AppConfig.Source, sender.GetChannelID()),
+			fmt.Sprintf("discord-consumer-%s-%s", sender.GetChannelID(), cfg.AppConfig.Source),
 			sender,
-			discordLimiter,
 		)
 	}
 
@@ -211,20 +207,18 @@ func main() {
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
 			if err.Error() != ConsumerGroupExists {
 				log.Error(fmt.Sprintf("Error creating %s stream: %v", sender.GetRedisStreamName(), err))
+				return
 			}
 		}
 
-		opsGenieLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
-
 		worker.SendFindings(gCtx, g,
-			fmt.Sprintf("opsgenie-consumer-%s-%s", cfg.AppConfig.Source, sender.GetChannelID()),
+			fmt.Sprintf("opsgenie-consumer-%s-%s", sender.GetChannelID(), cfg.AppConfig.Source),
 			sender,
-			opsGenieLimiter,
 		)
 	}
 
 	if err = worker.ConsumeFindings(gCtx, g); err != nil {
-		fmt.Println("Could not findings consumer:", err.Error())
+		log.Error(fmt.Sprintf("Could not findings consumer: %s", err))
 		return
 	}
 

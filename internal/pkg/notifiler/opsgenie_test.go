@@ -88,6 +88,7 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 				`channelId`,
 				`opsgenie`,
 				`redis-consumer-group-name`,
+				`local`,
 			)
 			if err := u.SendFinding(tt.args.ctx, tt.args.alert, `unit-test-local`); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)

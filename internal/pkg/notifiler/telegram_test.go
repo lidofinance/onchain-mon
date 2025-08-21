@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -194,6 +195,20 @@ func Test_SendFinding(t *testing.T) {
 	promRegistry := prometheus.NewRegistry()
 	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
+	transport := &http.Transport{
+		MaxIdleConns:          64,
+		MaxIdleConnsPerHost:   16,
+		MaxConnsPerHost:       12,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
 	type fields struct {
 		botToken     string
 		chatID       string
@@ -247,7 +262,7 @@ Withdrawals info:
 			fields: fields{
 				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
 				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
-				httpClient:   &http.Client{},
+				httpClient:   httpClient,
 				metricsStore: metricsStore,
 			},
 			args: args{
@@ -272,7 +287,7 @@ Withdrawals info:
 			fields: fields{
 				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
 				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
-				httpClient:   &http.Client{},
+				httpClient:   httpClient,
 				metricsStore: metricsStore,
 			},
 			args: args{
@@ -303,6 +318,7 @@ Withdrawals info:
 				`channelId`,
 				`redis-stream-name`,
 				`redis-consumer-group-name`,
+				`local`,
 			)
 			if err := u.SendFinding(tt.args.ctx, tt.args.alert, `unit-test-local`); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)

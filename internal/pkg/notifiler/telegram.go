@@ -27,6 +27,7 @@ type Telegram struct {
 	channelID              string
 	redisStreamName        string
 	redisConsumerGroupName string
+	source                 string
 }
 
 type tgRes struct {
@@ -41,7 +42,7 @@ type tgRes struct {
 func NewTelegram(botToken, chatID string,
 	httpClient *http.Client, metricsStore *metrics.Store,
 	blockExplorer, channelID,
-	redisStreamName, redisConsumerGroupName string,
+	redisStreamName, redisConsumerGroupName, source string,
 ) *Telegram {
 	return &Telegram{
 		botToken:               botToken,
@@ -52,12 +53,14 @@ func NewTelegram(botToken, chatID string,
 		channelID:              channelID,
 		redisStreamName:        redisStreamName,
 		redisConsumerGroupName: redisConsumerGroupName,
+		source:                 source,
 	}
 }
 
 const MaxTelegramMessageLength = 4096
 const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message"
 const TelegramLabel = `telegram`
+const TelegramRetryAfter = 30 * time.Second
 
 func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	message := TruncateMessageWithAlertID(
@@ -70,12 +73,11 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		m := escapeMarkdownV1(message)
 
 		if sendErr := t.send(ctx, m, true); sendErr != nil {
-			if errors.Is(sendErr, ErrRateLimited) {
-				return sendErr
+			if errors.Is(sendErr, ErrMarkdownParse) {
+				return t.send(ctx, message+"\n\nWarning: Could not send msg as markdown", false)
 			}
 
-			message += "\n\nWarning: Could not send msg as markdown"
-			return t.send(ctx, message, false)
+			return sendErr
 		}
 
 		return nil
@@ -121,7 +123,14 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
 			Inc()
 
-		return fmt.Errorf("429 - Retray after: %ds: %w", resp.Parameters.RetryAfter, ErrRateLimited)
+		return &RateLimitedError{
+			ResetAfter: time.Duration(resp.Parameters.RetryAfter) * time.Second,
+			Err:        ErrRateLimited,
+		}
+	}
+
+	if rawResp.StatusCode >= http.StatusBadRequest && rawResp.StatusCode < http.StatusInternalServerError {
+		return fmt.Errorf("%w: %s", ErrMarkdownParse, resp.Description)
 	}
 
 	if rawResp.StatusCode != http.StatusOK || !resp.Ok {
@@ -148,10 +157,10 @@ func (t *Telegram) GetChannelID() string {
 	return t.channelID
 }
 func (t *Telegram) GetRedisStreamName() string {
-	return fmt.Sprintf("%s:%s", t.redisStreamName, t.channelID)
+	return fmt.Sprintf("%s:%s:%s", t.redisStreamName, t.channelID, t.source)
 }
 func (t *Telegram) GetRedisConsumerGroupName() string {
-	return fmt.Sprintf("%s:%s", t.redisConsumerGroupName, t.channelID)
+	return fmt.Sprintf("%s:%s:%s", t.redisConsumerGroupName, t.channelID, t.source)
 }
 
 // Telegram supports two versions of markdown. V1, V2

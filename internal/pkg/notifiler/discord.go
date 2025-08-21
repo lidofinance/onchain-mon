@@ -25,6 +25,7 @@ type Discord struct {
 	channelID              string
 	redisStreamName        string
 	redisConsumerGroupName string
+	source                 string
 }
 
 type MessagePayload struct {
@@ -36,7 +37,7 @@ const DiscordLabel = `discord`
 func NewDiscord(
 	webhookURL string, httpClient *http.Client,
 	metricsStore *metrics.Store, blockExplorer, channelID,
-	redisStreamName, redisConsumerGroupName string,
+	redisStreamName, redisConsumerGroupName, source string,
 ) *Discord {
 	return &Discord{
 		webhookURL:             webhookURL,
@@ -46,11 +47,13 @@ func NewDiscord(
 		channelID:              channelID,
 		redisStreamName:        redisStreamName,
 		redisConsumerGroupName: redisConsumerGroupName,
+		source:                 source,
 	}
 }
 
 const MaxDiscordMsgLength = 2000
 const WarningDiscordMessage = "Warn: Msg >=2000, pls review description message"
+const DiscordRetryAfter = 10 * time.Second
 
 func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	message := TruncateMessageWithAlertID(
@@ -95,13 +98,22 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		if v := resp.Header.Get("X-RateLimit-Reset-After"); v != "" {
 			resetAfter, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
 			if err != nil {
-				return ErrRateLimited
+				return &RateLimitedError{
+					ResetAfter: DiscordRetryAfter,
+					Err:        ErrRateLimited,
+				}
 			}
 
-			return fmt.Errorf("429 - Retray after: %ds: %w", int(resetAfter), ErrRateLimited)
+			return &RateLimitedError{
+				ResetAfter: time.Duration(int(resetAfter)) * time.Second,
+				Err:        ErrRateLimited,
+			}
 		}
 
-		return ErrRateLimited
+		return &RateLimitedError{
+			ResetAfter: DiscordRetryAfter,
+			Err:        ErrRateLimited,
+		}
 	}
 
 	if resp.StatusCode != http.StatusNoContent {
@@ -120,8 +132,8 @@ func (d *Discord) GetChannelID() string {
 	return d.channelID
 }
 func (d *Discord) GetRedisStreamName() string {
-	return fmt.Sprintf("%s:%s", d.redisStreamName, d.channelID)
+	return fmt.Sprintf("%s:%s:%s", d.redisStreamName, d.channelID, d.source)
 }
 func (d *Discord) GetRedisConsumerGroupName() string {
-	return fmt.Sprintf("%s:%s", d.redisConsumerGroupName, d.channelID)
+	return fmt.Sprintf("%s:%s:%s", d.redisConsumerGroupName, d.channelID, d.source)
 }
