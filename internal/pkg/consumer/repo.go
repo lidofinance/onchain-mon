@@ -120,7 +120,7 @@ func (r *Repo) AddIntoStream(
 		"source":   source,
 	}
 
-	rawKey := finding.UniqueKey + "-" + source + "-" + flag
+	rawKey := sender.GetRedisStreamName() + "-" + sender.GetRedisConsumerGroupName() + "-" + finding.UniqueKey + "-" + flag
 	hash := sha256.Sum256([]byte(rawKey))
 	dedupKey := "dedup:" + hex.EncodeToString(hash[:])
 

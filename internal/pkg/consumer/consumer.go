@@ -216,7 +216,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				return
 			}
 
-			msgInfo := fmt.Sprintf("%s: put %s into redis-debug-queue", c.instance, finding.AlertId)
+			msgInfo := fmt.Sprintf("%s: put %s into %s", c.instance, finding.AlertId, c.notifier.GetRedisStreamName())
 			if finding.BlockNumber != nil {
 				msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 			}
@@ -231,6 +231,8 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				slog.String("bot-name", finding.BotName),
 				slog.String("severity", string(finding.Severity)),
 				slog.String("uniqueKey", finding.UniqueKey),
+				slog.String("redisStream", c.notifier.GetRedisStreamName()),
+				slog.String("redisConsumerGroup", c.notifier.GetRedisStreamName()),
 			)
 
 			c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()

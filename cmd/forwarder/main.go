@@ -173,7 +173,7 @@ func main() {
 	)
 
 	for _, sender := range notificationChannels.TelegramChannels {
-		//nolint:gocritic - cause usefull for cleaning streams, consumer groups
+		//nolint:gocritic - cause useful for cleaning streams, consumer groups
 		// _ = rds.XGroupDestroy(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName()).Err()
 		// _ = rds.Del(ctx, sender.GetRedisStreamName()).Err()
 		if err = rds.XGroupCreateMkStream(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName(), "$").Err(); err != nil {
