@@ -30,7 +30,7 @@ type Consumer struct {
 	redisClient *redis.Client
 	repo        *Repo
 
-	instance         string
+	source           string
 	name             string
 	subject          string
 	severitySet      registry.FindingMapping
@@ -48,7 +48,7 @@ func New(
 	cache *expirable.LRU[string, uint],
 	redisClient *redis.Client,
 	repo *Repo,
-	instance string,
+	source string,
 	consumerName,
 	subject string,
 	severitySet registry.FindingMapping,
@@ -64,7 +64,7 @@ func New(
 		redisClient: redisClient,
 		repo:        repo,
 
-		instance:         instance,
+		source:           source,
 		name:             consumerName,
 		subject:          subject,
 		severitySet:      severitySet,
@@ -79,7 +79,7 @@ func NewConsumers(
 	log *slog.Logger,
 	mtr *metrics.Store,
 	redisClient *redis.Client,
-	instance string,
+	source string,
 	repo *Repo,
 	quorumSize uint,
 	cfg *env.NotificationConfig,
@@ -127,7 +127,7 @@ func NewConsumers(
 
 			consumer := New(
 				log, mtr, cache, redisClient, repo,
-				instance,
+				source,
 				consumerName,
 				subject,
 				consumerCfg.SeveritySet,
@@ -207,33 +207,51 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 		}
 
 		if !c.byQuorum {
-			_, putOnStreamErr := c.repo.AddIntoStream(ctx, finding, c.notifier, c.instance, false)
-			if putOnStreamErr != nil {
-				c.logError(fmt.Sprintf(`Could not push debug-fidning into redis queue: %v`, putOnStreamErr), finding)
+			debugTmpl := strings.Join([]string{`debug`, c.source, c.name, finding.UniqueKey}, "-")
+			debugHash := sha256.Sum256([]byte(debugTmpl))
+			dedupKey := hex.EncodeToString(debugHash[:])
 
+			ok, err := c.redisClient.SetNX(ctx, dedupKey, 1, DedupKeyTTL).Result()
+			if err != nil {
+				c.log.Error(fmt.Sprintf(`"%s[%s] Failed to set dedup key to[%s]%s`, c.source, c.notifier.GetType(), finding.AlertId, dedupKey))
+				c.nackMessage(msg)
+				return
+			}
+
+			if !ok {
+				c.ackMessage(msg)
+				return
+			}
+
+			if sendErr := c.notifier.SendFinding(ctx, finding, c.source); sendErr != nil {
+				_ = c.redisClient.Del(ctx, dedupKey).Err()
+
+				var rle *notifiler.RateLimitedError
+				if errors.As(sendErr, &rle) {
+					debugMsgInfo := fmt.Sprintf("%s[%s] put debug-finding back[%s] into nats:%s. cause: %v",
+						c.source, c.notifier.GetType(), finding.AlertId, c.name, sendErr,
+					)
+					c.logError(debugMsgInfo, finding)
+					backoff := rle.ResetAfter + 500*time.Millisecond
+					c.nackDelayMessage(msg, backoff)
+					return
+				}
+
+				c.logError(
+					fmt.Sprintf(`%s[%s] сould not send debug-fidning[%s]: %v`,
+						c.source, c.notifier.GetType(), finding.AlertId, sendErr),
+					finding,
+				)
 				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
 				c.nackDelayMessage(msg, NackDelayMsg)
 				return
 			}
 
-			msgInfo := fmt.Sprintf("%s: put %s into %s", c.instance, finding.AlertId, c.notifier.GetRedisStreamName())
+			dbgMsgInfo := fmt.Sprintf("%s[%s] sent debug-finding %s[%s]", c.source, c.notifier.GetType(), c.name, finding.AlertId)
 			if finding.BlockNumber != nil {
-				msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
+				dbgMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 			}
-
-			c.log.Info(
-				msgInfo,
-				slog.String("alertId", finding.AlertId),
-				slog.String("name", finding.Name),
-				slog.String("desc", finding.Description),
-				slog.String("setBy", c.instance),
-				slog.String("consumer", c.name),
-				slog.String("bot-name", finding.BotName),
-				slog.String("severity", string(finding.Severity)),
-				slog.String("uniqueKey", finding.UniqueKey),
-				slog.String("redisStream", c.notifier.GetRedisStreamName()),
-				slog.String("redisConsumerGroup", c.notifier.GetRedisStreamName()),
-			)
+			c.logInfo(dbgMsgInfo, finding)
 
 			c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 			c.ackMessage(msg)
@@ -305,23 +323,14 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 		touchTimes, _ := c.cache.Get(countKey)
 
-		msgInfo := fmt.Sprintf("%s: %s-%s read %d times. %s...%s",
-			c.name, finding.BotName, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:],
+		msgInfo := fmt.Sprintf("%s[%s] %s-%s read %d times. %s...%s",
+			c.source, c.notifier.GetType(), finding.BotName, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:],
 		)
 		if finding.BlockNumber != nil {
 			msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 		}
 
-		c.log.Info(msgInfo,
-			slog.String("alertId", finding.AlertId),
-			slog.String("name", finding.Name),
-			slog.String("desc", finding.Description),
-			slog.String("setBy", c.instance),
-			slog.String("consumer", c.name),
-			slog.String("bot-name", finding.BotName),
-			slog.String("severity", string(finding.Severity)),
-			slog.String("uniqueKey", finding.UniqueKey),
-		)
+		c.logInfo(msgInfo, finding)
 
 		if uint(count) >= c.quorumSize {
 			status, err := c.repo.GetStatus(ctx, statusKey)
@@ -330,13 +339,13 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 				c.mtrs.RedisErrors.Inc()
 				c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
-				c.nackMessage(msg)
+				c.nackDelayMessage(msg, 1*time.Second)
 				return
 			}
 
 			if status == StatusSending {
-				c.log.Info(fmt.Sprintf("%s[%s] - another instance is sending finding: %s", c.instance, c.notifier.GetType(), finding.AlertId))
-				c.nackMessage(msg)
+				c.log.Info(fmt.Sprintf("%s[%s] - another instance is sending finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
+				c.nackDelayMessage(msg, 1*time.Second)
 				return
 			}
 
@@ -356,7 +365,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					c.mtrs.RedisErrors.Inc()
 				}
 
-				c.log.Info(fmt.Sprintf("%s[%s] - another instance already sent finding: %s", c.instance, c.notifier.GetType(), finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] - another instance already sent finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
 				return
 			}
 
@@ -374,9 +383,9 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					return
 				}
 
-				readyToSend, err := c.repo.SetSendingStatus(ctx, countKey, statusKey)
-				if err != nil {
-					c.logError(fmt.Sprintf(`Could not check notification status for AlertID: %s: %v`, finding.AlertId, err), finding)
+				readyToSend, setSendStatusErr := c.repo.SetSendingStatus(ctx, countKey, statusKey)
+				if setSendStatusErr != nil {
+					c.logError(fmt.Sprintf(`Could not check notification status for AlertID: %s: %v`, finding.AlertId, setSendStatusErr), finding)
 
 					c.mtrs.RedisErrors.Inc()
 					c.nackMessage(msg)
@@ -385,58 +394,60 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 				if readyToSend {
 					// Sends via notification channel {Tg, Discord, OpsGenia}
-					if sendErr := c.notifier.SendFinding(ctx, finding, c.instance); sendErr != nil {
-						// When we found 429 - put finding into redis-queue for delayed sending
-						if errors.Is(sendErr, notifiler.ErrRateLimited) {
-							_, putOnStreamErr := c.repo.AddIntoStream(ctx, finding, c.notifier, c.instance, true)
-							if putOnStreamErr != nil {
-								c.logError(fmt.Sprintf(`Could not push msg into redis queue: %v`, putOnStreamErr), finding)
-								c.failAndNack(ctx, msg, countKey, statusKey)
-								return
+					if sendErr := c.notifier.SendFinding(ctx, finding, c.source); sendErr != nil {
+						if quorumKeyCount, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
+							c.mtrs.RedisErrors.Inc()
+							c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
+						} else if quorumKeyCount <= 0 {
+							if err := c.redisClient.Del(ctx, countKey).Err(); err != nil {
+								c.mtrs.RedisErrors.Inc()
+								c.log.Error(fmt.Sprintf(`Could not delete countKey %s: %v`, countKey, err))
 							}
+						}
 
-							quorumMsgInfo := fmt.Sprintf("%s pushed quorum-finding into %s stream %s[%s]",
-								c.instance, c.notifier.GetChannelID(), finding.BotName, finding.AlertId,
+						if err := c.redisClient.Del(ctx, statusKey).Err(); err != nil {
+							c.mtrs.RedisErrors.Inc()
+							c.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
+						}
+
+						c.cache.Remove(countKey)
+						c.mtrs.SentAlerts.With(prometheus.Labels{
+							metrics.ConsumerName: c.name,
+							metrics.Status:       metrics.StatusFail,
+						}).Inc()
+
+						var rle *notifiler.RateLimitedError
+						if errors.As(sendErr, &rle) {
+							quorumMsgInfo := fmt.Sprintf(
+								"%s[%s] put quorum-finding back[%s] into nats:%s. Cause: %v",
+								c.source, c.notifier.GetType(), finding.AlertId, c.name, sendErr,
 							)
 							if finding.BlockNumber != nil {
 								quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 							}
+							c.logInfo(quorumMsgInfo, finding)
 
-							c.log.Info(
-								quorumMsgInfo,
-								slog.String("alertId", finding.AlertId),
-								slog.String("name", finding.Name),
-								slog.String("desc", finding.Description),
-								slog.String("setBy", c.instance),
-								slog.String("consumer", c.name),
-								slog.String("bot-name", finding.BotName),
-								slog.String("severity", string(finding.Severity)),
-								slog.String("uniqueKey", finding.UniqueKey),
-							)
-						} else {
-							c.logError(fmt.Sprintf(`Could not send quorum-finding: %v`, sendErr), finding)
-							c.failAndNack(ctx, msg, countKey, statusKey)
+							backoff := rle.ResetAfter + 500*time.Millisecond
+							c.nackDelayMessage(msg, backoff)
 							return
 						}
-					} else {
-						quorumMsgInfo := fmt.Sprintf("%s[%s] send finding %s[%s]", c.instance, c.notifier.GetType(), finding.BotName, finding.AlertId)
-						if finding.BlockNumber != nil {
-							quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
-						}
 
-						c.log.Info(
-							quorumMsgInfo,
-							slog.String("alertId", finding.AlertId),
-							slog.String("name", finding.Name),
-							slog.String("desc", finding.Description),
-							slog.String("setBy", c.instance),
-							slog.String("consumer", c.name),
-							slog.String("bot-name", finding.BotName),
-							slog.String("severity", string(finding.Severity)),
-							slog.String("uniqueKey", finding.UniqueKey),
+						c.logError(
+							fmt.Sprintf(`%s[%s] сould not send qourum-fidning[%s]: %v`,
+								c.source, c.notifier.GetType(), finding.AlertId, sendErr),
+							finding,
 						)
+						c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusFail}).Inc()
+						c.nackDelayMessage(msg, NackDelayMsg)
+						return
 					}
 
+					quorumMsgInfo := fmt.Sprintf("%s[%s] sent quorum-finding %s[%s]", c.source, c.notifier.GetType(), c.name, finding.AlertId)
+					if finding.BlockNumber != nil {
+						quorumMsgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
+					}
+
+					c.logInfo(quorumMsgInfo, finding)
 					c.mtrs.SentAlerts.With(prometheus.Labels{metrics.ConsumerName: c.name, metrics.Status: metrics.StatusOk}).Inc()
 					c.ackMessage(msg)
 
@@ -479,44 +490,27 @@ func (c *Consumer) ackMessage(msg jetstream.Msg) {
 	}
 }
 
-func (c *Consumer) failAndNack(
-	ctx context.Context,
-	msg jetstream.Msg,
-	countKey, statusKey string,
-) {
-	if count, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
-		c.mtrs.RedisErrors.Inc()
-		c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))
-	} else if count <= 0 {
-		if err := c.redisClient.Del(ctx, countKey).Err(); err != nil {
-			c.mtrs.RedisErrors.Inc()
-			c.log.Error(fmt.Sprintf(`Could not delete countKey %s: %v`, countKey, err))
-		}
-	}
-
-	if err := c.redisClient.Del(ctx, statusKey).Err(); err != nil {
-		c.mtrs.RedisErrors.Inc()
-		c.log.Error(fmt.Sprintf(`Could not delete statusKey %s: %v`, statusKey, err))
-	}
-
-	c.cache.Remove(countKey)
-
-	c.mtrs.SentAlerts.With(prometheus.Labels{
-		metrics.ConsumerName: c.name,
-		metrics.Status:       metrics.StatusFail,
-	}).Inc()
-
-	c.nackMessage(msg)
-}
-
 func (c *Consumer) logError(errMsg string, finding *databus.FindingDtoJson) {
 	c.log.Error(errMsg,
 		slog.String("alertId", finding.AlertId),
 		slog.String("name", finding.Name),
 		slog.String("desc", finding.Description),
-		slog.String("setBy", c.instance),
-		slog.String("consumer", c.name),
-		slog.String("bot-name", finding.BotName),
+		slog.String("source", c.source),
+		slog.String("consumerName", c.name),
+		slog.String("botName", finding.BotName),
+		slog.String("severity", string(finding.Severity)),
+		slog.String("uniqueKey", finding.UniqueKey),
+	)
+}
+
+func (c *Consumer) logInfo(infoMsg string, finding *databus.FindingDtoJson) {
+	c.log.Info(infoMsg,
+		slog.String("alertId", finding.AlertId),
+		slog.String("name", finding.Name),
+		slog.String("desc", finding.Description),
+		slog.String("source", c.source),
+		slog.String("consumerName", c.name),
+		slog.String("botName", finding.BotName),
 		slog.String("severity", string(finding.Severity)),
 		slog.String("uniqueKey", finding.UniqueKey),
 	)
