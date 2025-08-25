@@ -172,7 +172,7 @@ func main() {
 		notificationChannels,
 	)
 
-	for _, sender := range notificationChannels.TelegramChannels {
+	/*for _, sender := range notificationChannels.TelegramChannels {
 		//nolint:gocritic - cause useful for cleaning streams, consumer groups
 		// _ = rds.XGroupDestroy(ctx, sender.GetRedisStreamName(), sender.GetRedisConsumerGroupName()).Err()
 		// _ = rds.Del(ctx, sender.GetRedisStreamName()).Err()
@@ -215,7 +215,7 @@ func main() {
 			fmt.Sprintf("opsgenie-consumer-%s-%s", sender.GetChannelID(), cfg.AppConfig.Source),
 			sender,
 		)
-	}
+	}*/
 
 	if err = worker.ConsumeFindings(gCtx, g); err != nil {
 		log.Error(fmt.Sprintf("Could not findings consumer: %s", err))
