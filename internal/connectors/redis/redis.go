@@ -10,10 +10,8 @@ import (
 )
 
 var (
-	writeClientOnce  sync.Once
-	streamClientOnce sync.Once
-	writeClient      *redis.Client
-	streamClient     *redis.Client
+	writeClientOnce sync.Once
+	writeClient     *redis.Client
 )
 
 func NewRedisClient(addr string, db int, log *slog.Logger, poolSize int) (*redis.Client, error) {
@@ -51,47 +49,4 @@ func NewRedisClient(addr string, db int, log *slog.Logger, poolSize int) (*redis
 		err = pingErr
 	}
 	return writeClient, err
-}
-
-const MinPoolSize = 20
-
-func NewStreamClient(addr string, db, streamWorkers int, log *slog.Logger) (*redis.Client, error) {
-	var err error
-
-	streamClientOnce.Do(func() {
-		pool := streamWorkers + 8
-		if pool < MinPoolSize {
-			pool = MinPoolSize
-		}
-		streamClient = redis.NewClient(&redis.Options{
-			Addr: addr,
-			DB:   db,
-
-			MaxRetries:      1,
-			MinRetryBackoff: 20 * time.Millisecond,
-			MaxRetryBackoff: 200 * time.Millisecond,
-
-			DialTimeout:  3 * time.Second,
-			ReadTimeout:  -1, // Nonblock for streams
-			WriteTimeout: 2 * time.Second,
-
-			PoolSize:     pool,
-			MinIdleConns: streamWorkers,
-			PoolTimeout:  2 * time.Second,
-
-			ConnMaxIdleTime: 10 * time.Minute,
-
-			OnConnect: func(_ context.Context, _ *redis.Conn) error {
-				log.Info("redis(stream): connected")
-				return nil
-			},
-		})
-	})
-
-	pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if pingErr := streamClient.Ping(pingCtx).Err(); pingErr != nil {
-		err = pingErr
-	}
-	return streamClient, err
 }

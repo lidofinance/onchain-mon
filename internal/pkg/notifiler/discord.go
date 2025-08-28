@@ -18,14 +18,10 @@ import (
 )
 
 type Discord struct {
-	webhookURL             string
-	httpClient             *http.Client
-	metrics                *metrics.Store
-	blockExplorer          string
-	channelID              string
-	redisStreamName        string
-	redisConsumerGroupName string
-	source                 string
+	webhookURL    string
+	httpClient    *http.Client
+	metrics       *metrics.Store
+	blockExplorer string
 }
 
 type MessagePayload struct {
@@ -35,19 +31,16 @@ type MessagePayload struct {
 const DiscordLabel = `discord`
 
 func NewDiscord(
-	webhookURL string, httpClient *http.Client,
-	metricsStore *metrics.Store, blockExplorer, channelID,
-	redisStreamName, redisConsumerGroupName, source string,
+	webhookURL string,
+	httpClient *http.Client,
+	metricsStore *metrics.Store,
+	blockExplorer string,
 ) *Discord {
 	return &Discord{
-		webhookURL:             webhookURL,
-		httpClient:             httpClient,
-		metrics:                metricsStore,
-		blockExplorer:          blockExplorer,
-		channelID:              channelID,
-		redisStreamName:        redisStreamName,
-		redisConsumerGroupName: redisConsumerGroupName,
-		source:                 source,
+		webhookURL:    webhookURL,
+		httpClient:    httpClient,
+		metrics:       metricsStore,
+		blockExplorer: blockExplorer,
 	}
 }
 
@@ -127,13 +120,4 @@ func (d *Discord) send(ctx context.Context, message string) error {
 
 func (d *Discord) GetType() registry.NotificationChannel {
 	return registry.Discord
-}
-func (d *Discord) GetChannelID() string {
-	return d.channelID
-}
-func (d *Discord) GetRedisStreamName() string {
-	return fmt.Sprintf("%s:%s:%s", d.redisStreamName, d.channelID, d.source)
-}
-func (d *Discord) GetRedisConsumerGroupName() string {
-	return fmt.Sprintf("%s:%s:%s", d.redisConsumerGroupName, d.channelID, d.source)
 }

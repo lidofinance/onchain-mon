@@ -40,7 +40,21 @@ type Consumer struct {
 	notifier         notifiler.FindingSender
 }
 
-const LRUCacheExpiration = time.Minute * 10
+const (
+	StatusNotSend Status = "not_send"
+	StatusSending Status = "sending"
+	StatusSent    Status = "sent"
+)
+
+const (
+	TTLMin1   = 1 * time.Minute
+	TTLMins10 = 10 * time.Minute
+	TTLMins30 = 30 * time.Minute
+
+	LRUCacheExpiration   = 10 * time.Minute
+	ResendQuorumMsgAfter = 5 * time.Second
+	NackDelayMsg         = 3 * time.Second
+)
 
 func New(
 	log *slog.Logger,
@@ -149,20 +163,6 @@ var countTemplate = "%s:finding:%s:count"
 
 type Status string
 
-const (
-	StatusNotSend Status = "not_send"
-	StatusSending Status = "sending"
-	StatusSent    Status = "sent"
-)
-
-const (
-	TTLMins10 = 10 * time.Minute
-	TTLMins30 = 30 * time.Minute
-	TTLMin1   = 1 * time.Minute
-)
-
-const NackDelayMsg = 3 * time.Second
-
 func (c *Consumer) GetName() string {
 	return c.name
 }
@@ -258,9 +258,6 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			return
 		}
 
-		hash := sha256.Sum256([]byte(finding.Description))
-		bodyDesc := hex.EncodeToString(hash[:])
-
 		key := finding.UniqueKey
 		countKey := fmt.Sprintf(countTemplate, c.name, key)
 		statusKey := fmt.Sprintf(statusTemplate, c.name, key)
@@ -323,13 +320,22 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 		touchTimes, _ := c.cache.Get(countKey)
 
-		msgInfo := fmt.Sprintf("%s[%s] %s-%s read %d times. %s...%s",
+		msgInfo := fmt.Sprintf("%s[%s] %s[%s] read %d times. %s...%s",
 			c.source, c.notifier.GetType(), finding.BotName, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:],
 		)
 		if finding.BlockNumber != nil {
 			msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 		}
 
+		if uint(count) < c.quorumSize {
+			// Wait another instance. Don't flood current
+			msgInfo += " Does not collect enough quorum. Nack message with delay"
+			c.logInfo(msgInfo, finding)
+			c.nackDelayMessage(msg, ResendQuorumMsgAfter)
+			return
+		}
+
+		msgInfo += " Quorum was collectd"
 		c.logInfo(msgInfo, finding)
 
 		if uint(count) >= c.quorumSize {
@@ -344,7 +350,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 
 			if status == StatusSending {
-				c.log.Info(fmt.Sprintf("%s[%s] - another instance is sending finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] another instance is sending finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
 				c.nackDelayMessage(msg, 1*time.Second)
 				return
 			}
@@ -365,11 +371,13 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					c.mtrs.RedisErrors.Inc()
 				}
 
-				c.log.Info(fmt.Sprintf("%s[%s] - another instance already sent finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] another instance already sent finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
 				return
 			}
 
 			if status == StatusNotSend {
+				hash := sha256.Sum256([]byte(finding.Description))
+				bodyDesc := hex.EncodeToString(hash[:])
 				// same alert by content but may different blockNumber
 				isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name))
 				if coolDownErr != nil {
