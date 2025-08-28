@@ -19,15 +19,11 @@ import (
 )
 
 type Telegram struct {
-	botToken               string
-	chatID                 string
-	httpClient             *http.Client
-	metrics                *metrics.Store
-	blockExplorer          string
-	channelID              string
-	redisStreamName        string
-	redisConsumerGroupName string
-	source                 string
+	botToken      string
+	chatID        string
+	httpClient    *http.Client
+	metrics       *metrics.Store
+	blockExplorer string
 }
 
 type tgRes struct {
@@ -41,26 +37,20 @@ type tgRes struct {
 
 func NewTelegram(botToken, chatID string,
 	httpClient *http.Client, metricsStore *metrics.Store,
-	blockExplorer, channelID,
-	redisStreamName, redisConsumerGroupName, source string,
+	blockExplorer string,
 ) *Telegram {
 	return &Telegram{
-		botToken:               botToken,
-		chatID:                 chatID,
-		httpClient:             httpClient,
-		metrics:                metricsStore,
-		blockExplorer:          blockExplorer,
-		channelID:              channelID,
-		redisStreamName:        redisStreamName,
-		redisConsumerGroupName: redisConsumerGroupName,
-		source:                 source,
+		botToken:      botToken,
+		chatID:        chatID,
+		httpClient:    httpClient,
+		metrics:       metricsStore,
+		blockExplorer: blockExplorer,
 	}
 }
 
 const MaxTelegramMessageLength = 4096
 const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message"
 const TelegramLabel = `telegram`
-const TelegramRetryAfter = 30 * time.Second
 
 func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
 	message := TruncateMessageWithAlertID(
@@ -152,15 +142,6 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 
 func (t *Telegram) GetType() registry.NotificationChannel {
 	return registry.Telegram
-}
-func (t *Telegram) GetChannelID() string {
-	return t.channelID
-}
-func (t *Telegram) GetRedisStreamName() string {
-	return fmt.Sprintf("%s:%s:%s", t.redisStreamName, t.channelID, t.source)
-}
-func (t *Telegram) GetRedisConsumerGroupName() string {
-	return fmt.Sprintf("%s:%s:%s", t.redisConsumerGroupName, t.channelID, t.source)
 }
 
 // Telegram supports two versions of markdown. V1, V2

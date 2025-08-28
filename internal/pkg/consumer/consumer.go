@@ -41,6 +41,7 @@ type Consumer struct {
 }
 
 const LRUCacheExpiration = time.Minute * 10
+const ResendQuorumMsgAfter = time.Second * 5
 
 func New(
 	log *slog.Logger,
@@ -323,13 +324,22 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 		touchTimes, _ := c.cache.Get(countKey)
 
-		msgInfo := fmt.Sprintf("%s[%s] %s-%s read %d times. %s...%s",
+		msgInfo := fmt.Sprintf("%s[%s] %s[%s] read %d times. %s...%s",
 			c.source, c.notifier.GetType(), finding.BotName, finding.AlertId, touchTimes, key[0:4], key[len(key)-4:],
 		)
 		if finding.BlockNumber != nil {
 			msgInfo += fmt.Sprintf(" blockNumber %d", *finding.BlockNumber)
 		}
 
+		if uint(count) < c.quorumSize {
+			// Wait another instance. Don't flood current
+			msgInfo += " Does not collect enough quorum. Nack message with delay"
+			c.logInfo(msgInfo, finding)
+			c.nackDelayMessage(msg, ResendQuorumMsgAfter)
+			return
+		}
+
+		msgInfo += " Quorum was collectd"
 		c.logInfo(msgInfo, finding)
 
 		if uint(count) >= c.quorumSize {
@@ -344,7 +354,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 
 			if status == StatusSending {
-				c.log.Info(fmt.Sprintf("%s[%s] - another instance is sending finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] another instance is sending finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
 				c.nackDelayMessage(msg, 1*time.Second)
 				return
 			}
@@ -365,7 +375,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 					c.mtrs.RedisErrors.Inc()
 				}
 
-				c.log.Info(fmt.Sprintf("%s[%s] - another instance already sent finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
+				c.log.Info(fmt.Sprintf("%s[%s] another instance already sent finding: %s", c.source, c.notifier.GetType(), finding.AlertId))
 				return
 			}
 

@@ -13,9 +13,6 @@ import (
 type FindingSender interface {
 	SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error
 	GetType() registry.NotificationChannel
-	GetChannelID() string
-	GetRedisStreamName() string
-	GetRedisConsumerGroupName() string
 }
 
 var ErrRateLimited = errors.New("rate limit reached")
