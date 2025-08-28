@@ -40,8 +40,21 @@ type Consumer struct {
 	notifier         notifiler.FindingSender
 }
 
-const LRUCacheExpiration = time.Minute * 10
-const ResendQuorumMsgAfter = time.Second * 5
+const (
+	StatusNotSend Status = "not_send"
+	StatusSending Status = "sending"
+	StatusSent    Status = "sent"
+)
+
+const (
+	TTLMin1   = 1 * time.Minute
+	TTLMins10 = 10 * time.Minute
+	TTLMins30 = 30 * time.Minute
+
+	LRUCacheExpiration   = 10 * time.Minute
+	ResendQuorumMsgAfter = 5 * time.Second
+	NackDelayMsg         = 3 * time.Second
+)
 
 func New(
 	log *slog.Logger,
@@ -150,20 +163,6 @@ var countTemplate = "%s:finding:%s:count"
 
 type Status string
 
-const (
-	StatusNotSend Status = "not_send"
-	StatusSending Status = "sending"
-	StatusSent    Status = "sent"
-)
-
-const (
-	TTLMins10 = 10 * time.Minute
-	TTLMins30 = 30 * time.Minute
-	TTLMin1   = 1 * time.Minute
-)
-
-const NackDelayMsg = 3 * time.Second
-
 func (c *Consumer) GetName() string {
 	return c.name
 }
@@ -258,9 +257,6 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			c.ackMessage(msg)
 			return
 		}
-
-		hash := sha256.Sum256([]byte(finding.Description))
-		bodyDesc := hex.EncodeToString(hash[:])
 
 		key := finding.UniqueKey
 		countKey := fmt.Sprintf(countTemplate, c.name, key)
@@ -380,6 +376,8 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 			}
 
 			if status == StatusNotSend {
+				hash := sha256.Sum256([]byte(finding.Description))
+				bodyDesc := hex.EncodeToString(hash[:])
 				// same alert by content but may different blockNumber
 				isCooldownActive, coolDownErr := c.repo.GetCoolDown(ctx, getCoolDownKey(finding.BotName, finding.AlertId, bodyDesc, c.name))
 				if coolDownErr != nil {
