@@ -13,12 +13,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/lidofinance/onchain-mon/internal/pkg/chain"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/pkg/chain"
 	"github.com/lidofinance/onchain-mon/internal/pkg/chain/entity"
 )
 
@@ -49,6 +49,10 @@ func New(log *slog.Logger, chainSrv ChainSrv, js jetstream.JetStream, metricsSto
 }
 
 const Per6Sec = 6 * time.Second
+const JetStreamRetryWrite = 250 * time.Millisecond
+const JetStreamAttemptsWrite = 5
+const EtaNextBlock = 12 * time.Second
+const DelayNextBlock = 500 * time.Millisecond
 
 func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 	g.Go(func() error {
@@ -84,13 +88,13 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 							fetchStartTime = time.Now()
 						}
 
-						if errors.Is(err, chain.EmptyResponseErr) {
-							w.log.Info(fmt.Sprintf("Block %d is not avaliable", nextBlockNumber))
+						if errors.Is(err, chain.ErrEmptyResponse) {
+							w.log.Info(fmt.Sprintf("Block %d is not available", nextBlockNumber))
 							w.resetTimer(timer)
 							continue
 						}
 
-						if !errors.Is(err, chain.EmptyResponseErr) {
+						if !errors.Is(err, chain.ErrEmptyResponse) {
 							w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 							w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
 						}
@@ -141,7 +145,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
-				blockDto := buildBlockDto(*block.Result, *blockReceipts.Result)
+				blockDto := buildBlockDto(block.Result, *blockReceipts.Result)
 				if publishErr := w.publishBlock(blockDto); publishErr != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
 					w.log.Error(fmt.Sprintf(`Could not publish block blockDto: %s`, publishErr))
@@ -167,7 +171,7 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 
 	latestNumber := latestBlock.Result.GetNumber()
 	if latestNumber <= fromBlock {
-		return nil, fmt.Errorf(fmt.Sprintf("Latest block number %d is less than fromBlock %d", latestNumber, fromBlock))
+		return nil, fmt.Errorf("latest block number %d is less than fromBlock %d", latestNumber, fromBlock)
 	}
 
 	blocksResp, err := w.chainSrv.FetchBlocksInRange(ctx, fromBlock+1, latestNumber)
@@ -176,8 +180,8 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 	}
 
 	blockHashes := make([]string, 0, len(*blocksResp.Result))
-	for _, block := range *blocksResp.Result {
-		blockHashes = append(blockHashes, block.Hash)
+	for i := range *blocksResp.Result {
+		blockHashes = append(blockHashes, (*blocksResp.Result)[i].Hash)
 	}
 
 	receiptsResp, err := w.chainSrv.FetchReceipts(ctx, blockHashes)
@@ -186,16 +190,18 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 	}
 
 	receiptsByBlock := make(map[string][]entity.BlockReceipt, len(*receiptsResp.Result))
-	for _, receipt := range *receiptsResp.Result {
+	for i := range *receiptsResp.Result {
+		receipt := (*receiptsResp.Result)[i]
 		receiptsByBlock[receipt.BlockHash] = append(receiptsByBlock[receipt.BlockHash], receipt)
 	}
 
 	var latestPubBlock *entity.EthBlock = nil
-	for _, block := range *blocksResp.Result {
+	for i := range *blocksResp.Result {
+		block := (*blocksResp.Result)[i]
 		hash := block.Hash
 		receipts := receiptsByBlock[hash]
 
-		dto := buildBlockDto(block, receipts)
+		dto := buildBlockDto(&block, receipts)
 		if publishErr := w.publishBlock(dto); publishErr != nil {
 			return nil, fmt.Errorf("could not publish block: %w", publishErr)
 		}
@@ -219,9 +225,10 @@ func compress(payload []byte) (*bytes.Buffer, error) {
 	return cPayload, nil
 }
 
-func buildBlockDto(block entity.EthBlock, blockReceipts []entity.BlockReceipt) databus.BlockDtoJson {
+func buildBlockDto(block *entity.EthBlock, blockReceipts []entity.BlockReceipt) databus.BlockDtoJson {
 	receipts := make([]databus.BlockDtoJsonReceiptsElem, 0, len(blockReceipts))
-	for _, receipt := range blockReceipts {
+	for i := range blockReceipts {
+		receipt := blockReceipts[i]
 		logs := make([]databus.BlockDtoJsonReceiptsElemLogsElem, 0, len(receipt.Logs))
 		for j := range receipt.Logs {
 			receiptLog := receipt.Logs[j]
@@ -272,8 +279,8 @@ func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
 
 	if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 		jetstream.WithMsgID(blockDto.Hash),
-		jetstream.WithRetryAttempts(5),
-		jetstream.WithRetryWait(250*time.Millisecond),
+		jetstream.WithRetryAttempts(JetStreamAttemptsWrite),
+		jetstream.WithRetryWait(JetStreamRetryWrite),
 	); publishErr != nil {
 		cPayloadSize := slog.String("cPayloadSize", fmt.Sprintf(`%.6f mb`, float64(cPayload.Len())/(1024*1024)))
 		return fmt.Errorf("could not publish block %d(cPayload: %s) to JetStream: %w ", blockDto.Number, cPayloadSize, publishErr)
@@ -283,8 +290,8 @@ func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
 }
 
 func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBlock) time.Duration {
-	expectedNextBlockTime := time.Unix(block.GetTimestamp(), 0).Add(12 * time.Second)
-	delay := time.Until(expectedNextBlockTime.Add(500 * time.Millisecond))
+	expectedNextBlockTime := time.Unix(block.GetTimestamp(), 0).Add(EtaNextBlock)
+	delay := time.Until(expectedNextBlockTime.Add(DelayNextBlock))
 
 	if delay < time.Second {
 		delay = time.Second

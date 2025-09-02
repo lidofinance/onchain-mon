@@ -28,3 +28,5 @@ vendor/
 tools/vendor
 
 notification.yaml
+notification.prod.yaml
+notification.temp.yaml

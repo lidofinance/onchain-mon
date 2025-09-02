@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -194,6 +195,20 @@ func Test_SendFinding(t *testing.T) {
 	promRegistry := prometheus.NewRegistry()
 	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
+	transport := &http.Transport{
+		MaxIdleConns:          64,
+		MaxIdleConnsPerHost:   16,
+		MaxConnsPerHost:       12,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
 	type fields struct {
 		botToken     string
 		chatID       string
@@ -247,13 +262,14 @@ Withdrawals info:
 			fields: fields{
 				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
 				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
-				httpClient:   &http.Client{},
+				httpClient:   httpClient,
 				metricsStore: metricsStore,
 			},
 			args: args{
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
-					Name:           "ℹ️ #l2_arbitrum Arbitrum digest",
+					Name: "ℹ️ #l2_arbitrum Arbitrum digest",
+					//nolint:lll
 					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
@@ -271,7 +287,7 @@ Withdrawals info:
 			fields: fields{
 				botToken:     notifcationConfig.TelegramChannels[0].BotToken,
 				chatID:       notifcationConfig.TelegramChannels[0].ChatID,
-				httpClient:   &http.Client{},
+				httpClient:   httpClient,
 				metricsStore: metricsStore,
 			},
 			args: args{
@@ -443,7 +459,10 @@ Block  timestamp: 17:20:36.000 MSK`,
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := notifiler.TruncateMessageWithAlertID(tt.args.message, notifiler.MaxTelegramMessageLength, notifiler.WarningTelegramMessage); got != tt.want {
+			if got := notifiler.TruncateMessageWithAlertID(
+				tt.args.message, notifiler.MaxTelegramMessageLength,
+				notifiler.WarningTelegramMessage,
+			); got != tt.want {
 				t.Errorf("TruncateMessageWithAlertID() = %v, want %v", got, tt.want)
 			}
 		})

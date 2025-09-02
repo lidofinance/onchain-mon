@@ -12,6 +12,7 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type AlertPayload struct {
@@ -25,21 +26,25 @@ type OpsGenie struct {
 	opsGenieKey   string
 	httpClient    *http.Client
 	metrics       *metrics.Store
-	source        string
 	blockExplorer string
+	source        string
 }
 
-func NewOpsgenie(opsGenieKey string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *OpsGenie {
+func NewOpsgenie(opsGenieKey string,
+	httpClient *http.Client, metricsStore *metrics.Store,
+	source, blockExplorer string,
+) *OpsGenie {
 	return &OpsGenie{
 		opsGenieKey:   opsGenieKey,
 		httpClient:    httpClient,
 		metrics:       metricsStore,
-		source:        source,
 		blockExplorer: blockExplorer,
+		source:        source,
 	}
 }
 
 const OpsGenieLabel = `opsgenie`
+const OpsGenieRetryAfter = 5 * time.Second
 
 func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	opsGeniePriority := ""
@@ -95,6 +100,14 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 		o.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: OpsGenieLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
+		return &RateLimitedError{
+			ResetAfter: OpsGenieRetryAfter,
+			Err:        ErrRateLimited,
+		}
+	}
+
 	if resp.StatusCode != http.StatusAccepted {
 		o.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: OpsGenieLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from OpsGenie non-202 response code: %v", resp.Status)
@@ -104,6 +117,6 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 	return nil
 }
 
-func (o *OpsGenie) GetType() string {
-	return "OpsGenie"
+func (o *OpsGenie) GetType() registry.NotificationChannel {
+	return registry.OpsGenie
 }

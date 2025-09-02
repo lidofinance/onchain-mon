@@ -12,12 +12,6 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
-const (
-	ChannelTypeTelegram = "Telegram"
-	ChannelTypeDiscord  = "Discord"
-	ChannelTypeOpsGenie = "OpsGenie"
-)
-
 type SeverityLevel struct {
 	ID string `mapstructure:"id"`
 }
@@ -42,13 +36,13 @@ type OpsGenieChannel struct {
 }
 
 type Consumer struct {
-	ConsumerName     string   `mapstructure:"consumerName"`
-	Type             string   `mapstructure:"type"`
-	ChannelID        string   `mapstructure:"channel_id"`
-	Severities       []string `mapstructure:"severities"`
-	ByQuorum         bool     `mapstructure:"by_quorum"`
-	Subjects         []string `mapstructure:"subjects"`
-	Filter           []string `mapstructure:"filter"`
+	ConsumerName     string                       `mapstructure:"consumerName"`
+	Type             registry.NotificationChannel `mapstructure:"type"`
+	ChannelID        string                       `mapstructure:"channel_id"`
+	Severities       []string                     `mapstructure:"severities"`
+	ByQuorum         bool                         `mapstructure:"by_quorum"`
+	Subjects         []string                     `mapstructure:"subjects"`
+	Filter           []string                     `mapstructure:"filter"`
 	SeveritySet      registry.FindingMapping
 	FindingFilterMap registry.FindingFilterMap
 }
@@ -128,15 +122,15 @@ func ValidateConfig(cfg *NotificationConfig) error {
 
 	for _, consumer := range cfg.Consumers {
 		switch consumer.Type {
-		case ChannelTypeTelegram:
+		case registry.Telegram:
 			if _, exists := telegramChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown Telegram channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}
-		case ChannelTypeDiscord:
+		case registry.Discord:
 			if _, exists := discordChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown Discord channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}
-		case ChannelTypeOpsGenie:
+		case registry.OpsGenie:
 			if _, exists := opsgenieChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown OpsGenie channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}

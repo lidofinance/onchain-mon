@@ -73,7 +73,7 @@ func (h *handler) Handler(w http.ResponseWriter, _ *http.Request) {
 
 			consumerInfo := ConsumerInfo{
 				ConsumerName: generatedName,
-				Type:         consumer.Type,
+				Type:         string(consumer.Type),
 				ChannelDesc:  channelDesc,
 				Severities:   consumer.Severities,
 				ByQuorum:     consumer.ByQuorum,
@@ -99,5 +99,6 @@ func (h *handler) Handler(w http.ResponseWriter, _ *http.Request) {
 	err = tmpl.Execute(w, data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }

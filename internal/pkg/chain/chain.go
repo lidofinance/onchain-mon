@@ -24,7 +24,11 @@ type chain struct {
 	metrics    *metrics.Store
 }
 
-var EmptyResponseErr = errors.New("empty response")
+var ErrEmptyResponse = errors.New("empty response")
+
+const MaxAttempts = 6
+const RetryDelay = 75 * time.Millisecond
+const MaxDelay = 5 * time.Second
 
 func NewChain(jsonRpcUrl string, httpClient *http.Client, metricsStore *metrics.Store) *chain {
 	return &chain{
@@ -98,23 +102,20 @@ func doRpcRequest[T any](
 			}
 
 			if p.Result == nil {
-				return nil, fmt.Errorf("%s rpcResponse.Result is nil. payload %s: %w", method, string(payload), EmptyResponseErr)
+				return nil, fmt.Errorf("%s rpcResponse.Result is nil. payload %s: %w", method, string(payload), ErrEmptyResponse)
 			}
 
 			return &p, nil
 		},
-		retry.Attempts(6),
-		retry.Delay(750*time.Millisecond),
-		retry.MaxDelay(5*time.Second),
+		retry.Attempts(MaxAttempts),
+		retry.Delay(RetryDelay),
+		retry.MaxDelay(MaxDelay),
 		retry.DelayType(retry.CombineDelay(
 			retry.BackOffDelay,
 			retry.RandomDelay,
 		)),
 		retry.RetryIf(func(err error) bool {
-			if errors.Is(err, EmptyResponseErr) {
-				return false
-			}
-			return true
+			return !errors.Is(err, ErrEmptyResponse)
 		}),
 	)
 }
@@ -179,9 +180,9 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 				Result:  &combined,
 			}, nil
 		},
-		retry.Attempts(6),
-		retry.Delay(750*time.Millisecond),
-		retry.MaxDelay(5*time.Second),
+		retry.Attempts(MaxAttempts),
+		retry.Delay(RetryDelay),
+		retry.MaxDelay(MaxDelay),
 		retry.DelayType(retry.CombineDelay(
 			retry.BackOffDelay,
 			retry.RandomDelay,
@@ -251,9 +252,9 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 				Result:  &blocks,
 			}, nil
 		},
-		retry.Attempts(6),
-		retry.Delay(750*time.Millisecond),
-		retry.MaxDelay(5*time.Second),
+		retry.Attempts(MaxAttempts),
+		retry.Delay(RetryDelay),
+		retry.MaxDelay(MaxDelay),
 		retry.DelayType(retry.CombineDelay(
 			retry.BackOffDelay,
 			retry.RandomDelay,

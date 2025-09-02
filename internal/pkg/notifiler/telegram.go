@@ -2,7 +2,10 @@ package notifiler
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type Telegram struct {
@@ -19,11 +23,23 @@ type Telegram struct {
 	chatID        string
 	httpClient    *http.Client
 	metrics       *metrics.Store
-	source        string
 	blockExplorer string
+	source        string
 }
 
-func NewTelegram(botToken, chatID string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Telegram {
+type tgRes struct {
+	Ok          bool   `json:"ok"`
+	ErrorCode   int    `json:"error_code"`
+	Description string `json:"description"`
+	Parameters  struct {
+		RetryAfter int `json:"retry_after"`
+	} `json:"parameters"`
+}
+
+func NewTelegram(botToken, chatID string,
+	httpClient *http.Client, metricsStore *metrics.Store,
+	source, blockExplorer string,
+) *Telegram {
 	return &Telegram{
 		botToken:      botToken,
 		chatID:        chatID,
@@ -49,8 +65,11 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		m := escapeMarkdownV1(message)
 
 		if sendErr := t.send(ctx, m, true); sendErr != nil {
-			message += "\n\nWarning: Could not send msg as markdown"
-			return t.send(ctx, message, false)
+			if errors.Is(sendErr, ErrMarkdownParse) {
+				return t.send(ctx, message+"\n\nWarning: Could not send msg as markdown", false)
+			}
+
+			return sendErr
 		}
 
 		return nil
@@ -60,7 +79,12 @@ func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 }
 
 func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) error {
-	requestURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s", t.botToken, t.chatID, url.QueryEscape(message))
+	requestURL := fmt.Sprintf(
+		"https://api.telegram.org/bot%s/sendMessage?disable_web_page_preview=true&disable_notification=true&chat_id=-%s&text=%s",
+		t.botToken,
+		t.chatID,
+		url.QueryEscape(message),
+	)
 	if useMarkdown {
 		requestURL += `&parse_mode=markdown`
 	}
@@ -71,28 +95,55 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 	}
 
 	start := time.Now()
-
-	resp, err := t.httpClient.Do(req)
+	rawResp, err := t.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send telegram request: %w", err)
 	}
 	defer func() {
-		resp.Body.Close()
-		duration := time.Since(start).Seconds()
-		t.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: TelegramLabel}).Observe(duration)
+		rawResp.Body.Close()
+		t.metrics.SummaryHandlers.
+			With(prometheus.Labels{metrics.Channel: TelegramLabel}).
+			Observe(time.Since(start).Seconds())
 	}()
 
-	if resp.StatusCode != http.StatusOK {
-		t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).Inc()
-		return fmt.Errorf("received from telegram non-200 response code: %v", resp.Status)
+	var resp tgRes
+	body, _ := io.ReadAll(rawResp.Body)
+	_ = json.Unmarshal(body, &resp)
+
+	if rawResp.StatusCode == http.StatusTooManyRequests || resp.ErrorCode == http.StatusTooManyRequests {
+		t.metrics.NotifyChannels.
+			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
+			Inc()
+
+		return &RateLimitedError{
+			ResetAfter: time.Duration(resp.Parameters.RetryAfter) * time.Second,
+			Err:        ErrRateLimited,
+		}
 	}
 
-	t.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusOk}).Inc()
+	if rawResp.StatusCode >= http.StatusBadRequest && rawResp.StatusCode < http.StatusInternalServerError {
+		return fmt.Errorf("%w: %s", ErrMarkdownParse, resp.Description)
+	}
+
+	if rawResp.StatusCode != http.StatusOK || !resp.Ok {
+		t.metrics.NotifyChannels.
+			With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusFail}).
+			Inc()
+
+		if resp.Description != "" || resp.ErrorCode != 0 {
+			return fmt.Errorf("telegram error: %s (%d)", resp.Description, resp.ErrorCode)
+		}
+		return fmt.Errorf("received from telegram non-200 response code: %v", rawResp.Status)
+	}
+
+	t.metrics.NotifyChannels.
+		With(prometheus.Labels{metrics.Channel: TelegramLabel, metrics.Status: metrics.StatusOk}).
+		Inc()
 	return nil
 }
 
-func (t *Telegram) GetType() string {
-	return "Telegram"
+func (t *Telegram) GetType() registry.NotificationChannel {
+	return registry.Telegram
 }
 
 // Telegram supports two versions of markdown. V1, V2

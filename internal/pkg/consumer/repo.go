@@ -2,11 +2,13 @@ package consumer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 type Repo struct {
@@ -22,6 +24,7 @@ func NewRepo(redisClient *redis.Client, quorumSize uint) *Repo {
 }
 
 const TTLMins12 = 12 * time.Minute
+const DedupKeyTTL = 15 * time.Minute
 const coolDownTemplate = "cooldown:%s"
 
 func (r *Repo) SetSendingStatus(ctx context.Context, countKey, statusKey string) (bool, error) {
@@ -75,11 +78,13 @@ func (r *Repo) GetStatus(ctx context.Context, statusKey string) (Status, error) 
 }
 
 func (r *Repo) SetCoolDown(ctx context.Context, key string) error {
-	return r.redisClient.Set(ctx, fmt.Sprintf(coolDownTemplate, key), "", TTLMins30).Err()
+	hash := sha256.Sum256([]byte(key))
+	return r.redisClient.Set(ctx, fmt.Sprintf(coolDownTemplate, hex.EncodeToString(hash[:])), "", TTLMins30).Err()
 }
 
 func (r *Repo) GetCoolDown(ctx context.Context, key string) (bool, error) {
-	exists, err := r.redisClient.Exists(ctx, fmt.Sprintf(coolDownTemplate, key)).Result()
+	hash := sha256.Sum256([]byte(key))
+	exists, err := r.redisClient.Exists(ctx, fmt.Sprintf(coolDownTemplate, hex.EncodeToString(hash[:]))).Result()
 	if err != nil {
 		return false, err
 	}

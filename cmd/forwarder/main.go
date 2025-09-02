@@ -28,6 +28,7 @@ import (
 
 const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
 
+//nolint:funlen
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	defer stop()
@@ -48,13 +49,51 @@ func main() {
 		defer sentryClient.Flush(2 * time.Second)
 	}
 
+	// Must be unique among instances
+	if cfg.AppConfig.Source == "" {
+		log.Error("Env Source must be set and unique among instances")
+		return
+	}
+
+	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
+	transport := &http.Transport{
+		MaxIdleConns:          64,
+		MaxIdleConnsPerHost:   16,
+		MaxConnsPerHost:       12,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+
 	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, `notification.yaml`)
 	if err != nil {
 		log.Error(fmt.Sprintf("Error loading consumer's config: %v", err))
 		return
 	}
 
-	rds, err := redis.NewRedisClient(gCtx, cfg.AppConfig.RedisURL, cfg.AppConfig.RedisDB, log)
+	notificationChannels, err := env.NewNotificationChannels(
+		log, notificationConfig, httpClient,
+		metricsStore,
+		cfg.AppConfig.BlockExplorer,
+		cfg.AppConfig.Source,
+	)
+	if err != nil {
+		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
+		return
+	}
+
+	natsConsumerCount := 0
+	for _, consumerCfg := range notificationConfig.Consumers {
+		natsConsumerCount += len(consumerCfg.Subjects)
+	}
+
+	rds, err := redis.NewRedisClient(cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, log, natsConsumerCount)
 	if err != nil {
 		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
 		return
@@ -77,7 +116,6 @@ func main() {
 	log.Info("Nats jetStream connected")
 
 	r := chi.NewRouter()
-	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
 
 	app := server.New(&cfg.AppConfig, notificationConfig, log, metricsStore, js, natsClient)
 
@@ -96,34 +134,11 @@ func main() {
 	}
 	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", natsStreamName))
 
-	transport := &http.Transport{
-		MaxIdleConns:          30,
-		MaxIdleConnsPerHost:   5,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	httpClient := &http.Client{
-		Transport: transport,
-		Timeout:   10 * time.Second,
-	}
-
-	notificationChannels, err := env.NewNotificationChannels(
-		log, notificationConfig, httpClient,
-		metricsStore,
-		cfg.AppConfig.Source,
-		cfg.AppConfig.BlockExplorer,
-	)
-	if err != nil {
-		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
-		return
-	}
-
 	consumers, err := consumer.NewConsumers(
 		log,
 		metricsStore,
 		rds,
+		cfg.AppConfig.Source,
 		consumer.NewRepo(rds, cfg.AppConfig.QuorumSize),
 		cfg.AppConfig.QuorumSize,
 		notificationConfig,
@@ -134,9 +149,16 @@ func main() {
 		return
 	}
 
-	worker := forwarder.New(consumers, natStream, log)
-	if err := worker.Run(gCtx, g); err != nil {
-		fmt.Println("Could not start worker error:", err.Error())
+	worker := forwarder.New(
+		cfg.AppConfig.Source,
+		rds,
+		consumers, natStream, log,
+		&cfg.AppConfig.RedisConfig,
+		notificationChannels,
+	)
+
+	if err = worker.ConsumeFindings(gCtx, g); err != nil {
+		log.Error(fmt.Sprintf("Could not findings consumer: %s", err))
 		return
 	}
 

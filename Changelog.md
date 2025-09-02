@@ -1,3 +1,13 @@
+## 18.08.2025
+1. Update to go1.25
+2. Update dependencies
+3. Fix linters, format warnings
+4. Add docker-compose.prod.yml for emulating prod setup
+
+## 07.08.2025
+1. Updated NATS consumers to handle explicit delayed message redelivery for Discord, Telegram, and OpsGenie
+2. Updated go-redis/v8 -> go-redis/v9
+
 ## 13.05.2025
 1. Add support for fetching blocks by number and dynamic time
 2. Add support for skipped blocks

@@ -6,20 +6,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 type Discord struct {
 	webhookURL    string
 	httpClient    *http.Client
 	metrics       *metrics.Store
-	source        string
 	blockExplorer string
+	source        string
 }
 
 type MessagePayload struct {
@@ -28,18 +31,24 @@ type MessagePayload struct {
 
 const DiscordLabel = `discord`
 
-func NewDiscord(webhookURL string, httpClient *http.Client, metricsStore *metrics.Store, source string, blockExplorer string) *Discord {
+func NewDiscord(
+	webhookURL string,
+	httpClient *http.Client,
+	metricsStore *metrics.Store,
+	source, blockExplorer string,
+) *Discord {
 	return &Discord{
 		webhookURL:    webhookURL,
 		httpClient:    httpClient,
 		metrics:       metricsStore,
-		source:        source,
 		blockExplorer: blockExplorer,
+		source:        source,
 	}
 }
 
 const MaxDiscordMsgLength = 2000
 const WarningDiscordMessage = "Warn: Msg >=2000, pls review description message"
+const DiscordRetryAfter = 10 * time.Second
 
 func (d *Discord) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
@@ -79,6 +88,29 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: DiscordLabel}).Observe(duration)
 	}()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
+		if v := resp.Header.Get("X-RateLimit-Reset-After"); v != "" {
+			resetAfter, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			if err != nil {
+				return &RateLimitedError{
+					ResetAfter: DiscordRetryAfter,
+					Err:        ErrRateLimited,
+				}
+			}
+
+			return &RateLimitedError{
+				ResetAfter: time.Duration(int(resetAfter)) * time.Second,
+				Err:        ErrRateLimited,
+			}
+		}
+
+		return &RateLimitedError{
+			ResetAfter: DiscordRetryAfter,
+			Err:        ErrRateLimited,
+		}
+	}
+
 	if resp.StatusCode != http.StatusNoContent {
 		d.metrics.NotifyChannels.With(prometheus.Labels{metrics.Channel: DiscordLabel, metrics.Status: metrics.StatusFail}).Inc()
 		return fmt.Errorf("received from Discord non-204 response code: %v", resp.Status)
@@ -88,6 +120,6 @@ func (d *Discord) send(ctx context.Context, message string) error {
 	return nil
 }
 
-func (d *Discord) GetType() string {
-	return "Discord"
+func (d *Discord) GetType() registry.NotificationChannel {
+	return registry.Discord
 }

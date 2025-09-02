@@ -6,36 +6,47 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
-	rdb               *redis.Client
-	onceDefaultClient sync.Once
+	writeClientOnce sync.Once
+	writeClient     *redis.Client
 )
 
-func NewRedisClient(ctx context.Context, addr string, db int, log *slog.Logger) (*redis.Client, error) {
+func NewRedisClient(addr string, db int, log *slog.Logger, poolSize int) (*redis.Client, error) {
 	var err error
 
-	onceDefaultClient.Do(func() {
-		rdb = redis.NewClient(&redis.Options{
-			Addr:            addr,
-			DB:              db,
+	writeClientOnce.Do(func() {
+		writeClient = redis.NewClient(&redis.Options{
+			Addr: addr,
+			DB:   db,
+			// retries: for set, expire and
 			MaxRetries:      5,
-			MinRetryBackoff: 500 * time.Millisecond,
-			MaxRetryBackoff: 5 * time.Second,
-			DialTimeout:     5 * time.Second,
-			ReadTimeout:     3 * time.Second,
-			WriteTimeout:    3 * time.Second,
+			MinRetryBackoff: 50 * time.Millisecond,
+			MaxRetryBackoff: 500 * time.Millisecond,
+
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  3 * time.Second,
+			WriteTimeout: 3 * time.Second,
+
+			PoolSize:     poolSize,
+			MinIdleConns: poolSize / 10,
+			PoolTimeout:  1500 * time.Millisecond,
+
+			ConnMaxIdleTime: 5 * time.Minute,
+
 			OnConnect: func(_ context.Context, _ *redis.Conn) error {
-				log.Info("Redis connected")
+				log.Info("redis(write): connected")
 				return nil
 			},
 		})
-		rdb = rdb.WithContext(ctx)
-
-		err = rdb.Ping(ctx).Err()
 	})
 
-	return rdb, err
+	pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if pingErr := writeClient.Ping(pingCtx).Err(); pingErr != nil {
+		err = pingErr
+	}
+	return writeClient, err
 }
