@@ -34,8 +34,8 @@ func NewNotificationChannels(
 			tgChannel.ChatID,
 			httpClient,
 			metricsStore,
-			blockExplorer,
 			source,
+			blockExplorer,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", tgChannel.ID, tgChannel.Description))
 	}
@@ -45,8 +45,8 @@ func NewNotificationChannels(
 			discordChannel.WebhookURL,
 			httpClient,
 			metricsStore,
-			blockExplorer,
 			source,
+			blockExplorer,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", discordChannel.ID, discordChannel.Description))
 	}
@@ -56,8 +56,8 @@ func NewNotificationChannels(
 			opsGenieChannel.APIKey,
 			httpClient,
 			metricsStore,
-			blockExplorer,
 			source,
+			blockExplorer,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", opsGenieChannel.ID, opsGenieChannel.Description))
 	}
