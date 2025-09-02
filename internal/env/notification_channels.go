@@ -20,7 +20,7 @@ func NewNotificationChannels(
 	cfg *NotificationConfig,
 	httpClient *http.Client,
 	metricsStore *metrics.Store,
-	blockExplorer string,
+	blockExplorer, source string,
 ) (*NotificationChannels, error) {
 	channels := &NotificationChannels{
 		TelegramChannels: make(map[string]*notifiler.Telegram),
@@ -35,6 +35,7 @@ func NewNotificationChannels(
 			httpClient,
 			metricsStore,
 			blockExplorer,
+			source,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", tgChannel.ID, tgChannel.Description))
 	}
@@ -45,6 +46,7 @@ func NewNotificationChannels(
 			httpClient,
 			metricsStore,
 			blockExplorer,
+			source,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", discordChannel.ID, discordChannel.Description))
 	}
@@ -55,6 +57,7 @@ func NewNotificationChannels(
 			httpClient,
 			metricsStore,
 			blockExplorer,
+			source,
 		)
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", opsGenieChannel.ID, opsGenieChannel.Description))
 	}

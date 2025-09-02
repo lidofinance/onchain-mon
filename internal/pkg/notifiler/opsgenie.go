@@ -27,24 +27,26 @@ type OpsGenie struct {
 	httpClient    *http.Client
 	metrics       *metrics.Store
 	blockExplorer string
+	source        string
 }
 
 func NewOpsgenie(opsGenieKey string,
 	httpClient *http.Client, metricsStore *metrics.Store,
-	blockExplorer string,
+	source, blockExplorer string,
 ) *OpsGenie {
 	return &OpsGenie{
 		opsGenieKey:   opsGenieKey,
 		httpClient:    httpClient,
 		metrics:       metricsStore,
 		blockExplorer: blockExplorer,
+		source:        source,
 	}
 }
 
 const OpsGenieLabel = `opsgenie`
 const OpsGenieRetryAfter = 5 * time.Second
 
-func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
+func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	opsGeniePriority := ""
 	switch alert.Severity {
 	case databus.SeverityCritical:
@@ -58,7 +60,7 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		return nil
 	}
 
-	message := FormatAlert(alert, quorumBy, o.blockExplorer)
+	message := FormatAlert(alert, o.source, o.blockExplorer)
 
 	payload := AlertPayload{
 		Message:     alert.Name,
