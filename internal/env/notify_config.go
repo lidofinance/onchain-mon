@@ -12,12 +12,6 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
-const (
-	ChannelTypeTelegram = "Telegram"
-	ChannelTypeDiscord  = "Discord"
-	ChannelTypeOpsGenie = "OpsGenie"
-)
-
 type SeverityLevel struct {
 	ID string `mapstructure:"id"`
 }
@@ -128,15 +122,15 @@ func ValidateConfig(cfg *NotificationConfig) error {
 
 	for _, consumer := range cfg.Consumers {
 		switch consumer.Type {
-		case ChannelTypeTelegram:
+		case registry.Telegram:
 			if _, exists := telegramChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown Telegram channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}
-		case ChannelTypeDiscord:
+		case registry.Discord:
 			if _, exists := discordChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown Discord channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}
-		case ChannelTypeOpsGenie:
+		case registry.OpsGenie:
 			if _, exists := opsgenieChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown OpsGenie channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}

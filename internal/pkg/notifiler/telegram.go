@@ -24,6 +24,7 @@ type Telegram struct {
 	httpClient    *http.Client
 	metrics       *metrics.Store
 	blockExplorer string
+	source        string
 }
 
 type tgRes struct {
@@ -37,13 +38,14 @@ type tgRes struct {
 
 func NewTelegram(botToken, chatID string,
 	httpClient *http.Client, metricsStore *metrics.Store,
-	blockExplorer string,
+	source, blockExplorer string,
 ) *Telegram {
 	return &Telegram{
 		botToken:      botToken,
 		chatID:        chatID,
 		httpClient:    httpClient,
 		metrics:       metricsStore,
+		source:        source,
 		blockExplorer: blockExplorer,
 	}
 }
@@ -52,9 +54,9 @@ const MaxTelegramMessageLength = 4096
 const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message"
 const TelegramLabel = `telegram`
 
-func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error {
+func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, quorumBy, t.blockExplorer)),
+		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, t.source, t.blockExplorer)),
 		MaxTelegramMessageLength,
 		WarningTelegramMessage,
 	)

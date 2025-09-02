@@ -11,7 +11,7 @@ import (
 )
 
 type FindingSender interface {
-	SendFinding(ctx context.Context, alert *databus.FindingDtoJson, quorumBy string) error
+	SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error
 	GetType() registry.NotificationChannel
 }
 

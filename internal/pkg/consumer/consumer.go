@@ -223,7 +223,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 				return
 			}
 
-			if sendErr := c.notifier.SendFinding(ctx, finding, c.source); sendErr != nil {
+			if sendErr := c.notifier.SendFinding(ctx, finding); sendErr != nil {
 				_ = c.redisClient.Del(ctx, dedupKey).Err()
 
 				var rle *notifiler.RateLimitedError
@@ -402,7 +402,7 @@ func (c *Consumer) GetConsumeHandler(ctx context.Context) func(msg jetstream.Msg
 
 				if readyToSend {
 					// Sends via notification channel {Tg, Discord, OpsGenia}
-					if sendErr := c.notifier.SendFinding(ctx, finding, c.source); sendErr != nil {
+					if sendErr := c.notifier.SendFinding(ctx, finding); sendErr != nil {
 						if quorumKeyCount, err := c.redisClient.Decr(ctx, countKey).Result(); err != nil {
 							c.mtrs.RedisErrors.Inc()
 							c.log.Error(fmt.Sprintf(`Could not decrease count key %s: %v`, countKey, err))

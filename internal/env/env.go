@@ -28,6 +28,8 @@ type AppConfig struct {
 	BlockTopic   string
 	FindingTopic string
 
+	RedisURL      string
+	RedisDB       int
 	QuorumSize    uint
 	SentryDSN     string
 	BlockExplorer string
@@ -101,14 +103,8 @@ func Read(configPath string) (*Config, error) {
 				BlockExplorer: blockExplorer,
 
 				RedisConfig: RedisConfig{
-					URL:                       viper.GetString("REDIS_ADDRESS"),
-					DB:                        viper.GetInt("REDIS_DB"),
-					TelegramStreamName:        "stream:telegram",
-					DiscordStreamName:         "stream:discord",
-					OpsGenieStreamName:        "stream:opsgenie",
-					TelegramConsumerGroupName: "cs:telegram",
-					DiscordConsumerGroupName:  "cs:discord",
-					OpsGeniaConsumerGroupName: "cs:opsgenie",
+					URL: viper.GetString("REDIS_ADDRESS"),
+					DB:  viper.GetInt("REDIS_DB"),
 				},
 			},
 		}

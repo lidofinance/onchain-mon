@@ -127,9 +127,10 @@ func Test_usecase_SendFinding(t *testing.T) {
 				tt.fields.webhookURL,
 				tt.fields.httpClient,
 				metricsStore,
+				`local`,
 				`etherscan.io`,
 			)
-			if err := u.SendFinding(tt.args.ctx, tt.args.alert, `unit-test-local`); (err != nil) != tt.wantErr {
+			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
 				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
