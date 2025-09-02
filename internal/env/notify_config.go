@@ -42,13 +42,13 @@ type OpsGenieChannel struct {
 }
 
 type Consumer struct {
-	ConsumerName     string                       `mapstructure:"consumerName"`
-	Type             registry.NotificationChannel `mapstructure:"type"`
-	ChannelID        string                       `mapstructure:"channel_id"`
-	Severities       []string                     `mapstructure:"severities"`
-	ByQuorum         bool                         `mapstructure:"by_quorum"`
-	Subjects         []string                     `mapstructure:"subjects"`
-	Filter           []string                     `mapstructure:"filter"`
+	ConsumerName     string   `mapstructure:"consumerName"`
+	Type             string   `mapstructure:"type"`
+	ChannelID        string   `mapstructure:"channel_id"`
+	Severities       []string `mapstructure:"severities"`
+	ByQuorum         bool     `mapstructure:"by_quorum"`
+	Subjects         []string `mapstructure:"subjects"`
+	Filter           []string `mapstructure:"filter"`
 	SeveritySet      registry.FindingMapping
 	FindingFilterMap registry.FindingFilterMap
 }

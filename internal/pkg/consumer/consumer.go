@@ -163,6 +163,18 @@ var countTemplate = "%s:finding:%s:count"
 
 type Status string
 
+const (
+	StatusNotSend Status = "not_send"
+	StatusSending Status = "sending"
+	StatusSent    Status = "sent"
+)
+
+const (
+	TTLMins10 = 10 * time.Minute
+	TTLMins30 = 30 * time.Minute
+	TTLMin1   = 1 * time.Minute
+)
+
 func (c *Consumer) GetName() string {
 	return c.name
 }

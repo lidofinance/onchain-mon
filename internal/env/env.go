@@ -28,22 +28,11 @@ type AppConfig struct {
 	BlockTopic   string
 	FindingTopic string
 
+	RedisURL      string
+	RedisDB       int
 	QuorumSize    uint
 	SentryDSN     string
 	BlockExplorer string
-
-	RedisConfig RedisConfig
-}
-
-type RedisConfig struct {
-	URL                       string
-	DB                        int
-	TelegramStreamName        string
-	DiscordStreamName         string
-	OpsGenieStreamName        string
-	TelegramConsumerGroupName string
-	DiscordConsumerGroupName  string
-	OpsGeniaConsumerGroupName string
 }
 
 var (
@@ -95,21 +84,11 @@ func Read(configPath string) (*Config, error) {
 				MetricsPrefix:  re.ReplaceAllString(viper.GetString("APP_NAME"), `_`),
 				JsonRpcURL:     viper.GetString("JSON_RPC_URL"),
 				BlockTopic:     viper.GetString("BLOCK_TOPIC"),
-
-				QuorumSize:    viper.GetUint("QUORUM_SIZE"),
-				SentryDSN:     viper.GetString("SENTRY_DSN"),
-				BlockExplorer: blockExplorer,
-
-				RedisConfig: RedisConfig{
-					URL:                       viper.GetString("REDIS_ADDRESS"),
-					DB:                        viper.GetInt("REDIS_DB"),
-					TelegramStreamName:        "stream:telegram",
-					DiscordStreamName:         "stream:discord",
-					OpsGenieStreamName:        "stream:opsgenie",
-					TelegramConsumerGroupName: "cs:telegram",
-					DiscordConsumerGroupName:  "cs:discord",
-					OpsGeniaConsumerGroupName: "cs:opsgenie",
-				},
+				RedisURL:       viper.GetString("REDIS_ADDRESS"),
+				RedisDB:        viper.GetInt("REDIS_DB"),
+				QuorumSize:     viper.GetUint("QUORUM_SIZE"),
+				SentryDSN:      viper.GetString("SENTRY_DSN"),
+				BlockExplorer:  blockExplorer,
 			},
 		}
 	})

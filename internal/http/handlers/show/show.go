@@ -73,7 +73,7 @@ func (h *handler) Handler(w http.ResponseWriter, _ *http.Request) {
 
 			consumerInfo := ConsumerInfo{
 				ConsumerName: generatedName,
-				Type:         string(consumer.Type),
+				Type:         consumer.Type,
 				ChannelDesc:  channelDesc,
 				Severities:   consumer.Severities,
 				ByQuorum:     consumer.ByQuorum,
