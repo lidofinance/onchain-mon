@@ -1,3 +1,7 @@
+## 08.09.2025
+1. Update to go1.25.1
+2. Update dependencies
+
 ## 18.08.2025
 1. Update to go1.25
 2. Update dependencies
