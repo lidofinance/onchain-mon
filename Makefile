@@ -44,7 +44,7 @@ lint:
 
 outdated:
 	@echo "Checking for outdated modules..."
-	go list -u -m -json all | ./bin/go-mod-outdated -update -direct
+	go list -u -m -json -mod=mod all | ./bin/go-mod-outdated -update -direct
 .PHONY: outdated
 
 generate-databus-objects:
