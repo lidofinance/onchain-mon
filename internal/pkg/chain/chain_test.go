@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,6 +13,69 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 )
+
+func Test_chain_GetBlockNumber(t *testing.T) {
+	cfg, envErr := env.Read("../../../.env")
+	if envErr != nil {
+		t.Errorf("Read env error: %s", envErr.Error())
+		return
+	}
+	promRegistry := prometheus.NewRegistry()
+	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
+	type fields struct {
+		jsonRpcUrl string
+		httpClient *http.Client
+		metrics    *metrics.Store
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "success",
+			fields: fields{
+				jsonRpcUrl: cfg.AppConfig.JsonRpcURL,
+				httpClient: &http.Client{},
+				metrics:    metricsStore,
+			},
+			args: args{
+				ctx: context.Background(),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &chain{
+				jsonRpcUrl: tt.fields.jsonRpcUrl,
+				httpClient: tt.fields.httpClient,
+				metrics:    tt.fields.metrics,
+			}
+			got, err := c.GetBlockNumber(tt.args.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetBlockNumber() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if got.Result == nil {
+				t.Errorf("GetBlockNumber() got nil Result")
+				return
+			}
+			
+			// Verify it's a valid hex number
+			_, parseErr := strconv.ParseInt(*got.Result, 0, 64)
+			if parseErr != nil {
+				t.Errorf("GetBlockNumber() returned invalid hex number: %s", *got.Result)
+			}
+		})
+	}
+}
 
 func Test_chain_GetLatestBlock(t *testing.T) {
 	cfg, envErr := env.Read("../../../.env")

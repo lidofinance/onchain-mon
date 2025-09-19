@@ -24,6 +24,7 @@ import (
 
 type ChainSrv interface {
 	GetLatestBlock(ctx context.Context) (*entity.RpcResponse[entity.EthBlock], error)
+	GetBlockNumber(ctx context.Context) (*entity.RpcResponse[string], error)
 	GetBlockReceipts(ctx context.Context, blockHash string) (*entity.RpcResponse[[]entity.BlockReceipt], error)
 	FetchReceipts(ctx context.Context, blockHashes []string) (*entity.RpcResponse[[]entity.BlockReceipt], error)
 	FetchBlockByNumber(ctx context.Context, blockNumber int64) (*entity.RpcResponse[entity.EthBlock], error)
@@ -62,9 +63,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 		prevBlockNumber := int64(-1)
 
 		var (
-			block          *entity.RpcResponse[entity.EthBlock]
 			fetchStartTime time.Time
-			err            error
 		)
 
 		for {
@@ -72,58 +71,82 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-timer.C:
-				if prevBlockNumber == -1 {
-					block, err = w.chainSrv.GetLatestBlock(ctx)
-					if err != nil {
-						w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-						w.log.Error(fmt.Sprintf("GetLatestBlock error: %v", err))
-						w.resetTimer(timer)
-						continue
-					}
-				} else {
-					nextBlockNumber := prevBlockNumber + 1
-					block, err = w.chainSrv.FetchBlockByNumber(ctx, nextBlockNumber)
-					if err != nil {
-						if fetchStartTime.IsZero() {
-							fetchStartTime = time.Now()
-						}
-
-						if errors.Is(err, chain.ErrEmptyResponse) {
-							w.log.Info(fmt.Sprintf("Block %d is not available", nextBlockNumber))
-							w.resetTimer(timer)
-							continue
-						}
-
-						if !errors.Is(err, chain.ErrEmptyResponse) {
-							w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-							w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
-						}
-
-						if time.Since(fetchStartTime) > 2*time.Minute {
-							w.metricsStore.BlockResets.Inc()
-							w.log.Warn("Too long without next block, attempting to recover missed blocks")
-							latestRecovered, recoverErr := w.recoverMissedBlocks(ctx, prevBlockNumber)
-							if recoverErr != nil {
-								w.log.Error(fmt.Sprintf("Failed to recover missed blocks %s", recoverErr))
-								prevBlockNumber = -1
-								w.resetTimer(timer)
-							} else {
-								prevBlockNumber = latestRecovered.GetNumber()
-								delay := w.updateTickerAfterBlock(timer, latestRecovered)
-								w.log.Info(fmt.Sprintf("Latest recovered block: %d, delay: %s", (*latestRecovered).GetNumber(), slog.Duration("delay", delay)))
-							}
-
-							// Positive branch - we recovered all skipped blocks
-							fetchStartTime = time.Time{}
-							continue
-						}
-
-						w.resetTimer(timer)
-						continue
-					}
-
-					fetchStartTime = time.Time{}
+				// First, check the current block number
+				blockNumberResp, err := w.chainSrv.GetBlockNumber(ctx)
+				if err != nil {
+					w.log.Error(fmt.Sprintf("GetBlockNumber error: %v", err))
+					w.resetTimer(timer)
+					continue
 				}
+
+				if blockNumberResp == nil || blockNumberResp.Result == nil {
+					w.log.Error("Received nil block number response")
+					w.resetTimer(timer)
+					continue
+				}
+
+				// Convert hex block number to int64
+				currentBlockNumber, err := strconv.ParseInt(*blockNumberResp.Result, 0, 64)
+				if err != nil {
+					w.log.Error(fmt.Sprintf("Failed to parse block number %s: %v", *blockNumberResp.Result, err))
+					w.resetTimer(timer)
+					continue
+				}
+
+				// Initialize prevBlockNumber if this is the first run
+				if prevBlockNumber == -1 {
+					prevBlockNumber = currentBlockNumber - 1
+				}
+
+				// Check if there's a new block
+				if currentBlockNumber <= prevBlockNumber {
+					w.log.Debug(fmt.Sprintf("No new block yet. Current: %d, Previous: %d", currentBlockNumber, prevBlockNumber))
+					w.resetTimer(timer)
+					continue
+				}
+
+				// There's at least one new block, fetch the next expected block
+				nextBlockNumber := prevBlockNumber + 1
+
+				// Check if we've been waiting too long for a specific block
+				if nextBlockNumber < currentBlockNumber && !fetchStartTime.IsZero() && time.Since(fetchStartTime) > 2*time.Minute {
+					w.metricsStore.BlockResets.Inc()
+					w.log.Warn(fmt.Sprintf("Too long without next block %d, current is %d, attempting to recover missed blocks", nextBlockNumber, currentBlockNumber))
+					latestRecovered, recoverErr := w.recoverMissedBlocks(ctx, prevBlockNumber)
+					if recoverErr != nil {
+						w.log.Error(fmt.Sprintf("Failed to recover missed blocks %s", recoverErr))
+						prevBlockNumber = currentBlockNumber - 1
+						w.resetTimer(timer)
+					} else {
+						prevBlockNumber = latestRecovered.GetNumber()
+						delay := w.updateTickerAfterBlock(timer, latestRecovered)
+						delay = max(delay, 30*time.Second)
+						w.log.Info(fmt.Sprintf("Latest recovered block: %d, delay: %s", (*latestRecovered).GetNumber(), slog.Duration("delay", delay)))
+					}
+					fetchStartTime = time.Time{}
+					continue
+				}
+
+				// Fetch the next block
+				block, err := w.chainSrv.FetchBlockByNumber(ctx, nextBlockNumber)
+				if err != nil {
+					if fetchStartTime.IsZero() {
+						fetchStartTime = time.Now()
+					}
+
+					if errors.Is(err, chain.ErrEmptyResponse) {
+						w.log.Info(fmt.Sprintf("Block %d is not available yet", nextBlockNumber))
+						w.resetTimer(timer)
+						continue
+					}
+
+					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+					w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
+					w.resetTimer(timer)
+					continue
+				}
+
+				fetchStartTime = time.Time{}
 
 				if block == nil || block.Result == nil {
 					w.log.Error("Received nil block or result")
@@ -131,12 +154,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
-				if block.Result.GetNumber() == prevBlockNumber {
-					w.resetTimer(timer)
-					w.log.Warn(fmt.Sprintf(`got the same block %d as before, skipping`, block.Result.GetNumber()))
-					continue
-				}
-
+				// Fetch block receipts
 				blockReceipts, getReceiptsErr := w.chainSrv.GetBlockReceipts(ctx, block.Result.Hash)
 				if getReceiptsErr != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
@@ -145,6 +163,7 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 					continue
 				}
 
+				// Build and publish the block
 				blockDto := buildBlockDto(block.Result, *blockReceipts.Result)
 				if publishErr := w.publishBlock(blockDto); publishErr != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
@@ -293,14 +312,15 @@ func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBloc
 	expectedNextBlockTime := time.Unix(block.GetTimestamp(), 0).Add(EtaNextBlock)
 	delay := time.Until(expectedNextBlockTime.Add(DelayNextBlock))
 
-	if delay < time.Second {
-		delay = time.Second
-	}
+	// Trim delay to be at least 1 second and at most 30 seconds
+	// Upper bound is needed for the case when the block is far in the future (forked env)
+	delay = max(1*time.Second, min(delay, 30*time.Second))
 
 	timer.Reset(delay)
 	return delay
 }
 
 func (w *Feeder) resetTimer(timer *time.Timer) {
+	// Reset timer to 2 seconds to avoid spamming the network
 	timer.Reset(2 * time.Second)
 }
