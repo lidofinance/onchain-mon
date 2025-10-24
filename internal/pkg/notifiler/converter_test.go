@@ -250,9 +250,9 @@ func TestConvertDiscordToSlack(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ConvertDiscordToSlack(tt.in)
+			got := NormalizeMarkdownForSlack(tt.in)
 			if got != tt.want {
-				t.Errorf("ConvertDiscordToSlack()\ngot:  %q\nwant: %q", got, tt.want)
+				t.Errorf("NormalizeMarkdownForSlack()\ngot:  %q\nwant: %q", got, tt.want)
 			}
 		})
 	}

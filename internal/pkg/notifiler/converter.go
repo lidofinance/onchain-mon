@@ -5,7 +5,7 @@ import (
 	"unicode"
 )
 
-func ConvertDiscordToSlack(in string) string {
+func NormalizeMarkdownForSlack(in string) string {
 	if in == "" {
 		return in
 	}

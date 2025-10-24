@@ -54,7 +54,7 @@ const MaxSlackMsgLength = 3000
 const WarningSlackMessage = "Warn: Msg >=3000, pls review description message"
 
 func (s *Slack) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
-	formatted := ConvertDiscordToSlack(FormatAlert(alert, s.source, s.blockExplorer))
+	formatted := NormalizeMarkdownForSlack(FormatAlert(alert, s.source, s.blockExplorer))
 	message := TruncateMessageWithAlertID(
 		fmt.Sprintf("%s\n\n%s", alert.Name, formatted),
 		MaxSlackMsgLength,

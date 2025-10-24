@@ -3,6 +3,7 @@ package notifiler_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -78,8 +79,17 @@ func TestSlack(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				alert: &databus.FindingDtoJson{
-					Name:           "ℹ️ #l2_arbitrum Arbitrum digest",
-					Description:    ParadiseLost,
+					Name: "🚨🚨🚨️ Houston we have a long text",
+					Description: strings.Repeat(
+						"This is a truly amazing, incredibly long piece of text meant to test Slack message truncation.\n"+
+							"It just keeps going, line after line, full of awe and verbosity, wrapping over and over again.\n"+
+							"Because we really want to make sure that long messages are handled gracefully.\n"+
+							"And yes, this is indeed a *really freaking long* text block!\n"+
+							"If you're reading this, congrats — you’ve scrolled more than any sane person would.\n"+
+							"Slack, please don’t rate limit us, we’re just testing things.\n"+
+							"Houston, we *definitely* have a long text.\n\n",
+						80,
+					),
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
 					BlockTimestamp: pointers.IntPtr(1727965236),
