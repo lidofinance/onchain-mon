@@ -132,6 +132,12 @@ func NewConsumers(
 					return nil, fmt.Errorf("opsgenie channel with id '%s' not found for consumer '%s'", consumerCfg.ChannelID, consumerCfg.ConsumerName)
 				}
 				notificationChannel = channel
+			case registry.Slack:
+				channel, exists := notificationChannels.SlackChannels[consumerCfg.ChannelID]
+				if !exists {
+					return nil, fmt.Errorf("slack channel with id '%s' not found for consumer '%s'", consumerCfg.ChannelID, consumerCfg.ConsumerName)
+				}
+				notificationChannel = channel
 			default:
 				return nil, fmt.Errorf("unsupported consumer type '%s'", consumerCfg.Type)
 			}

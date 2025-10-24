@@ -155,6 +155,6 @@ The data published by **Feeder** follows a structured JSON format defined in [bl
 | Listens to findings topics         |
 | Applies quorum and filtering       |
 | Forwards to notification channels  |
-| (Telegram, Discord, OpsGenie)      |
+|(Telegram, Discord, OpsGenie, Slack)|
 +------------------------------------+
 ```

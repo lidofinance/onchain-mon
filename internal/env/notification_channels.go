@@ -13,6 +13,7 @@ type NotificationChannels struct {
 	TelegramChannels map[string]*notifiler.Telegram
 	DiscordChannels  map[string]*notifiler.Discord
 	OpsGenieChannels map[string]*notifiler.OpsGenie
+	SlackChannels    map[string]*notifiler.Slack
 }
 
 func NewNotificationChannels(
@@ -26,6 +27,7 @@ func NewNotificationChannels(
 		TelegramChannels: make(map[string]*notifiler.Telegram),
 		DiscordChannels:  make(map[string]*notifiler.Discord),
 		OpsGenieChannels: make(map[string]*notifiler.OpsGenie),
+		SlackChannels:    make(map[string]*notifiler.Slack),
 	}
 
 	for _, tgChannel := range cfg.TelegramChannels {
@@ -62,9 +64,20 @@ func NewNotificationChannels(
 		log.Info(fmt.Sprintf("Initialized %s channel: %s", opsGenieChannel.ID, opsGenieChannel.Description))
 	}
 
+	for _, slackChannel := range cfg.SlackChannels {
+		channels.SlackChannels[slackChannel.ID] = notifiler.NewSlack(
+			slackChannel.WebhookURL,
+			httpClient,
+			metricsStore,
+			source,
+			blockExplorer,
+		)
+		log.Info(fmt.Sprintf("Initialized %s channel: %s", slackChannel.ID, slackChannel.Description))
+	}
+
 	return channels, nil
 }
 
 func (n *NotificationChannels) Count() int {
-	return len(n.TelegramChannels) + len(n.DiscordChannels) + len(n.OpsGenieChannels)
+	return len(n.TelegramChannels) + len(n.DiscordChannels) + len(n.OpsGenieChannels) + len(n.SlackChannels)
 }
