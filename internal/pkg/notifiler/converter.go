@@ -36,7 +36,7 @@ func AdjustMarkdownLinksToSlackWebhookFormat(in string) string {
 				i++
 			}
 			if i < n {
-				i++ // закрывающая `
+				i++
 			}
 			b.WriteString(string(r[start:i]))
 			continue
