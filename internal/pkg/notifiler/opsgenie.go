@@ -28,11 +28,13 @@ type OpsGenie struct {
 	metrics       *metrics.Store
 	blockExplorer string
 	source        string
+	env           string
 }
 
 func NewOpsgenie(opsGenieKey string,
 	httpClient *http.Client, metricsStore *metrics.Store,
 	source, blockExplorer string,
+	env string,
 ) *OpsGenie {
 	return &OpsGenie{
 		opsGenieKey:   opsGenieKey,
@@ -40,6 +42,7 @@ func NewOpsgenie(opsGenieKey string,
 		metrics:       metricsStore,
 		blockExplorer: blockExplorer,
 		source:        source,
+		env:           env,
 	}
 }
 
@@ -65,7 +68,7 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 	payload := AlertPayload{
 		Message:     alert.Name,
 		Description: message,
-		Alias:       alert.AlertId,
+		Alias:       fmt.Sprintf("%s-%s", o.env, alert.AlertId),
 		Priority:    opsGeniePriority,
 	}
 

@@ -40,6 +40,11 @@ opsgenie_channels:
     description: OpsGenie channel for High and Critical messages
     api_key: YOUR_OPSGENIE_API_KEY_1
 
+slack_channels:
+  - id: SlackProtocolErrors
+    description: Slack channel
+    webhook_url: YOUR_SLACK_WEBHOOK_URL_1
+
 consumers:
   - consumerName: TelegramUpdates
     type: Telegram

@@ -17,6 +17,11 @@ discord_channels:
     description: "Discord channel for debug messages (severity: unknown, no quorum)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_1
 
+slack_channels:
+  - id: Slack1
+    description: "Slack channel for debug messages (severity: unknown, no quorum)"
+    webhook_url: YOUR_SLACK_WEBHOOK_URL_1
+
 consumers:
   - consumerName: DiscordDevelopment
     type: Discord
@@ -35,6 +40,20 @@ consumers:
   - consumerName: TelegramDevelopment
     type: Telegram
     channel_id: Telegram1
+    severities:
+      - Unknown
+      - Info
+      - Low
+      - Medium
+      - High
+      - Critical
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
+
+  - consumerName: SlackDevelopment
+    type: Slack
+    channel_id: Slack1
     severities:
       - Unknown
       - Info

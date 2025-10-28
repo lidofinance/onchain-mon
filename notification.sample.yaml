@@ -35,6 +35,11 @@ discord_channels:
     description: "Analytics channel for getting only specific findings (filter: WITHDRAWALS-BIG-WITHDRAWAL-REQUEST-BATCH)"
     webhook_url: YOUR_DISCORD_WEBHOOK_URL_2
 
+slack_channels:
+  - id: Slack1
+    description: "Slack channel for debug messages (severity: Unknown, no quorum)"
+    webhook_url: YOUR_SLACK_WEBHOOK_URL_1
+
 opsgenie_channels:
   - id: OpsGenie1
     description: OpsGenie channel for High and Critical messages
@@ -111,6 +116,17 @@ consumers:
       - Medium
       - High
       - Critical
+    by_quorum: false
+    subjects:
+      - findings.protocol.steth
+      - findings.protocol.arb
+      - findings.protocol.opt
+
+  - consumerName: SlackDebug
+    type: Slack
+    channel_id: Slack1
+    severities:
+      - Unknown
     by_quorum: false
     subjects:
       - findings.protocol.steth
