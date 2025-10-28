@@ -1,5 +1,6 @@
 ## 24.10.2025
 1. Forwarder: add Slack channel notifications for findings.
+2. Forwarder: pass environment to notification channels and include it in OpsGenie alerts
 
 ## 08.09.2025
 1. Update to go1.25.1
