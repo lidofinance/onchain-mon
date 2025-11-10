@@ -1,0 +1,119 @@
+package notifiler_test
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/lidofinance/onchain-mon/generated/databus"
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
+	"github.com/lidofinance/onchain-mon/internal/env"
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
+)
+
+func TestSlack(t *testing.T) {
+	cfg, envErr := env.Read("../../../.env")
+	if envErr != nil {
+		t.Errorf("Read env error: %s", envErr.Error())
+		return
+	}
+	promRegistry := prometheus.NewRegistry()
+	metricsStore := metrics.New(promRegistry, cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
+
+	notifcationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, "../../../notification.yaml")
+	if err != nil {
+		t.Errorf("Read notification config error: %s", err.Error())
+		return
+	}
+
+	type fields struct {
+		webhookURL   string
+		httpClient   *http.Client
+		metricsStore *metrics.Store
+	}
+	type args struct {
+		ctx   context.Context
+		alert *databus.FindingDtoJson
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Success",
+			fields: fields{
+				webhookURL:   notifcationConfig.SlackChannels[0].WebhookURL,
+				httpClient:   &http.Client{},
+				metricsStore: metricsStore,
+			},
+			args: args{
+				ctx: context.Background(),
+				alert: &databus.FindingDtoJson{
+					Name: "ℹ️ #l2_arbitrum Arbitrum digest",
+					//nolint:lll
+					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
+					Severity:       databus.SeverityInfo,
+					AlertId:        `DIGEST`,
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BotName:        `Test`,
+					Team:           `Protocol`,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Too long message",
+			fields: fields{
+				webhookURL:   notifcationConfig.SlackChannels[0].WebhookURL,
+				httpClient:   &http.Client{},
+				metricsStore: metricsStore,
+			},
+			args: args{
+				ctx: context.Background(),
+				alert: &databus.FindingDtoJson{
+					Name: "🚨🚨🚨️ Houston we have a long text",
+					Description: strings.Repeat(
+						"This is a truly amazing, incredibly long piece of text meant to test Slack message truncation.\n"+
+							"It just keeps going, line after line, full of awe and verbosity, wrapping over and over again.\n"+
+							"Because we really want to make sure that long messages are handled gracefully.\n"+
+							"And yes, this is indeed a *really freaking long* text block!\n"+
+							"If you're reading this, congrats — you’ve scrolled more than any sane person would.\n"+
+							"Slack, please don’t rate limit us, we’re just testing things.\n"+
+							"Houston, we *definitely* have a long text.\n\n",
+						80,
+					),
+					Severity:       databus.SeverityInfo,
+					AlertId:        `DIGEST`,
+					BlockTimestamp: pointers.IntPtr(1727965236),
+					BlockNumber:    pointers.IntPtr(20884540),
+					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BotName:        `Test`,
+					Team:           `Protocol`,
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := notifiler.NewSlack(
+				tt.fields.webhookURL,
+				tt.fields.httpClient,
+				metricsStore,
+				`local`,
+				`etherscan.io`,
+			)
+			if err := u.SendFinding(tt.args.ctx, tt.args.alert); (err != nil) != tt.wantErr {
+				t.Errorf("SendMessage() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

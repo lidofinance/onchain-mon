@@ -82,6 +82,7 @@ func main() {
 		metricsStore,
 		cfg.AppConfig.BlockExplorer,
 		cfg.AppConfig.Source,
+		cfg.AppConfig.Env,
 	)
 	if err != nil {
 		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))

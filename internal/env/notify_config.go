@@ -35,6 +35,12 @@ type OpsGenieChannel struct {
 	APIKey      string `mapstructure:"api_key"`
 }
 
+type SlackChannel struct {
+	ID          string `mapstructure:"id"`
+	Description string `mapstructure:"description"`
+	WebhookURL  string `mapstructure:"webhook_url"`
+}
+
 type Consumer struct {
 	ConsumerName     string                       `mapstructure:"consumerName"`
 	Type             registry.NotificationChannel `mapstructure:"type"`
@@ -52,6 +58,7 @@ type NotificationConfig struct {
 	TelegramChannels []TelegramChannel `mapstructure:"telegram_channels"`
 	DiscordChannels  []DiscordChannel  `mapstructure:"discord_channels"`
 	OpsGenieChannels []OpsGenieChannel `mapstructure:"opsgenie_channels"`
+	SlackChannels    []SlackChannel    `mapstructure:"slack_channels"`
 	Consumers        []*Consumer       `mapstructure:"consumers"`
 }
 
@@ -120,6 +127,11 @@ func ValidateConfig(cfg *NotificationConfig) error {
 		opsgenieChannels[channel.ID] = true
 	}
 
+	slackChannels := make(map[string]bool)
+	for _, channel := range cfg.SlackChannels {
+		slackChannels[channel.ID] = true
+	}
+
 	for _, consumer := range cfg.Consumers {
 		switch consumer.Type {
 		case registry.Telegram:
@@ -133,6 +145,10 @@ func ValidateConfig(cfg *NotificationConfig) error {
 		case registry.OpsGenie:
 			if _, exists := opsgenieChannels[consumer.ChannelID]; !exists {
 				return fmt.Errorf("consumer '%s' references an unknown OpsGenie channel '%s'", consumer.ConsumerName, consumer.ChannelID)
+			}
+		case registry.Slack:
+			if _, exists := slackChannels[consumer.ChannelID]; !exists {
+				return fmt.Errorf("consumer '%s' references an unknown Slack channel '%s'", consumer.ConsumerName, consumer.ChannelID)
 			}
 		default:
 			return fmt.Errorf("consumer '%s' has an unknown type '%s'", consumer.ConsumerName, consumer.Type)

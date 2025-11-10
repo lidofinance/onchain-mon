@@ -11,4 +11,5 @@ const (
 	Telegram NotificationChannel = `Telegram`
 	Discord  NotificationChannel = `Discord`
 	OpsGenie NotificationChannel = `OpsGenie`
+	Slack    NotificationChannel = `Slack`
 )
