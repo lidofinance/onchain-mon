@@ -71,7 +71,13 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		Description: message,
 		Alias:       fmt.Sprintf("%s-%s", o.env, alert.AlertId),
 		Priority:    opsGeniePriority,
-		Details:     alert.Labels,
+		Details: map[string]string{
+			"env":     o.env,
+			"source":  o.source,
+			"team":    alert.Team,
+			"botName": alert.BotName,
+			"alertId": alert.AlertId,
+		},
 	}
 
 	return o.send(ctx, payload)

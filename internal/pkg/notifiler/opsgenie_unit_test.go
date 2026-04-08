@@ -41,18 +41,18 @@ func TestSendFinding_SkipsLowSeverity(t *testing.T) {
 	}
 }
 
-func TestAlertPayload_LabelsSerializedAsDetails(t *testing.T) {
-	labels := map[string]string{
-		"team":    "Oracle Team",
-		"runbook": "https://notion.so/runbook",
-		"version": "1",
-	}
-
+func TestAlertPayload_DetailsContainsForwarderAttributes(t *testing.T) {
 	payload := notifiler.AlertPayload{
 		Message:  "test alert",
 		Priority: "P1",
-		Alias:    "test-TEST",
-		Details:  labels,
+		Alias:    "mainnet-TEST",
+		Details: map[string]string{
+			"env":     "mainnet",
+			"source":  "cluster1",
+			"team":    "vroom",
+			"botName": "unusual-activity",
+			"alertId": "UNUSUAL-ACTIVITY-LOW-BALANCE",
+		},
 	}
 
 	data, err := json.Marshal(payload)
@@ -70,14 +70,21 @@ func TestAlertPayload_LabelsSerializedAsDetails(t *testing.T) {
 		t.Fatal("details field missing or wrong type in serialized payload")
 	}
 
-	for k, want := range labels {
-		if got, ok := details[k]; !ok || got != want {
+	expected := map[string]string{
+		"env":     "mainnet",
+		"source":  "cluster1",
+		"team":    "vroom",
+		"botName": "unusual-activity",
+		"alertId": "UNUSUAL-ACTIVITY-LOW-BALANCE",
+	}
+	for k, want := range expected {
+		if got := details[k]; got != want {
 			t.Errorf("details[%s] = %v, want %s", k, got, want)
 		}
 	}
 }
 
-func TestAlertPayload_NilLabelsOmitsDetails(t *testing.T) {
+func TestAlertPayload_NilDetailsOmitted(t *testing.T) {
 	payload := notifiler.AlertPayload{
 		Message:  "test alert",
 		Priority: "P2",
@@ -96,6 +103,6 @@ func TestAlertPayload_NilLabelsOmitsDetails(t *testing.T) {
 	}
 
 	if _, ok := decoded["details"]; ok {
-		t.Error("details field should be omitted when labels are nil")
+		t.Error("details field should be omitted when nil")
 	}
 }

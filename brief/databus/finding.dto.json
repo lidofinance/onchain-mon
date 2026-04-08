@@ -35,12 +35,6 @@
     },
     "team": {
       "type": "string"
-    },
-    "labels": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
     }
   },
   "required": ["severity", "alertId", "name", "description", "botName", "team", "uniqueKey"],
