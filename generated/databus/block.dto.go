@@ -2,10 +2,8 @@
 
 package databus
 
-import (
-	"encoding/json"
-	"fmt"
-)
+import "encoding/json"
+import "fmt"
 
 type BlockDtoJson struct {
 	// Hash corresponds to the JSON schema field "hash".
@@ -68,9 +66,9 @@ type BlockDtoJsonReceiptsElemLogsElem struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *BlockDtoJsonReceiptsElemLogsElem) UnmarshalJSON(b []byte) error {
+func (j *BlockDtoJsonReceiptsElemLogsElem) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["address"]; raw != nil && !ok {
@@ -102,7 +100,7 @@ func (j *BlockDtoJsonReceiptsElemLogsElem) UnmarshalJSON(b []byte) error {
 	}
 	type Plain BlockDtoJsonReceiptsElemLogsElem
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = BlockDtoJsonReceiptsElemLogsElem(plain)
@@ -110,9 +108,9 @@ func (j *BlockDtoJsonReceiptsElemLogsElem) UnmarshalJSON(b []byte) error {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *BlockDtoJsonReceiptsElem) UnmarshalJSON(b []byte) error {
+func (j *BlockDtoJsonReceiptsElem) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["from"]; raw != nil && !ok {
@@ -126,7 +124,7 @@ func (j *BlockDtoJsonReceiptsElem) UnmarshalJSON(b []byte) error {
 	}
 	type Plain BlockDtoJsonReceiptsElem
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = BlockDtoJsonReceiptsElem(plain)
@@ -134,9 +132,9 @@ func (j *BlockDtoJsonReceiptsElem) UnmarshalJSON(b []byte) error {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *BlockDtoJson) UnmarshalJSON(b []byte) error {
+func (j *BlockDtoJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["hash"]; raw != nil && !ok {
@@ -156,7 +154,7 @@ func (j *BlockDtoJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain BlockDtoJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = BlockDtoJson(plain)
