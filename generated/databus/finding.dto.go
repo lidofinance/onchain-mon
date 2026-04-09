@@ -2,9 +2,11 @@
 
 package databus
 
-import "encoding/json"
-import "fmt"
-import "reflect"
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+)
 
 type FindingDtoJson struct {
 	// AlertId corresponds to the JSON schema field "alertId".
@@ -42,9 +44,9 @@ type FindingDtoJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *FindingDtoJson) UnmarshalJSON(value []byte) error {
+func (j *FindingDtoJson) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(value, &raw); err != nil {
+	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["alertId"]; raw != nil && !ok {
@@ -70,7 +72,7 @@ func (j *FindingDtoJson) UnmarshalJSON(value []byte) error {
 	}
 	type Plain FindingDtoJson
 	var plain Plain
-	if err := json.Unmarshal(value, &plain); err != nil {
+	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
 	*j = FindingDtoJson(plain)
@@ -96,9 +98,9 @@ var enumValues_Severity = []interface{}{
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *Severity) UnmarshalJSON(value []byte) error {
+func (j *Severity) UnmarshalJSON(b []byte) error {
 	var v string
-	if err := json.Unmarshal(value, &v); err != nil {
+	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
 	var ok bool
