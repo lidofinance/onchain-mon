@@ -1,3 +1,7 @@
+## 08.04.2026
+1. Forwarder: add `details` field to OpsGenie alerts with forwarder attributes (env, source, team, botName, alertId) for flexible routing
+2. Forwarder: add unit tests for FormatAlert and OpsGenie AlertPayload serialization
+
 ## 24.10.2025
 1. Forwarder: add Slack channel notifications for findings.
 2. Forwarder: pass environment to notification channels and include it in OpsGenie alerts

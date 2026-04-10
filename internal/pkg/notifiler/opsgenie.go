@@ -16,10 +16,11 @@ import (
 )
 
 type AlertPayload struct {
-	Message     string `json:"message"`
-	Description string `json:"description,omitempty"`
-	Priority    string `json:"priority,omitempty"`
-	Alias       string `json:"alias,omitempty"`
+	Message     string            `json:"message"`
+	Description string            `json:"description,omitempty"`
+	Priority    string            `json:"priority,omitempty"`
+	Alias       string            `json:"alias,omitempty"`
+	Details     map[string]string `json:"details,omitempty"`
 }
 
 type OpsGenie struct {
@@ -70,6 +71,13 @@ func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJso
 		Description: message,
 		Alias:       fmt.Sprintf("%s-%s", o.env, alert.AlertId),
 		Priority:    opsGeniePriority,
+		Details: map[string]string{
+			"env":     o.env,
+			"source":  o.source,
+			"team":    alert.Team,
+			"botName": alert.BotName,
+			"alertId": alert.AlertId,
+		},
 	}
 
 	return o.send(ctx, payload)
