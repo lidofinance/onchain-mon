@@ -119,8 +119,11 @@ func doRpcRequest[T any](
 			return !errors.Is(err, ErrEmptyResponse)
 		}),
 	)
-
-	return out, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	if err != nil {
+		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	}
+	
+	return out, nil
 }
 
 func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
@@ -193,7 +196,11 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 		retry.Context(ctx),
 	)
 
-	return out, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	if err != nil {
+		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	}
+
+	return out, nil
 }
 
 func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity.RpcResponse[[]entity.EthBlock], error) {
@@ -267,5 +274,9 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 		retry.Context(ctx),
 	)
 
-	return out, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	if err != nil {
+		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	}
+
+	return out, nil
 }
