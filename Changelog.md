@@ -1,3 +1,6 @@
+## 06.05.2026
+1. Added string sanitizer
+
 ## 08.04.2026
 1. Forwarder: add `details` field to OpsGenie alerts with forwarder attributes (env, source, team, botName, alertId) for flexible routing
 2. Forwarder: add unit tests for FormatAlert and OpsGenie AlertPayload serialization
