@@ -21,6 +21,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
+	"github.com/lidofinance/onchain-mon/internal/utils/text"
 )
 
 type Consumer struct {
@@ -505,7 +506,9 @@ func (c *Consumer) ackMessage(msg jetstream.Msg) {
 }
 
 func (c *Consumer) logError(errMsg string, finding *databus.FindingDtoJson) {
-	c.log.Error(errMsg,
+	msg := text.LeaveOnlyDomainInURLs(errMsg)
+
+	c.log.Error(msg,
 		slog.String("alertId", finding.AlertId),
 		slog.String("name", finding.Name),
 		slog.String("desc", finding.Description),
@@ -518,7 +521,9 @@ func (c *Consumer) logError(errMsg string, finding *databus.FindingDtoJson) {
 }
 
 func (c *Consumer) logInfo(infoMsg string, finding *databus.FindingDtoJson) {
-	c.log.Info(infoMsg,
+	msg := text.LeaveOnlyDomainInURLs(infoMsg)
+
+	c.log.Info(msg,
 		slog.String("alertId", finding.AlertId),
 		slog.String("name", finding.Name),
 		slog.String("desc", finding.Description),
