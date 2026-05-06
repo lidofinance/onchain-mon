@@ -16,6 +16,7 @@ import (
 
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/pkg/chain/entity"
+	"github.com/lidofinance/onchain-mon/internal/utils/text"
 )
 
 type chain struct {
@@ -55,7 +56,7 @@ func doRpcRequest[T any](
 	ctx context.Context, method string, params []any,
 	httpClient *http.Client, m *metrics.Store, jsonRpcUrl string,
 ) (*entity.RpcResponse[T], error) {
-	return retry.DoWithData(
+	out, err := retry.DoWithData(
 		func() (*entity.RpcResponse[T], error) {
 			rpcRequest := entity.RpcRequest{
 				JsonRpc: "2.0",
@@ -118,6 +119,11 @@ func doRpcRequest[T any](
 			return !errors.Is(err, ErrEmptyResponse)
 		}),
 	)
+	if err != nil {
+		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	}
+	
+	return out, nil
 }
 
 func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
@@ -125,7 +131,7 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 		return &entity.RpcResponse[[]entity.BlockReceipt]{Result: &[]entity.BlockReceipt{}}, nil
 	}
 
-	return retry.DoWithData(
+	out, err := retry.DoWithData(
 		func() (*entity.RpcResponse[[]entity.BlockReceipt], error) {
 			requests := make([]entity.RpcRequest, 0, len(blockHashes))
 			for _, hash := range blockHashes {
@@ -189,6 +195,12 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 		)),
 		retry.Context(ctx),
 	)
+
+	if err != nil {
+		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	}
+
+	return out, nil
 }
 
 func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity.RpcResponse[[]entity.EthBlock], error) {
@@ -196,7 +208,7 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 		return &entity.RpcResponse[[]entity.EthBlock]{Result: &[]entity.EthBlock{}}, nil
 	}
 
-	return retry.DoWithData(
+	out, err := retry.DoWithData(
 		func() (*entity.RpcResponse[[]entity.EthBlock], error) {
 			requests := make([]entity.RpcRequest, 0, to-from+1)
 			for i := from; i <= to; i++ {
@@ -261,4 +273,10 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 		)),
 		retry.Context(ctx),
 	)
+
+	if err != nil {
+		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
+	}
+
+	return out, nil
 }
