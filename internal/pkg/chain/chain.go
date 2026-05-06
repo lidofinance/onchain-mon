@@ -120,6 +120,10 @@ func doRpcRequest[T any](
 		}),
 	)
 	if err != nil {
+		if errors.Is(err, ErrEmptyResponse) {
+			return nil, err
+		}
+
 		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
 	}
 	
