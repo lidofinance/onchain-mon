@@ -43,6 +43,10 @@ func (c *chain) GetLatestBlock(ctx context.Context) (*entity.RpcResponse[entity.
 	return doRpcRequest[entity.EthBlock](ctx, "eth_getBlockByNumber", []any{"latest", false}, c.httpClient, c.metrics, c.jsonRpcUrl)
 }
 
+func (c *chain) GetBlockNumber(ctx context.Context) (*entity.RpcResponse[string], error) {
+	return doRpcRequest[string](ctx, "eth_blockNumber", []any{}, c.httpClient, c.metrics, c.jsonRpcUrl)
+}
+
 func (c *chain) GetBlockReceipts(ctx context.Context, blockHash string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
 	return doRpcRequest[[]entity.BlockReceipt](ctx, "eth_getBlockReceipts", []any{blockHash}, c.httpClient, c.metrics, c.jsonRpcUrl)
 }
