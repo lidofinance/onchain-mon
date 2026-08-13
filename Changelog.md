@@ -10,35 +10,43 @@
 7. Stopped reporting `http: Server closed` to Sentry — a graceful shutdown makes `ListenAndServe` return `ErrServerClosed`, which was logged at error level on every restart
 8. Graceful shutdown now gets its own context with a 10s timeout; it used to receive the already-cancelled one and cut live connections instead of draining them
 9. Consumer: rate-limited debug findings are logged at info level instead of error, so expected back-pressure no longer reaches Sentry (the quorum branch already did this)
+10. Metrics: collectors went into the global promauto registry while `/metrics` served the app's one, so `blocks_published_total`, `finding_sent_total`, `request_processing_seconds` and `notification_channel_error_total` were never exported; the Go runtime and process collectors are now registered explicitly
+11. Metrics: `metrics.New` registered every collector twice and panicked on a second call, which made the package unusable from tests
+12. Feeder: `recoverMissedBlocks` could return `nil` with no error when the RPC replied with an empty range, and the caller dereferenced it — feeder crashed exactly while recovering from an RPC outage
+13. Feeder: recovery now walks the gap in chunks of 50 blocks; a long outage used to be fetched in one batch that ran into the client timeout and dropped the whole recovery
+14. Feeder: a failed chunk no longer discards the blocks already published — recovery reports how far it got and resumes from there instead of skipping the gap
+15. Feeder: `compress` handed the buffer over before `Close` wrote the zstd frame footer, and the writer's constructor error was discarded
 
 ### Changed
-10. Alert footer is shorter and easier to scan: dropped `Team`, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line
-11. Update to go1.26.5
-12. Update dependencies
-13. Update dev tools; `gomodguard` -> `gomodguard_v2`
-14. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
-15. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
-16. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
-17. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
+16. Alert footer is shorter and easier to scan: dropped `Team`, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line
+17. Update to go1.26.5
+18. Update dependencies
+19. Update dev tools; `gomodguard` -> `gomodguard_v2`
+20. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
+21. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
+22. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
+23. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
 
 ### Added
-18. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
-19. Consumer: tests for quorum counting and for losing the send race
-20. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
-21. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
-22. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
-23. `make check-format`, `make test` and `make test-live`
+24. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
+25. Consumer: tests for quorum counting and for losing the send race
+26. Feeder: tests covering recovery chunking, its boundaries, partial-progress handling and the nil-response guards
+27. `FormatAlert` tests now compare the rendered alert verbatim instead of asserting on substrings; `notifiler.Now` makes the timestamp deterministic
+28. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
+29. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
+30. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
+31. `make check-format`, `make test` and `make test-live`
 
 ### Removed
-24. The unused `/` config page: `web/templates` and the `show` handler
-25. The `tools` module — its pinned versions had drifted from what `make tools` installs
+32. The unused `/` config page: `web/templates` and the `show` handler
+33. The `tools` module — its pinned versions had drifted from what `make tools` installs
 
 ### Tooling
-26. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
-27. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
-28. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
-29. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
-30. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
+34. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
+35. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
+36. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
+37. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
+38. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
 
 ## 06.05.2026
 1. Added string sanitizer
