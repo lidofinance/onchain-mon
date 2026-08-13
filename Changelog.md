@@ -14,6 +14,7 @@
 13. Consumer: extracted handleWithoutQuorum and collectQuorumCount from GetConsumeHandler
 14. Consumer: added tests for quorum counting and send-race handling
 15. Put live RPC/messaging tests behind the `live` build tag, so `go test ./...` no longer posts to real channels; added `make test` and `make test-live`
+16. Added CI workflow: format, lint, build + tests (with Redis service), vulncheck; live tests stay excluded
 
 ## 06.05.2026
 1. Added string sanitizer

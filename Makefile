@@ -34,6 +34,11 @@ imports:
 fix-lint:
 	bin/golangci-lint run --config=.golangci.yml --fix ./cmd... ./internal/...
 
+# Fails when anything is not formatted, without rewriting files (for CI).
+.PHONY: check-format
+check-format:
+	bin/golangci-lint fmt --config=.golangci.yml --diff ./cmd/... ./internal/...
+
 .PHONY: test
 test:
 	go test ./cmd/... ./internal/...
