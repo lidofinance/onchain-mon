@@ -1,3 +1,7 @@
+## 13.08.2026
+1. Update to go1.26.5
+2. Update dev tools
+
 ## 06.05.2026
 1. Added string sanitizer
 

@@ -1,6 +1,6 @@
 module github.com/lidofinance/onchain-mon
 
-go 1.25.1
+go 1.26.5
 
 require (
 	github.com/avast/retry-go/v4 v4.6.1

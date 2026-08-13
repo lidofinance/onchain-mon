@@ -8,12 +8,12 @@ generate-docker:
 tools:
 	cd tools && go mod vendor && go mod tidy && go mod verify
 	@echo "Installing dev tools into ./bin ..."
-	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.4.0
-	GOBIN=$(PWD)/bin go install github.com/vektra/mockery/v3@v3.5.3
-	GOBIN=$(PWD)/bin go install golang.org/x/tools/cmd/goimports@v0.36.0
-	GOBIN=$(PWD)/bin go install github.com/atombender/go-jsonschema@v0.20.0
+	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	GOBIN=$(PWD)/bin go install github.com/vektra/mockery/v3@v3.7.3
+	GOBIN=$(PWD)/bin go install golang.org/x/tools/cmd/goimports@v0.48.0
+	GOBIN=$(PWD)/bin go install github.com/atombender/go-jsonschema@v0.24.1
 	GOBIN=$(PWD)/bin go install github.com/psampaz/go-mod-outdated@v0.9.0
-	GOBIN=$(PWD)/bin go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+	GOBIN=$(PWD)/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
 
 .PHONY: vendor
 vendor:
