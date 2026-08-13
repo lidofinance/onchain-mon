@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -14,11 +15,10 @@ import (
 
 func New(cfg *env.AppConfig) (*slog.Logger, *sentry.Client, error) {
 	logLevel := slog.LevelInfo
+
 	switch strings.ToUpper(cfg.LogLevel) {
 	case "DEBUG":
 		logLevel = slog.LevelDebug
-	case "INFO":
-		logLevel = slog.LevelInfo
 	case "WARN":
 		logLevel = slog.LevelWarn
 	case "ERROR":
@@ -30,29 +30,33 @@ func New(cfg *env.AppConfig) (*slog.Logger, *sentry.Client, error) {
 		slogHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
 	}
 
-	if cfg.Env != `local` {
-		hub := sentry.CurrentHub()
-		client, sentryErr := sentry.NewClient(sentry.ClientOptions{
-			Dsn:           cfg.SentryDSN,
-			EnableTracing: false,
-			Environment:   cfg.Env,
-			ServerName:    cfg.Source,
-		})
-		if sentryErr != nil {
-			return nil, nil, sentryErr
-		}
-
-		hub.BindClient(client)
-		return slog.New(
-			slogmulti.Fanout(
-				slogHandler,
-				slogsentry.Option{
-					Level: slog.LevelError,
-					Hub:   hub,
-				}.NewSentryHandler(),
-			),
-		), client, nil
+	// Sentry follows the DSN, not the environment name: an empty DSN builds a
+	// client that silently discards everything, which just looks like working
+	// error reporting.
+	if cfg.SentryDSN == "" {
+		return slog.New(slogHandler), nil, nil
 	}
 
-	return slog.New(slogHandler), nil, nil
+	hub := sentry.CurrentHub()
+	client, sentryErr := sentry.NewClient(sentry.ClientOptions{
+		Dsn:           cfg.SentryDSN,
+		EnableTracing: false,
+		Environment:   cfg.Env,
+		ServerName:    cfg.Source,
+	})
+	if sentryErr != nil {
+		return nil, nil, fmt.Errorf("could not create sentry client: %w", sentryErr)
+	}
+
+	hub.BindClient(client)
+
+	return slog.New(
+		slogmulti.Fanout(
+			slogHandler,
+			slogsentry.Option{
+				Level: slog.LevelError,
+				Hub:   hub,
+			}.NewSentryHandler(),
+		),
+	), client, nil
 }
