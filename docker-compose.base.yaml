@@ -25,3 +25,21 @@ services:
       - JS_STORAGE_DIR=/data/jetstream
     restart: unless-stopped
     logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=24h
+    restart: unless-stopped
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      # Local stacks only: skip the login screen.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    restart: unless-stopped
+    logging: *default-logging

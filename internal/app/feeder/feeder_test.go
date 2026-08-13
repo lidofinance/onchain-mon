@@ -6,10 +6,16 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/pkg/chain/entity"
 )
 
@@ -40,10 +46,19 @@ func (n *nilResultChain) GetLatestBlock(_ context.Context) (*entity.RpcResponse[
 	return &entity.RpcResponse[entity.EthBlock]{Result: nil}, nil
 }
 
+var testMetricsOnce sync.Once
+var testMetrics *metrics.Store
+
 func newTestFeeder(c ChainSrv) *Feeder {
+	// metrics.New registers collectors, so build the store once per binary.
+	testMetricsOnce.Do(func() {
+		testMetrics = metrics.New(prometheus.NewRegistry(), "feeder_test", "t", "t")
+	})
+
 	return &Feeder{
-		log:      slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError + 1})),
-		chainSrv: c,
+		log:          slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError + 1})),
+		chainSrv:     c,
+		metricsStore: testMetrics,
 	}
 }
 
@@ -213,4 +228,71 @@ func Test_recover_reports_error_when_nothing_was_published(t *testing.T) {
 	if last != nil {
 		t.Errorf("block must be nil when nothing was published, got %v", last)
 	}
+}
+
+// Publishes always fail with ErrMaxPayload and record which heights were asked for.
+type oversizedChain struct {
+	ChainSrv
+	mu      sync.Mutex
+	fetched []int64
+	latest  int64
+}
+
+func (c *oversizedChain) GetLatestBlock(_ context.Context) (*entity.RpcResponse[entity.EthBlock], error) {
+	b := entity.EthBlock{Number: "0x" + strconv.FormatInt(c.latest, 16), Hash: "0xh"}
+	return &entity.RpcResponse[entity.EthBlock]{Result: &b}, nil
+}
+
+func (c *oversizedChain) FetchBlockByNumber(_ context.Context, n int64) (*entity.RpcResponse[entity.EthBlock], error) {
+	c.mu.Lock()
+	c.fetched = append(c.fetched, n)
+	c.mu.Unlock()
+
+	b := entity.EthBlock{Number: "0x" + strconv.FormatInt(n, 16), Hash: "0xh" + strconv.FormatInt(n, 10)}
+	return &entity.RpcResponse[entity.EthBlock]{Result: &b}, nil
+}
+
+func (c *oversizedChain) GetBlockReceipts(_ context.Context, _ string) (*entity.RpcResponse[[]entity.BlockReceipt], error) {
+	empty := []entity.BlockReceipt{}
+	return &entity.RpcResponse[[]entity.BlockReceipt]{Result: &empty}, nil
+}
+
+type maxPayloadJetStream struct{ jetstream.JetStream }
+
+func (m *maxPayloadJetStream) PublishAsync(_ string, _ []byte, _ ...jetstream.PublishOpt) (jetstream.PubAckFuture, error) {
+	return nil, nats.ErrMaxPayload
+}
+
+// An oversized block used to wedge the loop: the publish failed, prevBlockNumber
+// never advanced, and the same height was re-fetched every couple of seconds.
+func Test_unpublishable_block_does_not_wedge_the_loop(t *testing.T) {
+	chainSrv := &oversizedChain{latest: 100}
+
+	f := newTestFeeder(chainSrv)
+	f.js = &maxPayloadJetStream{}
+
+	// The first tick fires after Per6Sec; give the loop room for a few more.
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+
+	g, gCtx := errgroup.WithContext(ctx)
+	f.Run(gCtx, g)
+	_ = g.Wait()
+
+	chainSrv.mu.Lock()
+	fetched := append([]int64(nil), chainSrv.fetched...)
+	chainSrv.mu.Unlock()
+
+	if len(fetched) < 2 {
+		t.Fatalf("expected the feeder to move on to further heights, got %v", fetched)
+	}
+
+	seen := map[int64]int{}
+	for _, n := range fetched {
+		seen[n]++
+		if seen[n] > 1 {
+			t.Fatalf("height %d was re-fetched — the loop is wedged: %v", n, fetched)
+		}
+	}
+	t.Logf("heights fetched in order: %v", fetched)
 }

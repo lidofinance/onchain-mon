@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -150,12 +151,40 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				blockDto := buildBlockDto(block.Result, *blockReceipts.Result)
 				if publishErr := w.publishBlock(blockDto); publishErr != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+
+					// An oversized block never becomes publishable, so retrying it
+					// wedges the feeder on this height forever. Skip past it.
+					if isUnpublishable(publishErr) {
+						w.metricsStore.UnpublishedBlock(metrics.ReasonMaxPayload, block.Result.GetNumber())
+						w.log.Error("Skipping unpublishable block",
+							slog.Int("blockNumber", blockDto.Number),
+							slog.String("reason", metrics.ReasonMaxPayload),
+							slog.String("error", publishErr.Error()),
+						)
+
+						prevBlockNumber = block.Result.GetNumber()
+						w.updateTickerAfterBlock(timer, block.Result)
+
+						continue
+					}
+
+					// Transient failure: arm the recovery window so a long outage
+					// here is backfilled the same way a fetch outage is.
+					if fetchStartTime.IsZero() {
+						fetchStartTime = time.Now()
+					}
+
 					w.log.Error(fmt.Sprintf(`Could not publish block blockDto: %s`, publishErr))
 					w.resetTimer(timer)
+
 					continue
 				}
 
 				w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+				// Wall-clock time of the publish, not the block timestamp: the
+				// staleness alert compares this against time().
+				w.metricsStore.LastPublishedBlockTimestamp.Set(float64(time.Now().Unix()))
+
 				prevBlockNumber = block.Result.GetNumber()
 				delay := w.updateTickerAfterBlock(timer, block.Result)
 
@@ -163,6 +192,13 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 			}
 		}
 	})
+}
+
+// isUnpublishable reports whether NATS rejected the block for good. Size limits
+// are checked before the message leaves the client, so no amount of retrying
+// makes such a block publishable — the feeder has to move past it.
+func isUnpublishable(err error) bool {
+	return errors.Is(err, nats.ErrMaxPayload) || errors.Is(err, jetstream.ErrMaxBytesExceeded)
 }
 
 func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*entity.EthBlock, error) {
@@ -259,6 +295,11 @@ func (w *Feeder) recoverBlockRange(ctx context.Context, from, to int64) (*entity
 		}
 		latestPubBlock = &block
 
+		// Recovered blocks count as published, otherwise a long backfill would
+		// look like a stalled feeder to the staleness alert.
+		w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+		w.metricsStore.LastPublishedBlockTimestamp.Set(float64(time.Now().Unix()))
+
 		w.log.Info(fmt.Sprintf("Recovered block %d", dto.Number))
 	}
 
@@ -338,6 +379,11 @@ func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
 	if compressErr != nil {
 		return fmt.Errorf("could not compress blockDto by zstd: %w", compressErr)
 	}
+
+	// Recorded before the publish so an oversized block is measured too — that
+	// is exactly the case worth seeing on the chart.
+	w.metricsStore.BlockPayloadSize.With(prometheus.Labels{metrics.Stage: metrics.StageRaw}).Set(float64(len(payload)))
+	w.metricsStore.BlockPayloadSize.With(prometheus.Labels{metrics.Stage: metrics.StageCompressed}).Set(float64(cPayload.Len()))
 
 	if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 		jetstream.WithMsgID(blockDto.Hash),

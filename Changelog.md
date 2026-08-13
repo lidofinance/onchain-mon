@@ -28,41 +28,48 @@
 25. Config: an empty `consumerName` is rejected instead of producing a malformed durable name
 26. Both binaries now exit with code 1 when they fail to start; they reported success, so an orchestrator could not tell a crash from a clean stop
 27. Dropped `syscall.SIGKILL` from the signal set — the OS never delivers it, so listening for it only suggested a graceful shutdown that cannot happen
+28. Feeder: an oversized block no longer wedges the loop. `ErrMaxPayload` is returned before the message leaves the client, so retrying it re-fetched the same height every two seconds forever and block delivery stalled. Such a block is now logged, counted and skipped
+29. Feeder: a failed publish also arms the recovery window, so `recoverMissedBlocks` backfills gaps that start here — previously only fetch errors did
 
 ### Changed
-28. Alert footer is shorter and easier to scan: dropped `Team`, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line
-29. Update to go1.26.5
-30. Update dependencies
-31. Update dev tools; `gomodguard` -> `gomodguard_v2`
-32. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
-33. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
-34. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
-35. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
+30. Alert footer is shorter and easier to scan: dropped `Team`, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line
+31. Update to go1.26.5
+32. Update dependencies
+33. Update dev tools; `gomodguard` -> `gomodguard_v2`
+34. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
+35. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
+36. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
+37. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
 
 ### Added
-36. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
-37. Consumer: tests for quorum counting and for losing the send race
-38. Feeder: tests covering recovery chunking, its boundaries, partial-progress handling and the nil-response guards
-39. `FormatAlert` tests now compare the rendered alert verbatim instead of asserting on substrings; `notifiler.Now` makes the timestamp deterministic
-40. Notifiler: a test that counts TCP connections against a local server, so connection reuse cannot regress unnoticed
-41. Config: tests for every validation rule, including the durable-name collision and the subject format
-42. Consumer: a test pinning the sending-status TTL to minutes
-43. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
-44. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
-45. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
-46. `make check-format`, `make test` and `make test-live`
+38. Feeder metrics for skipped blocks and staleness: `blocks_unpublishable_total{reason}`, `last_unpublishable_block_number` and `last_published_block_timestamp`. The block number is the gauge value, not a label — as a label it would spawn a new time series per block
+39. Feeder metric `block_payload_bytes{stage}` — the block size before and after zstd, so the headroom against the 8 Mb NATS limit is visible
+40. Feeder: a regression test asserting an unpublishable block never makes the loop re-fetch the same height
+41. Local observability stack: Prometheus and Grafana in docker-compose, provisioned with the production dashboard and scrape labels that match it
+42. Grafana panels for the new feeder metrics, per-consumer forwarder delivery, Go heap/GC/allocation and a build-info table with the commit each service runs
+43. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
+44. Consumer: tests for quorum counting and for losing the send race
+45. Feeder: tests covering recovery chunking, its boundaries, partial-progress handling and the nil-response guards
+46. `FormatAlert` tests now compare the rendered alert verbatim instead of asserting on substrings; `notifiler.Now` makes the timestamp deterministic
+47. Notifiler: a test that counts TCP connections against a local server, so connection reuse cannot regress unnoticed
+48. Config: tests for every validation rule, including the durable-name collision and the subject format
+49. Consumer: a test pinning the sending-status TTL to minutes
+50. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
+51. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
+52. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
+53. `make check-format`, `make test` and `make test-live`
 
 ### Removed
-47. The unused `/` config page: `web/templates` and the `show` handler
-48. The `tools` module — its pinned versions had drifted from what `make tools` installs
+54. The unused `/` config page: `web/templates` and the `show` handler
+55. The `tools` module — its pinned versions had drifted from what `make tools` installs
 
 ### Tooling
-49. Test fixtures no longer carry real team, bot and token names — subjects, alert ids and descriptions use neutral placeholders
-50. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
-51. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
-52. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
-53. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
-54. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
+56. Test fixtures no longer carry real team, bot and token names — subjects, alert ids and descriptions use neutral placeholders
+57. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
+58. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
+59. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
+60. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
+61. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
 
 ## 06.05.2026
 1. Added string sanitizer

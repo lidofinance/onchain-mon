@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # The dashboard filters on env/source/service, which production adds at scrape
+  # time — reproduce them here so the same dashboard works locally.
+  - job_name: feeder
+    static_configs:
+      - targets: ['feeder:8080']
+        labels:
+          service: service-feeder
+          env: local
+          source: local-1
+    metrics_path: /metrics
+
+  - job_name: forwarder
+    static_configs:
+      - targets: ['forwarder:8080']
+        labels:
+          service: service-forwarder
+          env: local
+          source: local-1
+    metrics_path: /metrics
