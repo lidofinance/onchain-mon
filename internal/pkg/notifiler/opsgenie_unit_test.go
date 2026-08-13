@@ -49,7 +49,7 @@ func TestAlertPayload_DetailsContainsForwarderAttributes(t *testing.T) {
 		Details: map[string]string{
 			"env":     "mainnet",
 			"source":  "cluster1",
-			"team":    "vroom",
+			"team":    "probe",
 			"botName": "unusual-activity",
 			"alertId": "UNUSUAL-ACTIVITY-LOW-BALANCE",
 		},
@@ -73,7 +73,7 @@ func TestAlertPayload_DetailsContainsForwarderAttributes(t *testing.T) {
 	expected := map[string]string{
 		"env":     "mainnet",
 		"source":  "cluster1",
-		"team":    "vroom",
+		"team":    "probe",
 		"botName": "unusual-activity",
 		"alertId": "UNUSUAL-ACTIVITY-LOW-BALANCE",
 	}

@@ -77,21 +77,21 @@ func Test_SendFinding(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
-					Name: `ℹ️ Lido: BotToken rebased`,
+					Name: `ℹ️ Acme: BotToken rebased`,
 					Description: `Withdrawals info:` +
 						`requests count:    4302
- withdrawn stETH:   174541.1742
- finalized stETH:   174541.1742 4302
- unfinalized stETH: 0.0000   0
+ withdrawn stTKN:   174541.1742
+ finalized stTKN:   174541.1742 4302
+ unfinalized stTKN: 0.0000   0
  claimed ether:     142576.2152 853
  unclaimed ether:   31964.9590   3449`,
 					Severity:       databus.SeverityLow,
-					AlertId:        `LIDO-TOKEN-REBASED`,
+					AlertId:        `ASSET-TOKEN-REBASED`,
 					BlockTimestamp: new(1727965236),
 					BlockNumber:    new(20884540),
 					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
-					BotName:        `FF-telegram-unit-test`,
-					Team:           `Protocol`,
+					BotName:        `FF-tg-unit-test`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,
@@ -107,16 +107,16 @@ func Test_SendFinding(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
-					Name: "ℹ️ #l2_arbitrum Arbitrum digest",
+					Name: "ℹ️ #l2_beta Beta digest",
 					//nolint:lll
-					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
+					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tGOV:\n\t\tL1: 1231218.4603 GOV\n\t\tL2: 1230730.9530 GOV\n\t\n\twrapTKN:\n\t\tL1: 84477.0663 wrapTKN\n\t\tL2: 81852.1638 wrapTKN\n\nWithdrawals:\n\twrapTKN: 1664.1363 (in 5 transactions)",
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
 					BlockTimestamp: new(1727965236),
 					BlockNumber:    new(20884540),
 					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,
@@ -132,7 +132,7 @@ func Test_SendFinding(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
-					Name:           "ℹ️ Lido: BotToken rebased",
+					Name:           "ℹ️ Acme: BotToken rebased",
 					Description:    ParadiseLost,
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
@@ -140,7 +140,7 @@ func Test_SendFinding(t *testing.T) {
 					BlockNumber:    new(20884540),
 					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,

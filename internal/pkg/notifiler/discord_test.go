@@ -19,7 +19,7 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 )
 
-const Name = `[INFO] ℹ️ Lido: BotToken rebased`
+const Name = `[INFO] ℹ️ Acme: BotToken rebased`
 const Description = `APR stats
 APR: 3.15%
 Total shares: 8,123,765.58 (+170686.98) × 1e18
@@ -40,7 +40,7 @@ EL Vault: 181.21 ETH
 
 Requests finalization
 Finalized: 180 (20,671.10 ETH)
-Pending: 16 (2,906.63 stETH)
+Pending: 16 (2,906.63 stTKN)
 Share rate: 1.16810
 Used buffer: 20,179.47 ETH
 
@@ -88,16 +88,16 @@ func Test_usecase_SendFinding(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				alert: &databus.FindingDtoJson{
-					Name: "ℹ️ #l2_arbitrum Arbitrum digest",
+					Name: "ℹ️ #l2_beta Beta digest",
 					//nolint:lll
-					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
+					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tGOV:\n\t\tL1: 1231218.4603 GOV\n\t\tL2: 1230730.9530 GOV\n\t\n\twrapTKN:\n\t\tL1: 84477.0663 wrapTKN\n\t\tL2: 81852.1638 wrapTKN\n\nWithdrawals:\n\twrapTKN: 1664.1363 (in 5 transactions)",
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
 					BlockTimestamp: new(1727965236),
 					BlockNumber:    new(20884540),
 					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,
@@ -112,7 +112,7 @@ func Test_usecase_SendFinding(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				alert: &databus.FindingDtoJson{
-					Name:           "ℹ️ #l2_arbitrum Arbitrum digest",
+					Name:           "ℹ️ #l2_beta Beta digest",
 					Description:    ParadiseLost,
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
@@ -120,7 +120,7 @@ func Test_usecase_SendFinding(t *testing.T) {
 					BlockNumber:    new(20884540),
 					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,

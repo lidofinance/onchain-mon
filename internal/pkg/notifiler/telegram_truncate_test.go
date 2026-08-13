@@ -165,9 +165,9 @@ Irreconcileable, to our grand Foe,
 Who now triumphs, and in th' excess of joy
 Sole reigning holds the Tyranny of Heav'n.
 
-Alert Id: LIDO-TOKEN-REBASED
-Bot name: FF-telegram-unit-test
-Team: Protocol
+Alert Id: ASSET-TOKEN-REBASED
+Bot name: FF-tg-unit-test
+Team: Alpha
 Block number: [20884540](https://etherscan.io/block/20884540/)
 Tx hash: [x714...bdf](https://etherscan.io/tx/0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf/)
 Source: local
@@ -293,13 +293,14 @@ Breaking the horrid silence thus began.
 
 If thou beest he; But O how fall'n! how chang'd
 From him, who in the happy Realms of Light
-Cloth'd with transcendent brightness didst out-sh
+Cloth'd with transcendent brightness didst out-shine
+Myri
 ...
 
 *Warn: Msg >=4096, pls review description message*
-Alert Id: LIDO-TOKEN-REBASED
-Bot name: FF-telegram-unit-test
-Team: Protocol
+Alert Id: ASSET-TOKEN-REBASED
+Bot name: FF-tg-unit-test
+Team: Alpha
 Block number: [20884540](https://etherscan.io/block/20884540/)
 Tx hash: [x714...bdf](https://etherscan.io/tx/0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf/)
 Source: local

@@ -21,7 +21,7 @@ import (
 
 const NameCritical = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
 const DescriptionCritical = `
-Total supply of bridged wstETH is greater than balanceOf L1 bridge side!
+Total supply of bridged wrapTKN is greater than balanceOf L1 bridge side!
 L2 total supply: 1105.48
 L1 balanceOf: 1080.11
 
@@ -77,7 +77,7 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 					BlockNumber:    new(20884540),
 					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,
