@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 
 const (
 	defaultReadTimeout  = 10 * time.Second
+	shutdownTimeout     = 10 * time.Second
 	defaultWriteTimeout = 10 * time.Second
 	defaultIdleTimeout  = 60 * time.Second
 )
@@ -61,12 +63,22 @@ func (a *App) RunHTTPServer(ctx context.Context, g *errgroup.Group, appPort uint
 	}
 
 	g.Go(func() error {
-		return server.ListenAndServe()
+		// A graceful Shutdown makes ListenAndServe return ErrServerClosed;
+		// that is the normal stop path, not a failure worth reporting.
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+
+		return nil
 	})
 
 	g.Go(func() error {
 		<-ctx.Done()
-		return server.Shutdown(ctx)
+
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+
+		return server.Shutdown(shutdownCtx)
 	})
 }
 

@@ -210,7 +210,9 @@ func (c *Consumer) handleWithoutQuorum(ctx context.Context, msg jetstream.Msg, f
 			debugMsgInfo := fmt.Sprintf("%s[%s] put debug-finding back[%s] into nats:%s. cause: %v",
 				c.source, c.notifier.GetType(), finding.AlertId, c.name, sendErr,
 			)
-			c.logError(debugMsgInfo, finding)
+			// Rate limiting is expected back-pressure, not a failure: log it at
+			// info level so it does not reach Sentry.
+			c.logInfo(debugMsgInfo, finding)
 			backoff := rle.ResetAfter + 500*time.Millisecond
 			c.nackDelayMessage(msg, backoff)
 			return

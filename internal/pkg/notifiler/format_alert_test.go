@@ -1,123 +1,108 @@
 package notifiler_test
 
 import (
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 )
 
+// Frozen quorum time so the rendered footer can be compared verbatim.
+// blockTS below is exactly one hour earlier, so the lag is always 3600s.
+var testNow = time.Date(2024, 1, 12, 13, 46, 40, 0, time.UTC)
+
 func TestFormatAlert(t *testing.T) {
+	notifiler.Now = func() time.Time { return testNow }
+	t.Cleanup(func() { notifiler.Now = time.Now })
+
+	const (
+		blockTS = 1705063600 // testNow minus one hour
+		txHash  = "0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"
+	)
+
 	tests := []struct {
-		name          string
-		alert         *databus.FindingDtoJson
-		source        string
-		blockExplorer string
-		wantContains  []string
-		wantAbsent    []string
+		name  string
+		alert *databus.FindingDtoJson
+		want  string
 	}{
 		{
-			name: "basic alert with all fields",
+			name: "all fields",
 			alert: &databus.FindingDtoJson{
-				Name:           "Test Alert",
 				Description:    "Something happened",
-				Severity:       databus.SeverityHigh,
 				AlertId:        "TEST-ALERT-1",
 				BotName:        "test-bot",
 				Team:           "test-team",
-				UniqueKey:      "abc123",
 				BlockNumber:    new(100),
-				BlockTimestamp: new(1000000),
-				TxHash:         new("0xabc123def456"),
+				BlockTimestamp: new(blockTS),
+				TxHash:         new(txHash),
 			},
-			source:        "local",
-			blockExplorer: "etherscan.io",
-			wantContains: []string{
-				"Something happened",
-				"block [100](https://etherscan.io/block/100/)",
-				"Team test-team",
-				"test-bot",
-				"TEST-ALERT-1",
-				"local",
-				"0xabc...456",
-			},
+			want: "Something happened\n" +
+				"\ntest-bot | TEST-ALERT-1 | 13:46:40.000 UTC (+3600s) by local\n" +
+				"[100](https://etherscan.io/block/100/) | " +
+				"[0x714...bdf](https://etherscan.io/tx/" + txHash + "/)",
 		},
 		{
-			name: "alert without block info",
+			name: "no block, no tx",
 			alert: &databus.FindingDtoJson{
-				Name:        "No Block",
 				Description: "desc",
-				Severity:    databus.SeverityInfo,
 				AlertId:     "TEST-2",
 				BotName:     "bot",
-				Team:        "team",
-				UniqueKey:   "key",
 			},
-			source:        "src",
-			blockExplorer: "etherscan.io",
-			wantContains: []string{
-				"desc",
-				"Team team",
-				"bot",
-				"TEST-2",
-			},
-			wantAbsent: []string{
-				"block [",
-				"Tx hash:",
-			},
+			want: "desc\n\nbot | TEST-2 | 13:46:40.000 UTC by local",
 		},
 		{
-			name: "alert with empty description",
+			name: "empty description",
 			alert: &databus.FindingDtoJson{
-				Name:        "Empty Desc",
-				Description: "",
-				Severity:    databus.SeverityCritical,
-				AlertId:     "TEST-3",
-				BotName:     "bot",
-				Team:        "team",
-				UniqueKey:   "key",
+				AlertId: "TEST-3",
+				BotName: "bot",
 			},
-			source:        "src",
-			blockExplorer: "etherscan.io",
-			wantContains: []string{
-				"Team team",
-			},
+			want: "\nbot | TEST-3 | 13:46:40.000 UTC by local",
 		},
 		{
-			name: "alert with tx hash renders shortened hash",
+			name: "tx hash only, shortened",
 			alert: &databus.FindingDtoJson{
-				Name:        "TX Alert",
 				Description: "tx alert",
-				Severity:    databus.SeverityHigh,
 				AlertId:     "TEST-4",
 				BotName:     "bot",
-				Team:        "team",
-				UniqueKey:   "key",
-				TxHash:      new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+				TxHash:      new(txHash),
 			},
-			source:        "local",
-			blockExplorer: "etherscan.io",
-			wantContains: []string{
-				"Tx hash: [0x714...bdf](https://etherscan.io/tx/0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf/)",
+			want: "tx alert\n" +
+				"\nbot | TEST-4 | 13:46:40.000 UTC by local\n" +
+				"[0x714...bdf](https://etherscan.io/tx/" + txHash + "/)",
+		},
+		{
+			// The lag needs only the timestamp, so a block without one still
+			// renders its link — just without the "(+Ns)" suffix.
+			name: "block without timestamp",
+			alert: &databus.FindingDtoJson{
+				Description: "desc",
+				AlertId:     "TEST-5",
+				BotName:     "bot",
+				BlockNumber: new(100),
 			},
+			want: "desc\n" +
+				"\nbot | TEST-5 | 13:46:40.000 UTC by local\n" +
+				"[100](https://etherscan.io/block/100/)",
+		},
+		{
+			// A timestamp without a block still yields the lag.
+			name: "timestamp without block",
+			alert: &databus.FindingDtoJson{
+				Description:    "desc",
+				AlertId:        "TEST-6",
+				BotName:        "bot",
+				BlockTimestamp: new(blockTS),
+			},
+			want: "desc\n\nbot | TEST-6 | 13:46:40.000 UTC (+3600s) by local",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := notifiler.FormatAlert(tt.alert, tt.source, tt.blockExplorer)
-
-			for _, s := range tt.wantContains {
-				if !strings.Contains(got, s) {
-					t.Errorf("FormatAlert() missing expected substring %q\ngot: %s", s, got)
-				}
-			}
-
-			for _, s := range tt.wantAbsent {
-				if strings.Contains(got, s) {
-					t.Errorf("FormatAlert() should not contain %q\ngot: %s", s, got)
-				}
+			got := notifiler.FormatAlert(tt.alert, "local", "etherscan.io")
+			if got != tt.want {
+				t.Errorf("FormatAlert()\n got: %q\nwant: %q", got, tt.want)
 			}
 		})
 	}

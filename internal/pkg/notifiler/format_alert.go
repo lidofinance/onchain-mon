@@ -8,6 +8,10 @@ import (
 	"github.com/lidofinance/onchain-mon/generated/databus"
 )
 
+// Now returns the quorum timestamp printed in the alert footer. Tests replace
+// it to make the rendered output deterministic.
+var Now = time.Now
+
 func FormatAlert(alert *databus.FindingDtoJson, source, blockExplorer string) string {
 	var (
 		body   string
@@ -16,23 +20,30 @@ func FormatAlert(alert *databus.FindingDtoJson, source, blockExplorer string) st
 
 	if alert.Description != "" {
 		body = alert.Description
-		footer += "\n\n"
+		footer += "\n"
 	}
 
-	quorumTime := time.Now()
-	if alert.BlockNumber != nil && alert.BlockTimestamp != nil {
+	quorumTime := Now()
+
+	quorumAt := quorumTime.Format("15:04:05.000 MST")
+	if alert.BlockTimestamp != nil {
 		eventToQuorumSecs := int(quorumTime.Unix()) - *alert.BlockTimestamp
-		footer += fmt.Sprintf(
-			"Happened ~%d seconds ago at block [%d](https://%s/block/%d/)",
-			eventToQuorumSecs, *alert.BlockNumber, blockExplorer, *alert.BlockNumber,
-		)
+		quorumAt += fmt.Sprintf(" (+%ds)", eventToQuorumSecs)
 	}
-	footer += fmt.Sprintf("\nTeam %s | %s | %s | quorum at %s by %s",
-		alert.Team, alert.BotName, alert.AlertId, quorumTime.Format("15:04:05.000 MST"), source,
+
+	footer += fmt.Sprintf("\n%s | %s | %s by %s",
+		alert.BotName, alert.AlertId, quorumAt, source,
 	)
 
+	var links []string
+	if alert.BlockNumber != nil {
+		links = append(links, fmt.Sprintf("[%d](https://%s/block/%d/)", *alert.BlockNumber, blockExplorer, *alert.BlockNumber))
+	}
 	if alert.TxHash != nil {
-		footer += fmt.Sprintf("\nTx hash: [%s](https://%s/tx/%s/)", shortenHex(*alert.TxHash), blockExplorer, *alert.TxHash)
+		links = append(links, fmt.Sprintf("[%s](https://%s/tx/%s/)", shortenHex(*alert.TxHash), blockExplorer, *alert.TxHash))
+	}
+	if len(links) > 0 {
+		footer += "\n" + strings.Join(links, " | ")
 	}
 
 	return fmt.Sprintf("%s%s", body, footer)

@@ -78,15 +78,13 @@ func Test_SendFinding(t *testing.T) {
 				ctx: context.TODO(),
 				alert: &databus.FindingDtoJson{
 					Name: `ℹ️ Lido: BotToken rebased`,
-					Description: `
-Withdrawals info:
- requests count:    4302
+					Description: `Withdrawals info:` +
+						`requests count:    4302
  withdrawn stETH:   174541.1742
  finalized stETH:   174541.1742 4302
  unfinalized stETH: 0.0000   0
  claimed ether:     142576.2152 853
- unclaimed ether:   31964.9590   3449
-`,
+ unclaimed ether:   31964.9590   3449`,
 					Severity:       databus.SeverityLow,
 					AlertId:        `LIDO-TOKEN-REBASED`,
 					BlockTimestamp: new(1727965236),

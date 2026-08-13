@@ -7,34 +7,38 @@
 4. Consumer: the `StatusFail` metric was counted twice on a send failure
 5. Removed deprecated chi `middleware.RealIP` (GHSA-3fxj-6jh8-hvhx and friends) — `RemoteAddr` is never read, and the services expose only infra endpoints
 6. Forwarder: `notification.yaml` is now also mounted at `/app`, so it is found when `ENV=local`
+7. Stopped reporting `http: Server closed` to Sentry — a graceful shutdown makes `ListenAndServe` return `ErrServerClosed`, which was logged at error level on every restart
+8. Graceful shutdown now gets its own context with a 10s timeout; it used to receive the already-cancelled one and cut live connections instead of draining them
+9. Consumer: rate-limited debug findings are logged at info level instead of error, so expected back-pressure no longer reaches Sentry (the quorum branch already did this)
 
 ### Changed
-7. Update to go1.26.5
-8. Update dependencies
-9. Update dev tools; `gomodguard` -> `gomodguard_v2`
-10. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
-11. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
-12. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
-13. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
+10. Alert footer is shorter and easier to scan: dropped `Team`, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line
+11. Update to go1.26.5
+12. Update dependencies
+13. Update dev tools; `gomodguard` -> `gomodguard_v2`
+14. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
+15. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
+16. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
+17. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
 
 ### Added
-14. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
-15. Consumer: tests for quorum counting and for losing the send race
-16. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
-17. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
-18. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
-19. `make check-format`, `make test` and `make test-live`
+18. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
+19. Consumer: tests for quorum counting and for losing the send race
+20. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
+21. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
+22. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
+23. `make check-format`, `make test` and `make test-live`
 
 ### Removed
-20. The unused `/` config page: `web/templates` and the `show` handler
-21. The `tools` module — its pinned versions had drifted from what `make tools` installs
+24. The unused `/` config page: `web/templates` and the `show` handler
+25. The `tools` module — its pinned versions had drifted from what `make tools` installs
 
 ### Tooling
-22. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
-23. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
-24. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
-25. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
-26. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
+26. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
+27. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
+28. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
+29. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
+30. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
 
 ## 06.05.2026
 1. Added string sanitizer
