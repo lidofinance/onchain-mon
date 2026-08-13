@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
@@ -28,9 +29,14 @@ const StatusFail = `Fail`
 var Commit string
 
 func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store {
+	promRegistry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+
 	store := &Store{
 		Prometheus: promRegistry,
-		BuildInfo: promauto.NewCounter(prometheus.CounterOpts{
+		BuildInfo: promauto.With(promRegistry).NewCounter(prometheus.CounterOpts{
 			Name: prefix + "_metric_build_info",
 			Help: "Build information",
 			ConstLabels: prometheus.Labels{
@@ -40,40 +46,32 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 				"version": runtime.Version(),
 			},
 		}),
-		PublishedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
+		PublishedBlocks: promauto.With(promRegistry).NewCounterVec(prometheus.CounterOpts{
 			Name: prefix + "_blocks_published_total",
 			Help: "The total number of published blocks",
 		}, []string{Status}),
-		SentAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
+		SentAlerts: promauto.With(promRegistry).NewCounterVec(prometheus.CounterOpts{
 			Name: prefix + "_finding_sent_total",
 			Help: "The total number of published findings",
 		}, []string{ConsumerName, Status}),
-		RedisErrors: promauto.NewCounter(prometheus.CounterOpts{
+		RedisErrors: promauto.With(promRegistry).NewCounter(prometheus.CounterOpts{
 			Name: prefix + "_redis_error_total",
 			Help: "The total number of redis errors",
 		}),
-		SummaryHandlers: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		SummaryHandlers: promauto.With(promRegistry).NewHistogramVec(prometheus.HistogramOpts{
 			Name:    prefix + "_request_processing_seconds",
 			Help:    "Time spent processing request to notification channel",
 			Buckets: prometheus.DefBuckets,
 		}, []string{Channel}),
-		NotifyChannels: promauto.NewCounterVec(prometheus.CounterOpts{
+		NotifyChannels: promauto.With(promRegistry).NewCounterVec(prometheus.CounterOpts{
 			Name: prefix + "_notification_channel_error_total",
 			Help: "The total number of network errors of telegram, discord, opsgenie channels",
 		}, []string{Channel, Status}),
-		BlockResets: promauto.NewCounter(prometheus.CounterOpts{
+		BlockResets: promauto.With(promRegistry).NewCounter(prometheus.CounterOpts{
 			Name: prefix + "_block_reset_total",
 			Help: "The total number of reset blocks",
 		}),
 	}
-
-	store.Prometheus.MustRegister(
-		store.BuildInfo,
-		store.PublishedBlocks,
-		store.SentAlerts,
-		store.RedisErrors,
-		store.SummaryHandlers,
-	)
 
 	return store
 }

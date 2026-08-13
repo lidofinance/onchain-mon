@@ -103,5 +103,5 @@ func (a *App) RegisterPprofRoutes(r chi.Router) {
 
 func (a *App) RegisterInfraRoutes(r chi.Router) {
 	r.Get("/health", health.New().Handler)
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	r.Get("/metrics", promhttp.HandlerFor(a.Metrics.Prometheus, promhttp.HandlerOpts{}).ServeHTTP)
 }
