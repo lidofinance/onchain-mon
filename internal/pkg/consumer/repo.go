@@ -46,7 +46,9 @@ func (r *Repo) SetSendingStatus(ctx context.Context, countKey, statusKey string)
 		r.quorumSize,
 		string(StatusNotSend),
 		string(StatusSending),
-		TTLMins12,
+		// Redis EXPIRE takes seconds; passing the Duration itself sends
+		// nanoseconds and pins the key for centuries.
+		int64(TTLMins12.Seconds()),
 	}
 
 	res, err := r.redisClient.Eval(ctx, luaScript, keys, args).Result()

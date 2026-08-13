@@ -266,3 +266,29 @@ func Test_consume_handler_skips_unwanted_severity(t *testing.T) {
 		t.Fatal("notifier must not be called for filtered findings")
 	}
 }
+
+// Redis EXPIRE counts seconds. Handing it a time.Duration sends nanoseconds,
+// which pinned the status key for centuries and broke the 12-minute reset.
+func Test_sending_status_key_expires_in_minutes_not_centuries(t *testing.T) {
+	ctx := context.Background()
+	rdb := dialTestRedis(t)
+
+	countKey, statusKey := "test:ttl:count", "test:ttl:status"
+	rdb.Del(ctx, countKey, statusKey)
+	t.Cleanup(func() { rdb.Del(ctx, countKey, statusKey) })
+
+	rdb.Set(ctx, countKey, testQuorumSize, time.Minute)
+
+	claimed, err := NewRepo(rdb, testQuorumSize).SetSendingStatus(ctx, countKey, statusKey)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !claimed {
+		t.Fatal("expected to claim the send")
+	}
+
+	ttl := rdb.TTL(ctx, statusKey).Val()
+	if ttl <= 0 || ttl > TTLMins12 {
+		t.Errorf("status key TTL: got %v, want at most %v", ttl, TTLMins12)
+	}
+}
