@@ -1,6 +1,9 @@
 ## 13.08.2026
 1. Update to go1.26.5
 2. Update dev tools
+3. Update dependencies
+4. Fixed vulncheck target: added missing package pattern and verbose output
+5. Removed unused tools module
 
 ## 06.05.2026
 1. Added string sanitizer

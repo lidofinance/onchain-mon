@@ -6,7 +6,6 @@ generate-docker:
 
 .PHONY: tools
 tools:
-	cd tools && go mod vendor && go mod tidy && go mod verify
 	@echo "Installing dev tools into ./bin ..."
 	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 	GOBIN=$(PWD)/bin go install github.com/vektra/mockery/v3@v3.7.3
@@ -57,4 +56,4 @@ generate-databus-objects:
 .PHONY: vulncheck
 vulncheck:
 	@echo "Running govulncheck..."
-	./bin/govulncheck
+	./bin/govulncheck -show verbose ./...
