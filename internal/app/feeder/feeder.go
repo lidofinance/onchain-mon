@@ -291,11 +291,7 @@ func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
 
 func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBlock) time.Duration {
 	expectedNextBlockTime := time.Unix(block.GetTimestamp(), 0).Add(EtaNextBlock)
-	delay := time.Until(expectedNextBlockTime.Add(DelayNextBlock))
-
-	if delay < time.Second {
-		delay = time.Second
-	}
+	delay := max(time.Until(expectedNextBlockTime.Add(DelayNextBlock)), time.Second)
 
 	timer.Reset(delay)
 	return delay

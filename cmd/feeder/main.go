@@ -86,11 +86,11 @@ func main() {
 	app.RegisterInfraRoutes(r)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
-	log.Info(fmt.Sprintf(`Started %s`, cfg.AppConfig.Name))
+	log.Info("Started " + cfg.AppConfig.Name)
 
 	if err := g.Wait(); err != nil {
 		log.Error(err.Error())
 	}
 
-	log.Info(fmt.Sprintf(`Main done %s`, cfg.AppConfig.Name))
+	log.Info("Main done " + cfg.AppConfig.Name)
 }

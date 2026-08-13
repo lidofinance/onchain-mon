@@ -78,13 +78,13 @@ func ReadNotificationConfig(env, configPath string) (*NotificationConfig, error)
 	v.AddConfigPath(filepath.Dir(configPath))
 
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("error reading config file, %s", err)
+		return nil, fmt.Errorf("error reading config file, %w", err)
 	}
 
 	var configData NotificationConfig
 
 	if err := v.Unmarshal(&configData); err != nil {
-		return nil, fmt.Errorf("unable to decode into struct, %v", err)
+		return nil, fmt.Errorf("unable to decode into struct, %w", err)
 	}
 
 	if err := ValidateConfig(&configData); err != nil {
@@ -96,6 +96,28 @@ func ReadNotificationConfig(env, configPath string) (*NotificationConfig, error)
 
 // ValidateConfig performs semantic and logical validation of the configuration
 func ValidateConfig(cfg *NotificationConfig) error {
+	if err := validateUniqueConsumerNames(cfg); err != nil {
+		return err
+	}
+
+	if err := validateChannelRefs(cfg); err != nil {
+		return err
+	}
+
+	if err := validateSeverities(cfg); err != nil {
+		return err
+	}
+
+	for _, consumer := range cfg.Consumers {
+		if len(consumer.Subjects) == 0 {
+			return fmt.Errorf("consumer '%s' does not have any NATS subjects configured", consumer.ConsumerName)
+		}
+	}
+
+	return nil
+}
+
+func validateUniqueConsumerNames(cfg *NotificationConfig) error {
 	consumerNames := make(map[string]struct {
 		ChannelID string
 	})
@@ -112,6 +134,10 @@ func ValidateConfig(cfg *NotificationConfig) error {
 		}
 	}
 
+	return nil
+}
+
+func validateChannelRefs(cfg *NotificationConfig) error {
 	telegramChannels := make(map[string]bool)
 	for _, channel := range cfg.TelegramChannels {
 		telegramChannels[channel.ID] = true
@@ -155,6 +181,10 @@ func ValidateConfig(cfg *NotificationConfig) error {
 		}
 	}
 
+	return nil
+}
+
+func validateSeverities(cfg *NotificationConfig) error {
 	validSeverities := make(registry.FindingMapping)
 	for _, severity := range cfg.SeverityLevels {
 		validSeverities[databus.Severity(severity.ID)] = true
@@ -177,12 +207,6 @@ func ValidateConfig(cfg *NotificationConfig) error {
 
 		consumer.SeveritySet = severitySet
 		consumer.FindingFilterMap = findingFilter
-	}
-
-	for _, consumer := range cfg.Consumers {
-		if len(consumer.Subjects) == 0 {
-			return fmt.Errorf("consumer '%s' does not have any NATS subjects configured", consumer.ConsumerName)
-		}
 	}
 
 	return nil

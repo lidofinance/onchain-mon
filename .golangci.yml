@@ -7,12 +7,13 @@ linters:
     - dogsled
     - dupl
     - errcheck
+    - errorlint
     - funlen
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - govet
@@ -20,14 +21,18 @@ linters:
     - lll
     - misspell
     - mnd
+    - modernize
     - nakedret
     - noctx
     - nolintlint
+    - perfsprint
     - revive
     - staticcheck
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
+    - usetesting
     - whitespace
   settings:
     dupl:
@@ -51,13 +56,9 @@ linters:
     gocyclo:
       min-complexity: 40
     govet:
-      settings:
-        printf:
-          funcs:
-            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+      enable-all: true
+      disable:
+        - fieldalignment
     lll:
       line-length: 140
     misspell:
@@ -99,7 +100,12 @@ linters:
     rules:
       - linters:
           - mnd
+          - goconst
         path: _test\.go
+      # pointers.StringPtr/IntPtr are intentional helpers, not new(expr) wrappers
+      - linters:
+          - modernize
+        text: newexpr
     paths:
       - third_party$
       - builtin$
@@ -115,7 +121,7 @@ formatters:
           replacement: any
     goimports:
       local-prefixes:
-        - github.com/golangci/golangci-lint
+        - github.com/lidofinance/onchain-mon
   exclusions:
     generated: lax
     paths:

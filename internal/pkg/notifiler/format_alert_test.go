@@ -6,7 +6,6 @@ import (
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
-	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
 
 func TestFormatAlert(t *testing.T) {
@@ -28,9 +27,9 @@ func TestFormatAlert(t *testing.T) {
 				BotName:        "test-bot",
 				Team:           "test-team",
 				UniqueKey:      "abc123",
-				BlockNumber:    pointers.IntPtr(100),
-				BlockTimestamp: pointers.IntPtr(1000000),
-				TxHash:         pointers.StringPtr("0xabc123def456"),
+				BlockNumber:    new(100),
+				BlockTimestamp: new(1000000),
+				TxHash:         new("0xabc123def456"),
 			},
 			source:        "local",
 			blockExplorer: "etherscan.io",
@@ -95,7 +94,7 @@ func TestFormatAlert(t *testing.T) {
 				BotName:     "bot",
 				Team:        "team",
 				UniqueKey:   "key",
-				TxHash:      pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+				TxHash:      new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 			},
 			source:        "local",
 			blockExplorer: "etherscan.io",
@@ -123,4 +122,3 @@ func TestFormatAlert(t *testing.T) {
 		})
 	}
 }
-

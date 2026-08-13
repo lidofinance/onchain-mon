@@ -1,3 +1,9 @@
+//go:build live
+
+// These tests read the repo-root .env / notification.yaml and hit live RPC and
+// messaging APIs — running them can post real messages to real channels.
+// They are excluded from the default build; run with: go test -tags=live ./...
+
 package chain
 
 import (

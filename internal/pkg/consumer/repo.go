@@ -51,7 +51,7 @@ func (r *Repo) SetSendingStatus(ctx context.Context, countKey, statusKey string)
 
 	res, err := r.redisClient.Eval(ctx, luaScript, keys, args).Result()
 	if err != nil {
-		return false, fmt.Errorf(`could not get notification_sent_status: %v`, err)
+		return false, fmt.Errorf(`could not get notification_sent_status: %w`, err)
 	}
 
 	sending, ok := res.(int64)

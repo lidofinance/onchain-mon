@@ -4,6 +4,16 @@
 3. Update dependencies
 4. Fixed vulncheck target: added missing package pattern and verbose output
 5. Removed unused tools module
+6. Fixed format/imports conflict: goimports local-prefixes now points to this module
+7. Updated linters: added errorlint, modernize, perfsprint, usestdlibvars, usetesting; gomodguard -> gomodguard_v2
+8. Removed deprecated chi middleware.RealIP (services expose only infra endpoints)
+9. Consumer: fixed finding loss when Redis Incr failed — the LRU was marked before the counter was accepted
+10. Consumer: fixed count key staying forever without TTL when Expire failed
+11. Consumer: fixed message left unsettled when another instance claimed the send — it hung until AckWait and burned a MaxDeliver attempt
+12. Consumer: fixed StatusFail metric counted twice on send failure
+13. Consumer: extracted handleWithoutQuorum and collectQuorumCount from GetConsumeHandler
+14. Consumer: added tests for quorum counting and send-race handling
+15. Put live RPC/messaging tests behind the `live` build tag, so `go test ./...` no longer posts to real channels; added `make test` and `make test-live`
 
 ## 06.05.2026
 1. Added string sanitizer

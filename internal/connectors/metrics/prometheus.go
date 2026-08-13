@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"runtime"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,7 +31,7 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 	store := &Store{
 		Prometheus: promRegistry,
 		BuildInfo: promauto.NewCounter(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_metric_build_info", prefix),
+			Name: prefix + "_metric_build_info",
 			Help: "Build information",
 			ConstLabels: prometheus.Labels{
 				"name":    appName,
@@ -42,28 +41,28 @@ func New(promRegistry *prometheus.Registry, prefix, appName, env string) *Store 
 			},
 		}),
 		PublishedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_blocks_published_total", prefix),
+			Name: prefix + "_blocks_published_total",
 			Help: "The total number of published blocks",
 		}, []string{Status}),
 		SentAlerts: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_finding_sent_total", prefix),
+			Name: prefix + "_finding_sent_total",
 			Help: "The total number of published findings",
 		}, []string{ConsumerName, Status}),
 		RedisErrors: promauto.NewCounter(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_redis_error_total", prefix),
+			Name: prefix + "_redis_error_total",
 			Help: "The total number of redis errors",
 		}),
 		SummaryHandlers: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    fmt.Sprintf("%s_request_processing_seconds", prefix),
+			Name:    prefix + "_request_processing_seconds",
 			Help:    "Time spent processing request to notification channel",
 			Buckets: prometheus.DefBuckets,
 		}, []string{Channel}),
 		NotifyChannels: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_notification_channel_error_total", prefix),
+			Name: prefix + "_notification_channel_error_total",
 			Help: "The total number of network errors of telegram, discord, opsgenie channels",
 		}, []string{Channel, Status}),
 		BlockResets: promauto.NewCounter(prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_block_reset_total", prefix),
+			Name: prefix + "_block_reset_total",
 			Help: "The total number of reset blocks",
 		}),
 	}

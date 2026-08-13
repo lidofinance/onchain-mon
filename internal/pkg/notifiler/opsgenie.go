@@ -89,7 +89,7 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 		return fmt.Errorf("could not marshal OpsGenie payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST",
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"https://api.opsgenie.com/v2/alerts",
 		bytes.NewBuffer(payloadBytes),
 	)

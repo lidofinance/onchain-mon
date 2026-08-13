@@ -87,7 +87,6 @@ func (a *App) RegisterWorkerRoutes(r chi.Router) {
 func (a *App) RegisterMiddleware(r chi.Router) {
 	r.Use(slogchi.New(a.Logger))
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
 	const httpTimeout = 60 * time.Second

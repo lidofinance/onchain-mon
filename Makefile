@@ -23,18 +23,28 @@ build:
 .PHONY: build
 
 fmt:
-	go fmt ./cmd/... && go fmt ./internal/...
+	bin/golangci-lint fmt --config=.golangci.yml ./cmd/... ./internal/...
 
 vet:
 	go vet ./cmd/... && go vet ./internal/...
 
 imports:
-	bin/goimports -local github.com/lidofinance/onchain-mon -w -d $(shell find . -type f -name '*.go'| grep -v "/vendor/\|/.git/\|/tools/")
+	bin/goimports -local github.com/lidofinance/onchain-mon -w $(shell find ./cmd ./internal -type f -name '*.go')
 
 fix-lint:
 	bin/golangci-lint run --config=.golangci.yml --fix ./cmd... ./internal/...
 
-.PHONY: format
+.PHONY: test
+test:
+	go test ./cmd/... ./internal/...
+
+# Tests behind the `live` tag read the repo-root .env / notification.yaml and hit
+# real RPC and messaging APIs — they can post messages to real channels.
+.PHONY: test-live
+test-live:
+	go test -tags=live ./cmd/... ./internal/...
+
+.PHONY: fmt vet imports format
 format: imports fmt vet
 
 .PHONY: lint

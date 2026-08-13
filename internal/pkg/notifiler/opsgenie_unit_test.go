@@ -60,12 +60,12 @@ func TestAlertPayload_DetailsContainsForwarderAttributes(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var decoded map[string]interface{}
+	var decoded map[string]any
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	details, ok := decoded["details"].(map[string]interface{})
+	details, ok := decoded["details"].(map[string]any)
 	if !ok {
 		t.Fatal("details field missing or wrong type in serialized payload")
 	}
@@ -97,7 +97,7 @@ func TestAlertPayload_NilDetailsOmitted(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var decoded map[string]interface{}
+	var decoded map[string]any
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

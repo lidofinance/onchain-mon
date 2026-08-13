@@ -70,7 +70,7 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		return fmt.Errorf("could not marshal Discord payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", d.webhookURL, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.webhookURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("error creating Discord request: %w", err)
 	}
