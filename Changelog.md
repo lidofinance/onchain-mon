@@ -1,20 +1,40 @@
 ## 13.08.2026
-1. Update to go1.26.5
-2. Update dev tools
-3. Update dependencies
-4. Fixed vulncheck target: added missing package pattern and verbose output
-5. Removed unused tools module
-6. Fixed format/imports conflict: goimports local-prefixes now points to this module
-7. Updated linters: added errorlint, modernize, perfsprint, usestdlibvars, usetesting; gomodguard -> gomodguard_v2
-8. Removed deprecated chi middleware.RealIP (services expose only infra endpoints)
-9. Consumer: fixed finding loss when Redis Incr failed — the LRU was marked before the counter was accepted
-10. Consumer: fixed count key staying forever without TTL when Expire failed
-11. Consumer: fixed message left unsettled when another instance claimed the send — it hung until AckWait and burned a MaxDeliver attempt
-12. Consumer: fixed StatusFail metric counted twice on send failure
-13. Consumer: extracted handleWithoutQuorum and collectQuorumCount from GetConsumeHandler
-14. Consumer: added tests for quorum counting and send-race handling
-15. Put live RPC/messaging tests behind the `live` build tag, so `go test ./...` no longer posts to real channels; added `make test` and `make test-live`
-16. Added CI workflow: format, lint, build + tests (with Redis service), vulncheck; live tests stay excluded
+
+### Fixed
+1. Consumer: finding could be lost when Redis `Incr` failed — the LRU was marked before the counter was accepted, so the redelivered message took the "already seen" path and got acked without ever being counted
+2. Consumer: the count key could stay in Redis forever without a TTL when `Expire` failed — `Decr` left it at 0 instead of dropping it
+3. Consumer: a message was left unsettled when another instance claimed the send, so it hung for the whole `AckWait` (30s) and burned one of the 10 `MaxDeliver` attempts
+4. Consumer: the `StatusFail` metric was counted twice on a send failure
+5. Removed deprecated chi `middleware.RealIP` (GHSA-3fxj-6jh8-hvhx and friends) — `RemoteAddr` is never read, and the services expose only infra endpoints
+6. Forwarder: `notification.yaml` is now also mounted at `/app`, so it is found when `ENV=local`
+
+### Changed
+7. Update to go1.26.5
+8. Update dependencies
+9. Update dev tools; `gomodguard` -> `gomodguard_v2`
+10. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
+11. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
+12. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
+13. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
+
+### Added
+14. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
+15. Consumer: tests for quorum counting and for losing the send race
+16. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
+17. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
+18. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
+19. `make check-format`, `make test` and `make test-live`
+
+### Removed
+20. The unused `/` config page: `web/templates` and the `show` handler
+21. The `tools` module — its pinned versions had drifted from what `make tools` installs
+
+### Tooling
+22. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
+23. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
+24. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
+25. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
+26. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
 
 ## 06.05.2026
 1. Added string sanitizer

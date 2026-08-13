@@ -72,3 +72,51 @@ generate-databus-objects:
 vulncheck:
 	@echo "Running govulncheck..."
 	./bin/govulncheck -show verbose ./...
+
+### Local environments
+# mainnet and prod both bind redis on 6379, so they cannot run at the same time.
+# testnet uses its own ports (6380/4223/8223/8083/8084) and runs alongside either.
+
+.PHONY: up
+up:
+	docker compose -f docker-compose.yml up -d
+
+.PHONY: down
+down:
+	docker compose -f docker-compose.yml down
+
+.PHONY: logs
+logs:
+	docker compose -f docker-compose.yml logs -f --tail=100
+
+.PHONY: up-testnet
+up-testnet:
+	docker compose -f docker-compose.testnet.yaml up -d
+
+.PHONY: down-testnet
+down-testnet:
+	docker compose -f docker-compose.testnet.yaml down
+
+.PHONY: logs-testnet
+logs-testnet:
+	docker compose -f docker-compose.testnet.yaml logs -f --tail=100
+
+# The steth-* bots need a private image, so they are left out here.
+.PHONY: up-prod
+up-prod:
+	docker compose -f docker-compose.prod.yml up -d \
+		redis nats-1 nats-2 nats-3 feeder-1 feeder-2 feeder-3 forwarder-1 forwarder-2 forwarder-3
+
+.PHONY: down-prod
+down-prod:
+	docker compose -f docker-compose.prod.yml down
+
+.PHONY: logs-prod
+logs-prod:
+	docker compose -f docker-compose.prod.yml logs -f --tail=100
+
+.PHONY: down-all
+down-all:
+	-docker compose -f docker-compose.yml down
+	-docker compose -f docker-compose.testnet.yaml down
+	-docker compose -f docker-compose.prod.yml down

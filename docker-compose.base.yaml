@@ -1,0 +1,27 @@
+# Shared infrastructure definitions. Not meant to be run on its own — it has no
+# ports, no container names and no volumes, so the same block can back both the
+# mainnet and the testnet stack without clashing.
+#
+# Consumed via `extends` from docker-compose.yml and docker-compose.testnet.yaml,
+# where each stack adds its own ports, container names and storage.
+
+x-logging: &default-logging
+  options:
+    max-size: "50m"
+    max-file: "10"
+
+services:
+  redis:
+    image: redis:7.0-alpine
+    command: [ "redis-server", "--appendonly", "yes" ]
+    restart: unless-stopped
+    logging: *default-logging
+
+  nats:
+    image: nats:2.10.20-alpine3.20
+    command: >
+      -js -c /etc/nats/nats.conf
+    environment:
+      - JS_STORAGE_DIR=/data/jetstream
+    restart: unless-stopped
+    logging: *default-logging

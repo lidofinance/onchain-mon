@@ -26,8 +26,6 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 )
 
-const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
-
 //nolint:funlen
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
@@ -118,7 +116,7 @@ func main() {
 
 	r := chi.NewRouter()
 
-	app := server.New(&cfg.AppConfig, notificationConfig, log, metricsStore, js, natsClient)
+	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	natsStreamName := `NatsStream`
 	natStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
@@ -126,7 +124,7 @@ func main() {
 		Discard:    jetstream.DiscardOld,
 		MaxAge:     10 * time.Minute,
 		Subjects:   env.CollectNatsSubjects(notificationConfig),
-		MaxMsgSize: maxMsgSize,
+		MaxMsgSize: nc.MaxMsgSize,
 		Retention:  jetstream.InterestPolicy,
 	})
 	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {

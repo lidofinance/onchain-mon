@@ -1,6 +1,8 @@
 # Mac OS X files
 .DS_Store
 .env
+.env.*
+!.env.example
 .env.yml
 .idea/
 .vscode/
@@ -30,3 +32,7 @@ tools/vendor
 notification.yaml
 notification.prod.yaml
 notification.temp.yaml
+# Local infrastructure state (JetStream data, bot DBs).
+# infra/nats/nats.conf is tracked — everything else here is runtime data.
+infra/nats/jetstream*
+infra/steth-db/

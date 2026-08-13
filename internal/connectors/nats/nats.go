@@ -11,6 +11,8 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/env"
 )
 
+const MaxMsgSize = 8 * 1024 * 1024 // 8 Mb
+
 var (
 	natsClient        *nats.Conn
 	onceDefaultClient sync.Once

@@ -110,3 +110,29 @@ jobs:
 
       - name: Run tests
         run: make test
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    # Catch a broken Dockerfile here instead of at deploy time. The image is
+    # built but never pushed — publishing stays in the deploy workflows.
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v3.3.0
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: onchain-mon:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify binaries are in the image
+        run: |
+          docker run --rm --entrypoint ls onchain-mon:ci -l /app/feeder /app/forwarder
