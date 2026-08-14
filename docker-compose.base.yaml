@@ -1,0 +1,45 @@
+# Shared infrastructure definitions. Not meant to be run on its own — it has no
+# ports, no container names and no volumes, so the same block can back both the
+# mainnet and the testnet stack without clashing.
+#
+# Consumed via `extends` from docker-compose.yml and docker-compose.testnet.yaml,
+# where each stack adds its own ports, container names and storage.
+
+x-logging: &default-logging
+  options:
+    max-size: "50m"
+    max-file: "10"
+
+services:
+  redis:
+    image: redis:7.0-alpine
+    command: [ "redis-server", "--appendonly", "yes" ]
+    restart: unless-stopped
+    logging: *default-logging
+
+  nats:
+    image: nats:2.10.20-alpine3.20
+    command: >
+      -js -c /etc/nats/nats.conf
+    environment:
+      - JS_STORAGE_DIR=/data/jetstream
+    restart: unless-stopped
+    logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=24h
+    restart: unless-stopped
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      # Local stacks only: skip the login screen.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    restart: unless-stopped
+    logging: *default-logging

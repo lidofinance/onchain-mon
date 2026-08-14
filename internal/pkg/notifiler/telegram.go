@@ -100,6 +100,7 @@ func (t *Telegram) send(ctx context.Context, message string, useMarkdown bool) e
 		return fmt.Errorf("could not send telegram request: %w", err)
 	}
 	defer func() {
+		_, _ = io.Copy(io.Discard, rawResp.Body)
 		rawResp.Body.Close()
 		t.metrics.SummaryHandlers.
 			With(prometheus.Labels{metrics.Channel: TelegramLabel}).

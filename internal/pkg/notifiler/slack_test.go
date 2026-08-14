@@ -1,3 +1,9 @@
+//go:build live
+
+// These tests read the repo-root .env / notification.yaml and hit live RPC and
+// messaging APIs — running them can post real messages to real channels.
+// They are excluded from the default build; run with: go test -tags=live ./...
+
 package notifiler_test
 
 import (
@@ -12,7 +18,6 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
-	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
 
 func TestSlack(t *testing.T) {
@@ -55,16 +60,16 @@ func TestSlack(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				alert: &databus.FindingDtoJson{
-					Name: "ℹ️ #l2_arbitrum Arbitrum digest",
+					Name: "ℹ️ #l2_beta Beta digest",
 					//nolint:lll
-					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tLDO:\n\t\tL1: 1231218.4603 LDO\n\t\tL2: 1230730.9530 LDO\n\t\n\twstETH:\n\t\tL1: 84477.0663 wstETH\n\t\tL2: 81852.1638 wstETH\n\nWithdrawals:\n\twstETH: 1664.1363 (in 5 transactions)",
+					Description:    "L1 token rate: 1.1808\nBridge balances:\n\tGOV:\n\t\tL1: 1231218.4603 GOV\n\t\tL2: 1230730.9530 GOV\n\t\n\twrapTKN:\n\t\tL1: 84477.0663 wrapTKN\n\t\tL2: 81852.1638 wrapTKN\n\nWithdrawals:\n\twrapTKN: 1664.1363 (in 5 transactions)",
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
-					BlockTimestamp: pointers.IntPtr(1727965236),
-					BlockNumber:    pointers.IntPtr(20884540),
-					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: new(1727965236),
+					BlockNumber:    new(20884540),
+					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,
@@ -92,11 +97,11 @@ func TestSlack(t *testing.T) {
 					),
 					Severity:       databus.SeverityInfo,
 					AlertId:        `DIGEST`,
-					BlockTimestamp: pointers.IntPtr(1727965236),
-					BlockNumber:    pointers.IntPtr(20884540),
-					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: new(1727965236),
+					BlockNumber:    new(20884540),
+					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,

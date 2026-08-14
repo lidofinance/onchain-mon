@@ -6,28 +6,24 @@ x-logging: &default-logging
 services:
   # ---------- Shared Redis ----------
   redis:
-    image: redis:7.0-alpine
+    extends:
+      file: docker-compose.base.yaml
+      service: redis
     container_name: redis
-    command: [ "redis-server", "--appendonly", "yes" ]
-    restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
       - redis-net
-    logging: *default-logging
 
   # ========== CELL 1 ==========
   nats-1:
-    image: nats:2.10.20-alpine3.20
+    extends:
+      file: docker-compose.base.yaml
+      service: nats
     container_name: nats-1
-    command: >-
-      -js -c /etc/nats/nats.conf
-    environment:
-      JS_STORAGE_DIR: /data/jetstream
     volumes:
-      - ./nats/jetstream-1:/data/jetstream
-      - ./nats/nats.conf:/etc/nats/nats.conf
-    restart: unless-stopped
+      - ./infra/nats/jetstream-1:/data/jetstream
+      - ./infra/nats/nats.conf:/etc/nats/nats.conf
     networks: [cell1-net]
     logging: *default-logging
 
@@ -53,6 +49,7 @@ services:
     depends_on: [redis, nats-1]
     networks: [cell1-net, redis-net]
     volumes:
+      - ./notification.yaml:/app/notification.yaml
       - ./notification.yaml:/etc/forwarder/notification.yaml
     logging: *default-logging
 
@@ -92,27 +89,23 @@ services:
       ETHEREUM_RPC_URL: ${JSON_RPC_URL}
       NATS_SERVER_URL: http://nats-1:4222
       NATS_LISTEN_TOPIC: ${BLOCK_TOPIC}
-      NATS_PUBLISH_TOPIC: ${STETH_NATS_PUBLISH_TOPIC}
       CHAIN_ID: "1"
       DB_FILEPATH: /data/steth.sqlite
     depends_on: [nats-1]
     networks: [cell1-net]
     logging: *default-logging
     volumes:
-      - ./steth-db/1:/data
+      - ./infra/steth-db/1:/data
 
   # ========== CELL 2 ==========
   nats-2:
-    image: nats:2.10.20-alpine3.20
+    extends:
+      file: docker-compose.base.yaml
+      service: nats
     container_name: nats-2
-    command: >-
-      -js -c /etc/nats/nats.conf
-    environment:
-      JS_STORAGE_DIR: /data/jetstream
     volumes:
-      - ./nats/jetstream-2:/data/jetstream
-      - ./nats/nats.conf:/etc/nats/nats.conf
-    restart: unless-stopped
+      - ./infra/nats/jetstream-2:/data/jetstream
+      - ./infra/nats/nats.conf:/etc/nats/nats.conf
     networks: [cell2-net]
     logging: *default-logging
 
@@ -138,6 +131,7 @@ services:
     depends_on: [redis, nats-2]
     networks: [cell2-net, redis-net]
     volumes:
+      - ./notification.yaml:/app/notification.yaml
       - ./notification.yaml:/etc/forwarder/notification.yaml
     logging: *default-logging
 
@@ -177,27 +171,23 @@ services:
       ETHEREUM_RPC_URL: ${JSON_RPC_URL}
       NATS_SERVER_URL: http://nats-2:4222
       NATS_LISTEN_TOPIC: ${BLOCK_TOPIC}
-      NATS_PUBLISH_TOPIC: ${STETH_NATS_PUBLISH_TOPIC}
       CHAIN_ID: "1"
       DB_FILEPATH: /data/steth.sqlite
     depends_on: [nats-2]
     networks: [cell2-net]
     logging: *default-logging
     volumes:
-      - ./steth-db/2:/data
+      - ./infra/steth-db/2:/data
 
   # ========== CELL 3 ==========
   nats-3:
-    image: nats:2.10.20-alpine3.20
+    extends:
+      file: docker-compose.base.yaml
+      service: nats
     container_name: nats-3
-    command: >-
-      -js -c /etc/nats/nats.conf
-    environment:
-      JS_STORAGE_DIR: /data/jetstream
     volumes:
-      - ./nats/jetstream-3:/data/jetstream
-      - ./nats/nats.conf:/etc/nats/nats.conf
-    restart: unless-stopped
+      - ./infra/nats/jetstream-3:/data/jetstream
+      - ./infra/nats/nats.conf:/etc/nats/nats.conf
     networks: [cell3-net]
     logging: *default-logging
 
@@ -223,6 +213,7 @@ services:
     depends_on: [redis, nats-3]
     networks: [cell3-net, redis-net]
     volumes:
+      - ./notification.yaml:/app/notification.yaml
       - ./notification.yaml:/etc/forwarder/notification.yaml
     logging: *default-logging
 
@@ -262,14 +253,13 @@ services:
       ETHEREUM_RPC_URL: ${JSON_RPC_URL}
       NATS_SERVER_URL: http://nats-3:4222
       NATS_LISTEN_TOPIC: ${BLOCK_TOPIC}
-      NATS_PUBLISH_TOPIC: ${STETH_NATS_PUBLISH_TOPIC}
       CHAIN_ID: "1"
       DB_FILEPATH: /data/steth.sqlite
     depends_on: [nats-3]
     networks: [cell3-net]
     logging: *default-logging
     volumes:
-      - ./steth-db/3:/data
+      - ./infra/steth-db/3:/data
 
 networks:
   redis-net: { driver: bridge }

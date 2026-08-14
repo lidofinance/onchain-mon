@@ -1,46 +1,67 @@
+# Testnet stack. Runs side by side with docker-compose.yml: every container
+# name, port, volume and project namespace is distinct, so both can be up at
+# once.
+#
+#   docker compose -f docker-compose.testnet.yaml --env-file .env.testnet up -d
+#
+# Needs .env.testnet (copy sample.testnet.env) and notification.testnet.yaml
+# with testnet channels. Defaults target Hoodi:
+#   BLOCK_TOPIC="blocks.hoodi.l1"
+#   JSON_RPC_URL=https://hoodi.drpc.org
+#   BLOCK_EXPLORER=hoodi.etherscan.io
+
+name: onchain-mon-testnet
+
+x-logging: &default-logging
+  options:
+    max-size: "50m"
+    max-file: "10"
+
 services:
   redis:
     extends:
       file: docker-compose.base.yaml
       service: redis
-    container_name: redis
+    container_name: redis-testnet
     ports:
-      - "6379:6379"
+      - "6380:6379"
+    volumes:
+      - redis-testnet-data:/data
 
   nats:
     extends:
       file: docker-compose.base.yaml
       service: nats
-    container_name: nats
+    container_name: nats-testnet
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "4223:4222"
+      - "8223:8222"
     volumes:
-      - ./infra/nats/jetstream:/data/jetstream
+      - ./infra/nats/jetstream-testnet:/data/jetstream
       - ./infra/nats/nats.conf:/etc/nats/nats.conf
 
   forwarder:
     image: lidofinance/onchain-mon:stable
-    container_name: forwarder
+    container_name: forwarder-testnet
     build: ./
     restart: always
     command:
       - ./forwarder
     env_file:
-      - .env
+      - .env.testnet
     environment:
       - READ_ENV_FROM_SHELL=true
       - ENV=${ENV}
-      - APP_NAME=forwarder
-      - PORT=8080
-      - LOG_FORMAT=json
+      - APP_NAME=${APP_NAME}
+      - PORT=${PORT}
+      - LOG_FORMAT=${LOG_FORMAT}
       - LOG_LEVEL=${LOG_LEVEL}
       - NATS_DEFAULT_URL=http://nats:4222
       - REDIS_ADDRESS=redis:6379
       - REDIS_DB=${REDIS_DB}
       - QUORUM_SIZE=${QUORUM_SIZE}
     ports:
-      - "8081:8080"
+      - "8083:8080"
     depends_on:
       - redis
       - nats
@@ -49,60 +70,33 @@ services:
       # /etc/forwarder/notification.yaml otherwise, so mount both.
       - ./notification.yaml:/app/notification.yaml
       - ./notification.yaml:/etc/forwarder/notification.yaml
+    logging: *default-logging
 
   feeder:
     image: lidofinance/onchain-mon:stable
-    container_name: feeder
+    container_name: feeder-testnet
     build: ./
     restart: always
     command:
       - ./feeder
     env_file:
-      - .env
+      - .env.testnet
     environment:
       - READ_ENV_FROM_SHELL=true
       - ENV=${ENV}
-      - APP_NAME=feeder
-      - PORT=8080
-      - LOG_FORMAT=json
+      - APP_NAME=${APP_NAME}
+      - PORT=${PORT}
+      - LOG_FORMAT=${LOG_FORMAT}
       - LOG_LEVEL=${LOG_LEVEL}
       - NATS_DEFAULT_URL=http://nats:4222
       - REDIS_ADDRESS=redis:6379
       - BLOCK_TOPIC=${BLOCK_TOPIC}
     ports:
-      - "8082:8080"
+      - "8084:8080"
     depends_on:
       - redis
       - nats
-
-  prometheus:
-    extends:
-      file: docker-compose.base.yaml
-      service: prometheus
-    container_name: prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    depends_on:
-      - feeder
-      - forwarder
-
-  grafana:
-    extends:
-      file: docker-compose.base.yaml
-      service: grafana
-    container_name: grafana
-    environment:
-      - GRAFANA_DS_UID=${GRAFANA_DS_UID}
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning
-      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards
-      - grafana-data:/var/lib/grafana
-    depends_on:
-      - prometheus
+    logging: *default-logging
 
 volumes:
-  grafana-data:
+  redis-testnet-data:

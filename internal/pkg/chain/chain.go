@@ -30,6 +30,7 @@ var ErrEmptyResponse = errors.New("empty response")
 const MaxAttempts = 6
 const RetryDelay = 75 * time.Millisecond
 const MaxDelay = 5 * time.Second
+const JsonRpcVersion = "2.0"
 
 func NewChain(jsonRpcUrl string, httpClient *http.Client, metricsStore *metrics.Store) *chain {
 	return &chain{
@@ -59,7 +60,7 @@ func doRpcRequest[T any](
 	out, err := retry.DoWithData(
 		func() (*entity.RpcResponse[T], error) {
 			rpcRequest := entity.RpcRequest{
-				JsonRpc: "2.0",
+				JsonRpc: JsonRpcVersion,
 				Method:  method,
 				Params:  params,
 				ID:      uuid.New().String(),
@@ -70,7 +71,7 @@ func doRpcRequest[T any](
 				return nil, marshaErr
 			}
 
-			req, err := http.NewRequestWithContext(ctx, "POST", jsonRpcUrl, bytes.NewBuffer(payload))
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, jsonRpcUrl, bytes.NewBuffer(payload))
 			if err != nil {
 				return nil, fmt.Errorf("could not create request: %w", err)
 			}
@@ -126,7 +127,7 @@ func doRpcRequest[T any](
 
 		return nil, errors.New(text.LeaveOnlyDomainInURLs(err.Error()))
 	}
-	
+
 	return out, nil
 }
 
@@ -140,7 +141,7 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 			requests := make([]entity.RpcRequest, 0, len(blockHashes))
 			for _, hash := range blockHashes {
 				requests = append(requests, entity.RpcRequest{
-					JsonRpc: "2.0",
+					JsonRpc: JsonRpcVersion,
 					Method:  "eth_getBlockReceipts",
 					Params:  []any{hash},
 					ID:      hash,
@@ -152,7 +153,7 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 				return nil, fmt.Errorf("marshal batch: %w", err)
 			}
 
-			req, err := http.NewRequestWithContext(ctx, "POST", c.jsonRpcUrl, bytes.NewBuffer(payload))
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.jsonRpcUrl, bytes.NewBuffer(payload))
 			if err != nil {
 				return nil, fmt.Errorf("create request: %w", err)
 			}
@@ -185,7 +186,7 @@ func (c *chain) FetchReceipts(ctx context.Context, blockHashes []string) (*entit
 			}
 
 			return &entity.RpcResponse[[]entity.BlockReceipt]{
-				JsonRpc: "2.0",
+				JsonRpc: JsonRpcVersion,
 				ID:      "batch",
 				Result:  &combined,
 			}, nil
@@ -218,7 +219,7 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 			for i := from; i <= to; i++ {
 				hexNum := fmt.Sprintf("0x%x", i)
 				requests = append(requests, entity.RpcRequest{
-					JsonRpc: "2.0",
+					JsonRpc: JsonRpcVersion,
 					Method:  "eth_getBlockByNumber",
 					Params:  []any{hexNum, false},
 					ID:      hexNum,
@@ -230,7 +231,7 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 				return nil, fmt.Errorf("marshal batch: %w", err)
 			}
 
-			req, err := http.NewRequestWithContext(ctx, "POST", c.jsonRpcUrl, bytes.NewBuffer(payload))
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.jsonRpcUrl, bytes.NewBuffer(payload))
 			if err != nil {
 				return nil, fmt.Errorf("create request: %w", err)
 			}
@@ -263,7 +264,7 @@ func (c *chain) FetchBlocksInRange(ctx context.Context, from, to int64) (*entity
 			}
 
 			return &entity.RpcResponse[[]entity.EthBlock]{
-				JsonRpc: "2.0",
+				JsonRpc: JsonRpcVersion,
 				ID:      "block-batch",
 				Result:  &blocks,
 			}, nil

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -84,6 +85,7 @@ func (s *Slack) send(ctx context.Context, message string) error {
 		return fmt.Errorf("could not send Slack request: %w", err)
 	}
 	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 		duration := time.Since(start).Seconds()
 		s.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: SlackLabel}).Observe(duration)

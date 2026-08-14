@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -70,7 +71,7 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		return fmt.Errorf("could not marshal Discord payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", d.webhookURL, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.webhookURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("error creating Discord request: %w", err)
 	}
@@ -83,6 +84,7 @@ func (d *Discord) send(ctx context.Context, message string) error {
 		return fmt.Errorf("could not send Discord request: %w", err)
 	}
 	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		duration := time.Since(start).Seconds()
 		d.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: DiscordLabel}).Observe(duration)
