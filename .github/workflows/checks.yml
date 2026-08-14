@@ -11,17 +11,18 @@ on:
 
 env:
   GOLANGCI_LINT_VERSION: v2.12.2
+  GOVULNCHECK_VERSION: v1.6.0
 
 jobs:
   format:
     name: Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -36,13 +37,13 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -57,26 +58,28 @@ jobs:
 
   vulncheck:
     name: Vulncheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Install govulncheck
-        run: GOBIN=$PWD/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+        run: |
+          GOBIN=$PWD/bin go install \
+            golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
 
       - name: Run govulncheck
         run: make vulncheck
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Don't spend runner time (and a Redis service) on a tree with known
     # vulnerable dependencies.
     needs: vulncheck
@@ -85,7 +88,7 @@ jobs:
     # here — use `make test-live` locally for those.
     services:
       redis:
-        image: redis:7.0-alpine
+        image: redis:7.0.15-alpine
         ports:
           - 6379:6379
         options: >-
@@ -95,10 +98,10 @@ jobs:
           --health-retries 5
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -113,18 +116,18 @@ jobs:
 
   docker:
     name: Docker image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Catch a broken Dockerfile here instead of at deploy time. The image is
     # built but never pushed — publishing stays in the deploy workflows.
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Setup buildx
-        uses: docker/setup-buildx-action@v3.3.0
+        uses: docker/setup-buildx-action@v4.2.0
 
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           push: false
