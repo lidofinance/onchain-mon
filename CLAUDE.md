@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Note: the repo was renamed from `finding-forwarder` to `onchain-mon`; the README and some docs still use the old name and a stale `./cmd/service` build path. The real entrypoints are `cmd/feeder` and `cmd/forwarder`.
 
-Go toolchain: `go 1.26.5` (per `go.mod`).
+Go toolchain: `go 1.26.6` (per `go.mod`).
 
 ## Commands
 

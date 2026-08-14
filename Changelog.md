@@ -33,7 +33,7 @@
 
 ### Changed
 30. Alert footer is shorter and easier to scan: dropped `Team`, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line
-31. Update to go1.26.5
+31. Update to go1.26.6 — 1.26.5 was affected by five stdlib vulnerabilities reachable from our code (`net/url` GO-2026-6218, `crypto/tls` GO-2026-6090, `net/http` GO-2026-6089 and GO-2026-5026, `encoding/asn1` GO-2026-5972), all fixed in 1.26.6
 32. Update dependencies
 33. Update dev tools; `gomodguard` -> `gomodguard_v2`
 34. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf

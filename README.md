@@ -86,7 +86,7 @@ This solution serves as an alternative to **[OpenZeppelin Defender](https://defe
 To set up a local development environment for **Onchain-Mon**, follow these steps:
 
 1. **Prerequisites**:
-    - Install `go1.26.5+` and Docker
+    - Install `go1.26.6+` and Docker
     - Clone the repository: `git clone https://github.com/lidofinance/onchain-mon`
     - Navigate to the root of the repository: `cd onchain-mon`
 
