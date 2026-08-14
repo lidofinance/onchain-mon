@@ -31,8 +31,8 @@ func FormatAlert(alert *databus.FindingDtoJson, source, blockExplorer string) st
 		quorumAt += fmt.Sprintf(" (+%ds)", eventToQuorumSecs)
 	}
 
-	footer += fmt.Sprintf("\n%s | %s | %s by %s",
-		alert.BotName, alert.AlertId, quorumAt, source,
+	footer += fmt.Sprintf("\n%s | %s | %s | %s by %s",
+		alert.Team, alert.BotName, alert.AlertId, quorumAt, source,
 	)
 
 	var links []string

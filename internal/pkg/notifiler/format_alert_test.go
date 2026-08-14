@@ -38,7 +38,7 @@ func TestFormatAlert(t *testing.T) {
 				TxHash:         new(txHash),
 			},
 			want: "Something happened\n" +
-				"\ntest-bot | TEST-ALERT-1 | 13:46:40.000 UTC (+3600s) by local\n" +
+				"\ntest-team | test-bot | TEST-ALERT-1 | 13:46:40.000 UTC (+3600s) by local\n" +
 				"[100](https://etherscan.io/block/100/) | " +
 				"[0x714...bdf](https://etherscan.io/tx/" + txHash + "/)",
 		},
@@ -48,16 +48,18 @@ func TestFormatAlert(t *testing.T) {
 				Description: "desc",
 				AlertId:     "TEST-2",
 				BotName:     "bot",
+				Team:        "team",
 			},
-			want: "desc\n\nbot | TEST-2 | 13:46:40.000 UTC by local",
+			want: "desc\n\nteam | bot | TEST-2 | 13:46:40.000 UTC by local",
 		},
 		{
 			name: "empty description",
 			alert: &databus.FindingDtoJson{
 				AlertId: "TEST-3",
 				BotName: "bot",
+				Team:    "team",
 			},
-			want: "\nbot | TEST-3 | 13:46:40.000 UTC by local",
+			want: "\nteam | bot | TEST-3 | 13:46:40.000 UTC by local",
 		},
 		{
 			name: "tx hash only, shortened",
@@ -65,10 +67,11 @@ func TestFormatAlert(t *testing.T) {
 				Description: "tx alert",
 				AlertId:     "TEST-4",
 				BotName:     "bot",
+				Team:        "team",
 				TxHash:      new(txHash),
 			},
 			want: "tx alert\n" +
-				"\nbot | TEST-4 | 13:46:40.000 UTC by local\n" +
+				"\nteam | bot | TEST-4 | 13:46:40.000 UTC by local\n" +
 				"[0x714...bdf](https://etherscan.io/tx/" + txHash + "/)",
 		},
 		{
@@ -79,10 +82,11 @@ func TestFormatAlert(t *testing.T) {
 				Description: "desc",
 				AlertId:     "TEST-5",
 				BotName:     "bot",
+				Team:        "team",
 				BlockNumber: new(100),
 			},
 			want: "desc\n" +
-				"\nbot | TEST-5 | 13:46:40.000 UTC by local\n" +
+				"\nteam | bot | TEST-5 | 13:46:40.000 UTC by local\n" +
 				"[100](https://etherscan.io/block/100/)",
 		},
 		{
@@ -92,9 +96,10 @@ func TestFormatAlert(t *testing.T) {
 				Description:    "desc",
 				AlertId:        "TEST-6",
 				BotName:        "bot",
+				Team:           "team",
 				BlockTimestamp: new(blockTS),
 			},
-			want: "desc\n\nbot | TEST-6 | 13:46:40.000 UTC (+3600s) by local",
+			want: "desc\n\nteam | bot | TEST-6 | 13:46:40.000 UTC (+3600s) by local",
 		},
 	}
 
