@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,38 +20,35 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/http/handlers/health"
-	"github.com/lidofinance/onchain-mon/internal/http/handlers/show"
 )
 
 const (
 	defaultReadTimeout  = 10 * time.Second
+	shutdownTimeout     = 10 * time.Second
 	defaultWriteTimeout = 10 * time.Second
 	defaultIdleTimeout  = 60 * time.Second
 )
 
 type App struct {
-	env             *env.AppConfig
-	notificationCfg *env.NotificationConfig
-	Logger          *slog.Logger
-	Metrics         *metrics.Store
-	JetStream       jetstream.JetStream
-	natsClient      *nats.Conn
+	env        *env.AppConfig
+	Logger     *slog.Logger
+	Metrics    *metrics.Store
+	JetStream  jetstream.JetStream
+	natsClient *nats.Conn
 }
 
 func New(
 	config *env.AppConfig,
-	notificationCfg *env.NotificationConfig,
 	logger *slog.Logger,
 	promStore *metrics.Store,
 	jetClient jetstream.JetStream, natsClient *nats.Conn,
 ) *App {
 	return &App{
-		env:             config,
-		notificationCfg: notificationCfg,
-		Logger:          logger,
-		Metrics:         promStore,
-		JetStream:       jetClient,
-		natsClient:      natsClient,
+		env:        config,
+		Logger:     logger,
+		Metrics:    promStore,
+		JetStream:  jetClient,
+		natsClient: natsClient,
 	}
 }
 
@@ -65,12 +63,22 @@ func (a *App) RunHTTPServer(ctx context.Context, g *errgroup.Group, appPort uint
 	}
 
 	g.Go(func() error {
-		return server.ListenAndServe()
+		// A graceful Shutdown makes ListenAndServe return ErrServerClosed;
+		// that is the normal stop path, not a failure worth reporting.
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+
+		return nil
 	})
 
 	g.Go(func() error {
 		<-ctx.Done()
-		return server.Shutdown(ctx)
+
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+
+		return server.Shutdown(shutdownCtx)
 	})
 }
 
@@ -78,16 +86,11 @@ func (a *App) RegisterWorkerRoutes(r chi.Router) {
 	a.RegisterMiddleware(r)
 	a.RegisterInfraRoutes(r)
 	a.RegisterPprofRoutes(r)
-
-	if a.notificationCfg != nil {
-		r.Get("/", show.New(a.notificationCfg).Handler)
-	}
 }
 
 func (a *App) RegisterMiddleware(r chi.Router) {
 	r.Use(slogchi.New(a.Logger))
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
 	const httpTimeout = 60 * time.Second
@@ -100,5 +103,5 @@ func (a *App) RegisterPprofRoutes(r chi.Router) {
 
 func (a *App) RegisterInfraRoutes(r chi.Router) {
 	r.Get("/health", health.New().Handler)
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	r.Get("/metrics", promhttp.HandlerFor(a.Metrics.Prometheus, promhttp.HandlerOpts{}).ServeHTTP)
 }

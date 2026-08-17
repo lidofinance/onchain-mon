@@ -1,3 +1,9 @@
+//go:build live
+
+// These tests read the repo-root .env / notification.yaml and hit live RPC and
+// messaging APIs — running them can post real messages to real channels.
+// They are excluded from the default build; run with: go test -tags=live ./...
+
 package notifiler_test
 
 import (
@@ -11,12 +17,11 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/env"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
-	"github.com/lidofinance/onchain-mon/internal/utils/pointers"
 )
 
 const NameCritical = `[CRITICAL] 🚨🚨🚨 ZkSync bridge balance mismatch 🚨🚨🚨`
 const DescriptionCritical = `
-Total supply of bridged wstETH is greater than balanceOf L1 bridge side!
+Total supply of bridged wrapTKN is greater than balanceOf L1 bridge side!
 L2 total supply: 1105.48
 L1 balanceOf: 1080.11
 
@@ -68,11 +73,11 @@ func Test_opsGenie_SendMessage(t *testing.T) {
 					Description:    DescriptionCritical,
 					Severity:       databus.SeverityHigh,
 					AlertId:        `TEST-CRITICAL-ID`,
-					BlockTimestamp: pointers.IntPtr(1727965236),
-					BlockNumber:    pointers.IntPtr(20884540),
-					TxHash:         pointers.StringPtr("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
+					BlockTimestamp: new(1727965236),
+					BlockNumber:    new(20884540),
+					TxHash:         new("0x714a6c2109c8af671c8a6df594bd9f1f3ba9f11b73a1e54f5f128a3447fa0bdf"),
 					BotName:        `Test`,
-					Team:           `Protocol`,
+					Team:           `Alpha`,
 				},
 			},
 			wantErr: false,

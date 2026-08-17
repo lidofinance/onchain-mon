@@ -24,20 +24,26 @@ import (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
+	// run returns the error so deferred cleanup still happens before os.Exit.
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	g, gCtx := errgroup.WithContext(ctx)
 
 	cfg, envErr := env.Read("")
 	if envErr != nil {
-		fmt.Println("Read env error:", envErr.Error())
-		return
+		return fmt.Errorf("read env: %w", envErr)
 	}
 
 	log, sentryClient, logErr := logger.New(&cfg.AppConfig)
 	if logErr != nil {
-		fmt.Println("New log error:", logErr.Error())
-		return
+		return fmt.Errorf("create logger: %w", logErr)
 	}
 	if sentryClient != nil {
 		defer sentryClient.Flush(2 * time.Second)
@@ -45,16 +51,14 @@ func main() {
 
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
-		log.Error(fmt.Sprintf(`Could not connect to nats error: %v`, natsErr))
-		return
+		return fmt.Errorf("connect to nats: %w", natsErr)
 	}
 	defer natsClient.Close()
 	log.Info("Nats connected")
 
 	js, jetStreamErr := jetstream.New(natsClient)
 	if jetStreamErr != nil {
-		fmt.Println("Could not connect to jetStream error:", jetStreamErr.Error())
-		return
+		return fmt.Errorf("connect to jetstream: %w", jetStreamErr)
 	}
 	log.Info("Nats jetStream connected")
 
@@ -75,7 +79,7 @@ func main() {
 	}
 
 	chainSrv := chain.NewChain(cfg.AppConfig.JsonRpcURL, httpClient, metricsStore)
-	app := server.New(&cfg.AppConfig, nil, log, metricsStore, js, natsClient)
+	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	app.Metrics.BuildInfo.Inc()
 
@@ -83,14 +87,15 @@ func main() {
 	feederWrk.Run(gCtx, g)
 
 	app.RegisterWorkerRoutes(r)
-	app.RegisterInfraRoutes(r)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
-	log.Info(fmt.Sprintf(`Started %s`, cfg.AppConfig.Name))
+	log.Info("Started feeder")
 
 	if err := g.Wait(); err != nil {
-		log.Error(err.Error())
+		return fmt.Errorf("%s stopped: %w", cfg.AppConfig.Name, err)
 	}
 
-	log.Info(fmt.Sprintf(`Main done %s`, cfg.AppConfig.Name))
+	log.Info("Main done feeder")
+
+	return nil
 }

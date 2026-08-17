@@ -15,7 +15,6 @@ type AppConfig struct {
 	Name      string
 	Source    string
 	Env       string
-	URL       string
 	Port      uint
 	LogFormat string
 	LogLevel  string
@@ -24,12 +23,8 @@ type AppConfig struct {
 	MetricsPrefix  string
 
 	JsonRpcURL string
+	BlockTopic string
 
-	BlockTopic   string
-	FindingTopic string
-
-	RedisURL      string
-	RedisDB       int
 	QuorumSize    uint
 	SentryDSN     string
 	BlockExplorer string
@@ -38,14 +33,8 @@ type AppConfig struct {
 }
 
 type RedisConfig struct {
-	URL                       string
-	DB                        int
-	TelegramStreamName        string
-	DiscordStreamName         string
-	OpsGenieStreamName        string
-	TelegramConsumerGroupName string
-	DiscordConsumerGroupName  string
-	OpsGeniaConsumerGroupName string
+	URL string
+	DB  int
 }
 
 var (

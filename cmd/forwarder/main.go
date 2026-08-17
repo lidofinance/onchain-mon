@@ -26,24 +26,28 @@ import (
 	"github.com/lidofinance/onchain-mon/internal/pkg/consumer"
 )
 
-const maxMsgSize = 4 * 1024 * 1024 // 4 Mb
+func main() {
+	// run returns the error so deferred cleanup still happens before os.Exit.
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
 //nolint:funlen
-func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	g, gCtx := errgroup.WithContext(ctx)
 
 	cfg, envErr := env.Read("")
 	if envErr != nil {
-		fmt.Println("Read env error:", envErr.Error())
-		return
+		return fmt.Errorf("read env: %w", envErr)
 	}
 
 	log, sentryClient, logErr := logger.New(&cfg.AppConfig)
 	if logErr != nil {
-		fmt.Println("New log error:", logErr.Error())
-		return
+		return fmt.Errorf("create logger: %w", logErr)
 	}
 	if sentryClient != nil {
 		defer sentryClient.Flush(2 * time.Second)
@@ -51,8 +55,7 @@ func main() {
 
 	// Must be unique among instances
 	if cfg.AppConfig.Source == "" {
-		log.Error("Env Source must be set and unique among instances")
-		return
+		return errors.New("SOURCE must be set and unique among instances")
 	}
 
 	metricsStore := metrics.New(prometheus.NewRegistry(), cfg.AppConfig.MetricsPrefix, cfg.AppConfig.Name, cfg.AppConfig.Env)
@@ -73,8 +76,7 @@ func main() {
 
 	notificationConfig, err := env.ReadNotificationConfig(cfg.AppConfig.Env, `notification.yaml`)
 	if err != nil {
-		log.Error(fmt.Sprintf("Error loading consumer's config: %v", err))
-		return
+		return fmt.Errorf("load notification config: %w", err)
 	}
 
 	notificationChannels, err := env.NewNotificationChannels(
@@ -85,8 +87,7 @@ func main() {
 		cfg.AppConfig.Env,
 	)
 	if err != nil {
-		log.Error(fmt.Sprintf("Could not init notification channels: %v", err))
-		return
+		return fmt.Errorf("init notification channels: %w", err)
 	}
 
 	natsConsumerCount := 0
@@ -96,29 +97,26 @@ func main() {
 
 	rds, err := redis.NewRedisClient(cfg.AppConfig.RedisConfig.URL, cfg.AppConfig.RedisConfig.DB, log, natsConsumerCount)
 	if err != nil {
-		log.Error(fmt.Sprintf(`create redis client error: %v`, err))
-		return
+		return fmt.Errorf("create redis client: %w", err)
 	}
 	defer rds.Close()
 
 	natsClient, natsErr := nc.New(&cfg.AppConfig, log)
 	if natsErr != nil {
-		log.Error(fmt.Sprintf(`Could not connect to nats error: %v`, natsErr))
-		return
+		return fmt.Errorf("connect to nats: %w", natsErr)
 	}
 	defer natsClient.Close()
 	log.Info("Nats connected")
 
 	js, jetStreamErr := jetstream.New(natsClient)
 	if jetStreamErr != nil {
-		log.Error(fmt.Sprintf(`Could not connect to jetStream error: %v`, jetStreamErr))
-		return
+		return fmt.Errorf("connect to jetstream: %w", jetStreamErr)
 	}
 	log.Info("Nats jetStream connected")
 
 	r := chi.NewRouter()
 
-	app := server.New(&cfg.AppConfig, notificationConfig, log, metricsStore, js, natsClient)
+	app := server.New(&cfg.AppConfig, log, metricsStore, js, natsClient)
 
 	natsStreamName := `NatsStream`
 	natStream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
@@ -126,14 +124,13 @@ func main() {
 		Discard:    jetstream.DiscardOld,
 		MaxAge:     10 * time.Minute,
 		Subjects:   env.CollectNatsSubjects(notificationConfig),
-		MaxMsgSize: maxMsgSize,
+		MaxMsgSize: nc.MaxMsgSize,
 		Retention:  jetstream.InterestPolicy,
 	})
 	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
-		fmt.Printf("could not create %s stream error: %v\n", natsStreamName, err)
-		return
+		return fmt.Errorf("create %s stream: %w", natsStreamName, err)
 	}
-	log.Info(fmt.Sprintf("%s jetStream createdOrUpdated", natsStreamName))
+	log.Info(natsStreamName + " jetStream createdOrUpdated")
 
 	consumers, err := consumer.NewConsumers(
 		log,
@@ -146,8 +143,7 @@ func main() {
 		notificationChannels,
 	)
 	if err != nil {
-		log.Error(fmt.Sprintf("Could not init consumers: %v", err))
-		return
+		return fmt.Errorf("init consumers: %w", err)
 	}
 
 	worker := forwarder.New(
@@ -159,20 +155,20 @@ func main() {
 	)
 
 	if err = worker.ConsumeFindings(gCtx, g); err != nil {
-		log.Error(fmt.Sprintf("Could not findings consumer: %s", err))
-		return
+		return fmt.Errorf("start findings consumer: %w", err)
 	}
 
 	app.Metrics.BuildInfo.Inc()
 	app.RegisterWorkerRoutes(r)
-	app.RegisterInfraRoutes(r)
 	app.RunHTTPServer(gCtx, g, cfg.AppConfig.Port, r)
 
-	log.Info(fmt.Sprintf(`Started %s`, cfg.AppConfig.Name))
+	log.Info("Started forwarder")
 
 	if err := g.Wait(); err != nil {
-		log.Error(err.Error())
+		return fmt.Errorf("%s stopped: %w", cfg.AppConfig.Name, err)
 	}
 
-	log.Info(fmt.Sprintf(`Main done %s`, cfg.AppConfig.Name))
+	log.Info("Main done forwarder")
+
+	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -54,6 +55,10 @@ const JetStreamAttemptsWrite = 5
 const EtaNextBlock = 12 * time.Second
 const DelayNextBlock = 500 * time.Millisecond
 
+// How many blocks one recovery batch asks for. Keep it well under the RPC
+// client timeout: each block also drags its receipts along.
+const RecoverChunkSize = 50
+
 func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 	g.Go(func() error {
 		timer := time.NewTimer(Per6Sec)
@@ -94,10 +99,8 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 							continue
 						}
 
-						if !errors.Is(err, chain.ErrEmptyResponse) {
-							w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
-							w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
-						}
+						w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+						w.log.Error(fmt.Sprintf("FetchBlockByNumber error: %v", err))
 
 						if time.Since(fetchStartTime) > 2*time.Minute {
 							w.metricsStore.BlockResets.Inc()
@@ -148,12 +151,40 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 				blockDto := buildBlockDto(block.Result, *blockReceipts.Result)
 				if publishErr := w.publishBlock(blockDto); publishErr != nil {
 					w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusFail}).Inc()
+
+					// An oversized block never becomes publishable, so retrying it
+					// wedges the feeder on this height forever. Skip past it.
+					if isUnpublishable(publishErr) {
+						w.metricsStore.UnpublishedBlock(metrics.ReasonMaxPayload, block.Result.GetNumber())
+						w.log.Error("Skipping unpublishable block",
+							slog.Int("blockNumber", blockDto.Number),
+							slog.String("reason", metrics.ReasonMaxPayload),
+							slog.String("error", publishErr.Error()),
+						)
+
+						prevBlockNumber = block.Result.GetNumber()
+						w.updateTickerAfterBlock(timer, block.Result)
+
+						continue
+					}
+
+					// Transient failure: arm the recovery window so a long outage
+					// here is backfilled the same way a fetch outage is.
+					if fetchStartTime.IsZero() {
+						fetchStartTime = time.Now()
+					}
+
 					w.log.Error(fmt.Sprintf(`Could not publish block blockDto: %s`, publishErr))
 					w.resetTimer(timer)
+
 					continue
 				}
 
 				w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+				// Wall-clock time of the publish, not the block timestamp: the
+				// staleness alert compares this against time().
+				w.metricsStore.LastPublishedBlockTimestamp.Set(float64(time.Now().Unix()))
+
 				prevBlockNumber = block.Result.GetNumber()
 				delay := w.updateTickerAfterBlock(timer, block.Result)
 
@@ -163,10 +194,21 @@ func (w *Feeder) Run(ctx context.Context, g *errgroup.Group) {
 	})
 }
 
+// isUnpublishable reports whether NATS rejected the block for good. Size limits
+// are checked before the message leaves the client, so no amount of retrying
+// makes such a block publishable — the feeder has to move past it.
+func isUnpublishable(err error) bool {
+	return errors.Is(err, nats.ErrMaxPayload) || errors.Is(err, jetstream.ErrMaxBytesExceeded)
+}
+
 func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*entity.EthBlock, error) {
 	latestBlock, err := w.chainSrv.GetLatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get latest block: %w", err)
+	}
+
+	if latestBlock.Result == nil {
+		return nil, fmt.Errorf("get latest block: %w", chain.ErrEmptyResponse)
 	}
 
 	latestNumber := latestBlock.Result.GetNumber()
@@ -174,14 +216,54 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 		return nil, fmt.Errorf("latest block number %d is less than fromBlock %d", latestNumber, fromBlock)
 	}
 
-	blocksResp, err := w.chainSrv.FetchBlocksInRange(ctx, fromBlock+1, latestNumber)
-	if err != nil {
-		return nil, fmt.Errorf("fetch blocksResp in range: %w", err)
+	// Walk the gap in chunks: a long RPC outage can leave hundreds of blocks
+	// behind, and asking for all of them (plus their receipts) in one batch
+	// runs into the client timeout and loses the whole recovery.
+	var latestPubBlock *entity.EthBlock
+	for from := fromBlock + 1; from <= latestNumber; from += RecoverChunkSize {
+		to := min(from+RecoverChunkSize-1, latestNumber)
+
+		lastInChunk, chunkErr := w.recoverBlockRange(ctx, from, to)
+		if chunkErr != nil {
+			// Keep what we already published: the caller resumes from there
+			// instead of replaying the whole gap.
+			if latestPubBlock != nil {
+				w.log.Error(fmt.Sprintf("Recovered blocks up to %d, then failed on range %d..%d: %v",
+					latestPubBlock.GetNumber(), from, to, chunkErr))
+
+				return latestPubBlock, nil
+			}
+
+			return nil, chunkErr
+		}
+
+		latestPubBlock = lastInChunk
 	}
 
-	blockHashes := make([]string, 0, len(*blocksResp.Result))
-	for i := range *blocksResp.Result {
-		blockHashes = append(blockHashes, (*blocksResp.Result)[i].Hash)
+	if latestPubBlock == nil {
+		return nil, fmt.Errorf("recovered no blocks for range %d..%d", fromBlock+1, latestNumber)
+	}
+
+	return latestPubBlock, nil
+}
+
+// recoverBlockRange fetches and publishes a single chunk, returning its last
+// published block.
+func (w *Feeder) recoverBlockRange(ctx context.Context, from, to int64) (*entity.EthBlock, error) {
+	blocksResp, err := w.chainSrv.FetchBlocksInRange(ctx, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("fetch blocks in range %d..%d: %w", from, to, err)
+	}
+
+	if blocksResp.Result == nil || len(*blocksResp.Result) == 0 {
+		return nil, fmt.Errorf("no blocks returned for range %d..%d: %w", from, to, chain.ErrEmptyResponse)
+	}
+
+	blocks := *blocksResp.Result
+
+	blockHashes := make([]string, 0, len(blocks))
+	for i := range blocks {
+		blockHashes = append(blockHashes, blocks[i].Hash)
 	}
 
 	receiptsResp, err := w.chainSrv.FetchReceipts(ctx, blockHashes)
@@ -189,23 +271,34 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 		return nil, fmt.Errorf("could not fetch receipts: %w", err)
 	}
 
-	receiptsByBlock := make(map[string][]entity.BlockReceipt, len(*receiptsResp.Result))
-	for i := range *receiptsResp.Result {
-		receipt := (*receiptsResp.Result)[i]
-		receiptsByBlock[receipt.BlockHash] = append(receiptsByBlock[receipt.BlockHash], receipt)
+	receiptsByBlock := make(map[string][]entity.BlockReceipt)
+	if receiptsResp.Result != nil {
+		for i := range *receiptsResp.Result {
+			receipt := (*receiptsResp.Result)[i]
+			receiptsByBlock[receipt.BlockHash] = append(receiptsByBlock[receipt.BlockHash], receipt)
+		}
 	}
 
-	var latestPubBlock *entity.EthBlock = nil
-	for i := range *blocksResp.Result {
-		block := (*blocksResp.Result)[i]
-		hash := block.Hash
-		receipts := receiptsByBlock[hash]
+	var latestPubBlock *entity.EthBlock
+	for i := range blocks {
+		block := blocks[i]
 
-		dto := buildBlockDto(&block, receipts)
+		dto := buildBlockDto(&block, receiptsByBlock[block.Hash])
 		if publishErr := w.publishBlock(dto); publishErr != nil {
+			// Blocks published before this one stay published — report how far
+			// we got so the caller can resume from there.
+			if latestPubBlock != nil {
+				return latestPubBlock, nil
+			}
+
 			return nil, fmt.Errorf("could not publish block: %w", publishErr)
 		}
 		latestPubBlock = &block
+
+		// Recovered blocks count as published, otherwise a long backfill would
+		// look like a stalled feeder to the staleness alert.
+		w.metricsStore.PublishedBlocks.With(prometheus.Labels{metrics.Status: metrics.StatusOk}).Inc()
+		w.metricsStore.LastPublishedBlockTimestamp.Set(float64(time.Now().Unix()))
 
 		w.log.Info(fmt.Sprintf("Recovered block %d", dto.Number))
 	}
@@ -215,11 +308,21 @@ func (w *Feeder) recoverMissedBlocks(ctx context.Context, fromBlock int64) (*ent
 
 func compress(payload []byte) (*bytes.Buffer, error) {
 	cPayload := &bytes.Buffer{}
-	zstdWriter, _ := zstd.NewWriter(cPayload)
-	defer zstdWriter.Close()
+
+	zstdWriter, err := zstd.NewWriter(cPayload)
+	if err != nil {
+		return nil, fmt.Errorf("could not create zstd writer: %w", err)
+	}
 
 	if _, zstdErr := zstdWriter.Write(payload); zstdErr != nil {
+		zstdWriter.Close()
 		return nil, zstdErr
+	}
+
+	// Close flushes the frame footer, so it has to happen before the buffer is
+	// handed over — a deferred Close would run after the return.
+	if closeErr := zstdWriter.Close(); closeErr != nil {
+		return nil, fmt.Errorf("could not finish zstd frame: %w", closeErr)
 	}
 
 	return cPayload, nil
@@ -277,6 +380,11 @@ func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
 		return fmt.Errorf("could not compress blockDto by zstd: %w", compressErr)
 	}
 
+	// Recorded before the publish so an oversized block is measured too — that
+	// is exactly the case worth seeing on the chart.
+	w.metricsStore.BlockPayloadSize.With(prometheus.Labels{metrics.Stage: metrics.StageRaw}).Set(float64(len(payload)))
+	w.metricsStore.BlockPayloadSize.With(prometheus.Labels{metrics.Stage: metrics.StageCompressed}).Set(float64(cPayload.Len()))
+
 	if _, publishErr := w.js.PublishAsync(w.topic, cPayload.Bytes(),
 		jetstream.WithMsgID(blockDto.Hash),
 		jetstream.WithRetryAttempts(JetStreamAttemptsWrite),
@@ -291,11 +399,7 @@ func (w *Feeder) publishBlock(blockDto databus.BlockDtoJson) error {
 
 func (w *Feeder) updateTickerAfterBlock(timer *time.Timer, block *entity.EthBlock) time.Duration {
 	expectedNextBlockTime := time.Unix(block.GetTimestamp(), 0).Add(EtaNextBlock)
-	delay := time.Until(expectedNextBlockTime.Add(DelayNextBlock))
-
-	if delay < time.Second {
-		delay = time.Second
-	}
+	delay := max(time.Until(expectedNextBlockTime.Add(DelayNextBlock)), time.Second)
 
 	timer.Reset(delay)
 	return delay

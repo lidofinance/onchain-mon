@@ -21,9 +21,13 @@ func TestLeaveOnlyDomainInURLs(t *testing.T) {
 		{
 			name: "leave only domain url",
 			args: args{
-				input: "FetchBlockByNumber error: All attempts fail:\\n#1: could not send request: Post \\\"https://api.example.com/foobar\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+				input: "FetchBlockByNumber error: All attempts fail:\\n#1: could not send request: " +
+					"Post \\\"https://api.example.com/foobar\\\": context deadline exceeded " +
+					"(Client.Timeout exceeded while awaiting headers)",
 			},
-			want: "FetchBlockByNumber error: All attempts fail:\\n#1: could not send request: Post \\\"https://api.example.com\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+			want: "FetchBlockByNumber error: All attempts fail:\\n#1: could not send request: " +
+				"Post \\\"https://api.example.com\": context deadline exceeded " +
+				"(Client.Timeout exceeded while awaiting headers)",
 		},
 	}
 	for _, tt := range tests {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -89,7 +90,7 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 		return fmt.Errorf("could not marshal OpsGenie payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST",
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"https://api.opsgenie.com/v2/alerts",
 		bytes.NewBuffer(payloadBytes),
 	)
@@ -106,6 +107,7 @@ func (o *OpsGenie) send(ctx context.Context, payload AlertPayload) error {
 		return fmt.Errorf("could not send OpsGenie request: %w", err)
 	}
 	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		duration := time.Since(start).Seconds()
 		o.metrics.SummaryHandlers.With(prometheus.Labels{metrics.Channel: OpsGenieLabel}).Observe(duration)

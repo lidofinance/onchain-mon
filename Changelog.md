@@ -1,3 +1,76 @@
+## 13.08.2026
+
+### Fixed
+1. Consumer: finding could be lost when Redis `Incr` failed — the LRU was marked before the counter was accepted, so the redelivered message took the "already seen" path and got acked without ever being counted
+2. Consumer: the count key could stay in Redis forever without a TTL when `Expire` failed — `Decr` left it at 0 instead of dropping it
+3. Consumer: a message was left unsettled when another instance claimed the send, so it hung for the whole `AckWait` (30s) and burned one of the 10 `MaxDeliver` attempts
+4. Consumer: the `StatusFail` metric was counted twice on a send failure
+5. Removed deprecated chi `middleware.RealIP` (GHSA-3fxj-6jh8-hvhx and friends) — `RemoteAddr` is never read, and the services expose only infra endpoints
+6. Forwarder: `notification.yaml` is now also mounted at `/app`, so it is found when `ENV=local`
+7. Stopped reporting `http: Server closed` to Sentry — a graceful shutdown makes `ListenAndServe` return `ErrServerClosed`, which was logged at error level on every restart
+8. Graceful shutdown now gets its own context with a 10s timeout; it used to receive the already-cancelled one and cut live connections instead of draining them
+9. Consumer: rate-limited debug findings are logged at info level instead of error, so expected back-pressure no longer reaches Sentry (the quorum branch already did this)
+10. Metrics: collectors went into the global promauto registry while `/metrics` served the app's one, so `blocks_published_total`, `finding_sent_total`, `request_processing_seconds` and `notification_channel_error_total` were never exported; the Go runtime and process collectors are now registered explicitly
+11. Metrics: `metrics.New` registered every collector twice and panicked on a second call, which made the package unusable from tests
+12. Feeder: `recoverMissedBlocks` could return `nil` with no error when the RPC replied with an empty range, and the caller dereferenced it — feeder crashed exactly while recovering from an RPC outage
+13. Feeder: recovery now walks the gap in chunks of 50 blocks; a long outage used to be fetched in one batch that ran into the client timeout and dropped the whole recovery
+14. Feeder: a failed chunk no longer discards the blocks already published — recovery reports how far it got and resumes from there instead of skipping the gap
+15. Feeder: `compress` handed the buffer over before `Close` wrote the zstd frame footer, and the writer's constructor error was discarded
+16. Connectors: `sync.Once` cached a failed connection in both the NATS and Redis clients — every later call returned a nil client with a nil error, hiding the outage instead of reporting it
+17. Redis: a client that failed its ping is now dropped, so the next call dials again instead of reusing a connection that never worked
+18. Redis: `MinIdleConns` was `poolSize / 10`, which is 0 for anything under ten consumers — the pool kept no warm connections for the quorum hot path
+19. Logger: Sentry now follows the DSN instead of the environment name; an empty DSN used to build a client that silently discarded every event
+20. Notifiler: every sender now drains the response body before closing it — Go only returns a connection to the keep-alive pool once its body is read to EOF, so replies carrying a body (429s in particular) opened a fresh TCP connection every time
+21. Repo: the Lua script handed `EXPIRE` a `time.Duration`, so the sending-status key was pinned for ~22 000 years instead of 12 minutes — a finding claimed by an instance that then died could never be picked up again
+22. Config: `notification.yaml` is now rejected when it has no consumers or no severity_levels, and when a consumer has no severities — each of those started a forwarder that looked healthy while forwarding nothing
+23. Config: subjects are validated against the `findings.<team>.<bot>` shape that `NewConsumers` requires; a shorter one used to pass validation and crash the forwarder at startup
+24. Config: consumers whose NATS durable names collide are rejected — `<team>_<consumerName>_<bot>` can repeat across different consumers, which made them share one JetStream consumer and drop findings
+25. Config: an empty `consumerName` is rejected instead of producing a malformed durable name
+26. Both binaries now exit with code 1 when they fail to start; they reported success, so an orchestrator could not tell a crash from a clean stop
+27. Dropped `syscall.SIGKILL` from the signal set — the OS never delivers it, so listening for it only suggested a graceful shutdown that cannot happen
+28. Feeder: an oversized block no longer wedges the loop. `ErrMaxPayload` is returned before the message leaves the client, so retrying it re-fetched the same height every two seconds forever and block delivery stalled. Such a block is now logged, counted and skipped
+29. Feeder: a failed publish also arms the recovery window, so `recoverMissedBlocks` backfills gaps that start here — previously only fetch errors did
+
+### Changed
+30. Alert footer is shorter and easier to scan: dropped the `Team` label, the `Tx hash:` label and the `quorum at` prefix; the "Happened ~N seconds ago" line is now a `(+Ns)` suffix next to the quorum time, and the block and tx links share one line. The team name itself stays, first in the footer — only the word `Team` is gone
+31. Update to go1.26.6 — 1.26.5 was affected by five stdlib vulnerabilities reachable from our code (`net/url` GO-2026-6218, `crypto/tls` GO-2026-6090, `net/http` GO-2026-6089 and GO-2026-5026, `encoding/asn1` GO-2026-5972), all fixed in 1.26.6
+32. Update dependencies
+33. Update dev tools; `gomodguard` -> `gomodguard_v2`
+34. NATS max message size moved into a single constant `nats.MaxMsgSize` and raised to 8 Mb, matching `max_payload` in nats.conf
+35. `AppConfig` now matches the keys actually parsed from env — dropped `URL`, `FindingTopic`, `RedisURL`, `RedisDB` and the unused Redis Streams names
+36. Reworked `sample.env` and added `sample.testnet.env`; dropped the dead `NATS_PUBLISH_TOPIC`
+37. Consumer: extracted `handleWithoutQuorum` and `collectQuorumCount` out of `GetConsumeHandler`
+
+### Added
+38. Feeder metrics for skipped blocks and staleness: `blocks_unpublishable_total{reason}`, `last_unpublishable_block_number` and `last_published_block_timestamp`. The block number is the gauge value, not a label — as a label it would spawn a new time series per block
+39. Feeder metric `block_payload_bytes{stage}` — the block size before and after zstd, so the headroom against the 8 Mb NATS limit is visible
+40. Feeder: a regression test asserting an unpublishable block never makes the loop re-fetch the same height
+41. Local observability stack: Prometheus and Grafana in docker-compose, provisioned with the production dashboard and scrape labels that match it
+42. Grafana panels for the new feeder metrics, per-consumer forwarder delivery, Go heap/GC/allocation and a build-info table with the commit each service runs
+43. CI workflow: format, lint, vulncheck, build + tests against a Redis service, and a docker image build so a broken Dockerfile surfaces before deploy
+44. Consumer: tests for quorum counting and for losing the send race
+45. Feeder: tests covering recovery chunking, its boundaries, partial-progress handling and the nil-response guards
+46. `FormatAlert` tests now compare the rendered alert verbatim instead of asserting on substrings; `notifiler.Now` makes the timestamp deterministic
+47. Notifiler: a test that counts TCP connections against a local server, so connection reuse cannot regress unnoticed
+48. Config: tests for every validation rule, including the durable-name collision and the subject format
+49. Consumer: a test pinning the sending-status TTL to minutes
+50. `docker-compose.testnet.yaml` (Hoodi) with its own ports, container names and Redis DB — it runs alongside the mainnet stack
+51. `docker-compose.base.yaml` holds the shared redis/nats definitions; mainnet, testnet and prod inherit them via `extends`
+52. Makefile targets per environment: `up`/`down`/`logs`, `up-testnet`/`down-testnet`/`logs-testnet`, `up-prod`/`down-prod`/`logs-prod`, `down-all`
+53. `make check-format`, `make test` and `make test-live`
+
+### Removed
+54. The unused `/` config page: `web/templates` and the `show` handler
+55. The `tools` module — its pinned versions had drifted from what `make tools` installs
+
+### Tooling
+56. Test fixtures no longer carry real team, bot and token names — subjects, alert ids and descriptions use neutral placeholders
+57. Live RPC/messaging tests now sit behind the `live` build tag, so `go test ./...` no longer posts to real channels — use `make test-live` for those
+58. Fixed the `vulncheck` target: it was missing the package pattern, so it never actually scanned anything
+59. Fixed the format/imports conflict: `goimports` local-prefixes pointed at golangci-lint's own module, so the IDE and the CLI grouped imports differently
+60. Enabled more linters: `errorlint`, `modernize`, `perfsprint`, `usestdlibvars`, `usetesting`
+61. Local infrastructure state moved into `infra/` (nats, steth-db); runtime data is gitignored, `nats.conf` stays tracked
+
 ## 06.05.2026
 1. Added string sanitizer
 

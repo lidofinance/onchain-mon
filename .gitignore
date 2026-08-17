@@ -1,6 +1,8 @@
 # Mac OS X files
 .DS_Store
 .env
+.env.*
+!.env.example
 .env.yml
 .idea/
 .vscode/
@@ -30,3 +32,13 @@ tools/vendor
 notification.yaml
 notification.prod.yaml
 notification.temp.yaml
+# infra/ holds both config (tracked) and runtime state (ignored).
+# Ignore everything, then re-add the files that describe the local stack.
+infra/*
+!infra/nats/
+infra/nats/*
+!infra/nats/nats.conf
+!infra/prometheus/
+!infra/grafana/
+# The dashboard lives in the ansible repo — this copy is a local working file.
+infra/grafana/dashboards/*.json
