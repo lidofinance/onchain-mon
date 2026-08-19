@@ -55,8 +55,20 @@ const WarningTelegramMessage = "Warn: Msg >=4096, pls review description message
 const TelegramLabel = `telegram`
 
 func (t *Telegram) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+	// Escape MarkdownV1 entity characters in the free-text, finding-controlled
+	// fields before they are composed into the message. This is done on a copy so
+	// the change is scoped to the Telegram notifier and does not affect the other
+	// channels that also call FormatAlert. FormatAlert still builds its own trusted
+	// inline links (block/tx) around these already-escaped values, so a crafted
+	// finding can no longer smuggle links or formatting into the alert.
+	safeAlert := *alert
+	safeAlert.Name = escapeMarkdownV1Field(alert.Name)
+	safeAlert.Description = escapeMarkdownV1Field(alert.Description)
+	safeAlert.Team = escapeMarkdownV1Field(alert.Team)
+	safeAlert.BotName = escapeMarkdownV1Field(alert.BotName)
+
 	message := TruncateMessageWithAlertID(
-		fmt.Sprintf("%s\n\n%s", alert.Name, FormatAlert(alert, t.source, t.blockExplorer)),
+		fmt.Sprintf("%s\n\n%s", safeAlert.Name, FormatAlert(&safeAlert, t.source, t.blockExplorer)),
 		MaxTelegramMessageLength,
 		WarningTelegramMessage,
 	)
@@ -152,6 +164,14 @@ func (t *Telegram) GetType() registry.NotificationChannel {
 //
 // V2 - is more reach for special symbols, more you can find by link
 // https://core.telegram.org/bots/update56kabdkb12ibuisabdubodbasbdaosd#markdownv2-style
+//
+// NOTE: this escapes an already-composed message and therefore only escapes the
+// underscore, because escaping the other V1 entity characters here would also
+// break the intentional inline links (`[block](url)`, `[tx](url)`) that
+// FormatAlert composes into the trusted footer. Escaping of the free-text,
+// finding-controlled fields (Name, Description, Team, BotName) is done at their
+// source in SendFinding via escapeMarkdownV1Field, so those cannot smuggle
+// markup into the message.
 func escapeMarkdownV1(input string) string {
 	specialChars := map[string]struct{}{
 		`_`: {},
@@ -160,6 +180,36 @@ func escapeMarkdownV1(input string) string {
 	var escaped strings.Builder
 	for _, char := range input {
 		if _, ok := specialChars[string(char)]; ok {
+			escaped.WriteString(`\`)
+		}
+
+		escaped.WriteRune(char)
+	}
+
+	return escaped.String()
+}
+
+// escapeMarkdownV1Field escapes every Telegram MarkdownV1 entity character in a
+// free-text field that originates from a finding (Name, Description). Unlike
+// escapeMarkdownV1, which runs over the fully composed message and must preserve
+// the intentional links, this runs over untrusted text before it is placed into
+// the message, so it neutralises `*`, backtick and `[` in addition to `_`.
+//
+// Without this, a finding whose text contains e.g. `[click](https://evil)` or
+// backtick-fenced content renders as active markup in the notification channel,
+// letting a crafted finding inject clickable links or formatting into an
+// otherwise trusted alert.
+func escapeMarkdownV1Field(input string) string {
+	specialChars := map[rune]struct{}{
+		'_': {},
+		'*': {},
+		'`': {},
+		'[': {},
+	}
+
+	var escaped strings.Builder
+	for _, char := range input {
+		if _, ok := specialChars[char]; ok {
 			escaped.WriteString(`\`)
 		}
 
