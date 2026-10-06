@@ -19,24 +19,21 @@ const (
 	Slack    NotificationChannel = `Slack`
 )
 
-var CanonicalSeverities = []databus.Severity{
-	databus.SeverityUnknown,
-	databus.SeverityInfo,
-	databus.SeverityLow,
-	databus.SeverityMedium,
-	databus.SeverityHigh,
-	databus.SeverityCritical,
-}
-
-func IsCanonicalSeverity(severity databus.Severity) bool {
-	return slices.Contains(CanonicalSeverities, severity)
+var CanonicalSeverities = FindingMapping{
+	databus.SeverityUnknown:  true,
+	databus.SeverityInfo:     true,
+	databus.SeverityLow:      true,
+	databus.SeverityMedium:   true,
+	databus.SeverityHigh:     true,
+	databus.SeverityCritical: true,
 }
 
 func CanonicalSeverityList() string {
 	out := make([]string, 0, len(CanonicalSeverities))
-	for _, severity := range CanonicalSeverities {
+	for severity := range CanonicalSeverities {
 		out = append(out, string(severity))
 	}
+	slices.Sort(out)
 
 	return strings.Join(out, ", ")
 }

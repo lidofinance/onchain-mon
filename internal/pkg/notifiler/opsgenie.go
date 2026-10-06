@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,11 +67,12 @@ func OpsGeniePriority(severity databus.Severity) string {
 
 func OpsGenieSeverityList() string {
 	out := make([]string, 0, len(registry.CanonicalSeverities))
-	for _, severity := range registry.CanonicalSeverities {
+	for severity := range registry.CanonicalSeverities {
 		if OpsGeniePriority(severity) != "" {
 			out = append(out, string(severity))
 		}
 	}
+	slices.Sort(out)
 
 	return strings.Join(out, ", ")
 }

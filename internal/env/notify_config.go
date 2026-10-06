@@ -343,7 +343,7 @@ func collectGlobalSeverities(cfg *NotificationConfig) (registry.FindingMapping, 
 			return nil, fmt.Errorf("severity_levels[%d] has an empty id", i)
 		}
 
-		if !registry.IsCanonicalSeverity(databus.Severity(severity.ID)) {
+		if !registry.CanonicalSeverities[databus.Severity(severity.ID)] {
 			return nil, fmt.Errorf("severity_levels[%d] declares an unknown severity '%s', expected one of: %s",
 				i, severity.ID, registry.CanonicalSeverityList())
 		}

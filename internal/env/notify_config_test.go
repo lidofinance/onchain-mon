@@ -309,7 +309,7 @@ func Test_collect_nats_subjects_is_deduped_and_sorted(t *testing.T) {
 func Test_every_canonical_severity_is_accepted(t *testing.T) {
 	levels := make([]SeverityLevel, 0, len(registry.CanonicalSeverities))
 	severities := make([]string, 0, len(registry.CanonicalSeverities))
-	for _, severity := range registry.CanonicalSeverities {
+	for severity := range registry.CanonicalSeverities {
 		levels = append(levels, SeverityLevel{ID: string(severity)})
 		severities = append(severities, string(severity))
 	}
@@ -322,7 +322,7 @@ func Test_every_canonical_severity_is_accepted(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, severity := range registry.CanonicalSeverities {
+	for severity := range registry.CanonicalSeverities {
 		if !cfg.Consumers[0].SeveritySet[severity] {
 			t.Errorf("severity %q is missing from SeveritySet", severity)
 		}
@@ -354,7 +354,7 @@ func Test_non_opsgenie_consumers_accept_every_severity(t *testing.T) {
 
 		levels := make([]SeverityLevel, 0, len(registry.CanonicalSeverities))
 		severities := make([]string, 0, len(registry.CanonicalSeverities))
-		for _, severity := range registry.CanonicalSeverities {
+		for severity := range registry.CanonicalSeverities {
 			levels = append(levels, SeverityLevel{ID: string(severity)})
 			severities = append(severities, string(severity))
 		}

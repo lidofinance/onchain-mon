@@ -31,9 +31,11 @@ func Test_canonical_severities_match_the_finding_schema(t *testing.T) {
 	}
 
 	got := make([]string, 0, len(CanonicalSeverities))
-	for _, severity := range CanonicalSeverities {
+	for severity := range CanonicalSeverities {
 		got = append(got, string(severity))
 	}
+	slices.Sort(got)
+	want = slices.Sorted(slices.Values(want))
 
 	if !slices.Equal(got, want) {
 		t.Errorf("CanonicalSeverities is %v, schema says %v", got, want)

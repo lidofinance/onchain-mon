@@ -55,14 +55,14 @@ func TestOpsGeniePriority_CoversOnlyPageableSeverities(t *testing.T) {
 		databus.SeverityUnknown:  "",
 	}
 
-	for _, severity := range registry.CanonicalSeverities {
+	for severity := range registry.CanonicalSeverities {
 		if got := notifiler.OpsGeniePriority(severity); got != want[severity] {
 			t.Errorf("OpsGeniePriority(%s) = %q, want %q", severity, got, want[severity])
 		}
 	}
 
-	if got := notifiler.OpsGenieSeverityList(); got != "High, Critical" {
-		t.Errorf("OpsGenieSeverityList() = %q, want %q", got, "High, Critical")
+	if got := notifiler.OpsGenieSeverityList(); got != "Critical, High" {
+		t.Errorf("OpsGenieSeverityList() = %q, want %q", got, "Critical, High")
 	}
 }
 
