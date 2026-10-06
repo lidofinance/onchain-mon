@@ -11,12 +11,19 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/lidofinance/onchain-mon/generated/databus"
+	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
 	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
-// SubjectParts is the minimum number of dot-separated parts in a findings
+// SubjectParts is the exact number of dot-separated parts in a findings
 // subject: findings.<team>.<bot>.
 const SubjectParts = 3
+
+// SubjectPrefix is the first part of every findings subject the bots publish to.
+const SubjectPrefix = "findings"
+
+// forbiddenSubjectChars are the NATS wildcards plus forbidden characters
+const forbiddenSubjectChars = "*> \t\r\n/\\"
 
 type SeverityLevel struct {
 	ID string `mapstructure:"id"`
@@ -138,17 +145,25 @@ func validateSubjects(cfg *NotificationConfig) error {
 		}
 
 		for _, subject := range consumer.Subjects {
-			// NewConsumers splits on "." and takes parts[1] and parts[2]; a
-			// shorter subject makes the forwarder fail on startup instead.
+			// The stream and the durable consumer filter on the raw subject
+			// while NewConsumers derives the durable name from parts[1] and
+			// parts[2] only. A wrong prefix or an extra part therefore builds a
+			// healthy-looking consumer subscribed to a subject nobody publishes
+			// to, so require the canonical shape instead.
 			parts := strings.Split(subject, ".")
-			if len(parts) < SubjectParts {
-				return fmt.Errorf("consumer '%s' has an invalid subject '%s', expected findings.<team>.<bot>",
-					consumer.ConsumerName, subject)
+			if len(parts) != SubjectParts || parts[0] != SubjectPrefix {
+				return fmt.Errorf("consumer '%s' has an invalid subject '%s', expected %s.<team>.<bot>",
+					consumer.ConsumerName, subject, SubjectPrefix)
 			}
 
-			for i, part := range parts[:SubjectParts] {
+			for i, part := range parts {
 				if part == "" {
 					return fmt.Errorf("consumer '%s' has an empty part %d in subject '%s'",
+						consumer.ConsumerName, i+1, subject)
+				}
+
+				if strings.ContainsAny(part, forbiddenSubjectChars) {
+					return fmt.Errorf("consumer '%s' has a forbidden character in part %d of subject '%s' (wildcards are not supported)",
 						consumer.ConsumerName, i+1, subject)
 				}
 			}
@@ -194,25 +209,104 @@ func validateUniqueConsumerNames(cfg *NotificationConfig) error {
 	return nil
 }
 
+type channelDecl interface {
+	id() string
+	validate() error
+}
+
+func (c TelegramChannel) id() string { return c.ID }
+
+func (c TelegramChannel) validate() error {
+	if c.BotToken == "" {
+		return errors.New("has an empty bot_token")
+	}
+
+	if c.ChatID == "" {
+		return errors.New("has an empty chat_id")
+	}
+
+	return nil
+}
+
+func (c DiscordChannel) id() string { return c.ID }
+
+func (c DiscordChannel) validate() error {
+	if c.WebhookURL == "" {
+		return errors.New("has an empty webhook_url")
+	}
+
+	return nil
+}
+
+func (c OpsGenieChannel) id() string { return c.ID }
+
+func (c OpsGenieChannel) validate() error {
+	if c.APIKey == "" {
+		return errors.New("has an empty api_key")
+	}
+
+	return nil
+}
+
+func (c SlackChannel) id() string { return c.ID }
+
+func (c SlackChannel) validate() error {
+	if c.WebhookURL == "" {
+		return errors.New("has an empty webhook_url")
+	}
+
+	return nil
+}
+
+// collectChannelIDs indexes the declarations of one channel type by id and rejects empty or duplicated ones
+func collectChannelIDs[T channelDecl](kind string, channels []T) (map[string]struct{}, error) {
+	firstSeen := make(map[string]int, len(channels))
+
+	for i, channel := range channels {
+		channelID := channel.id()
+		if channelID == "" {
+			return nil, fmt.Errorf("%s_channels[%d] has an empty id", kind, i)
+		}
+
+		if first, exists := firstSeen[channelID]; exists {
+			return nil, fmt.Errorf("%s_channels[%d] and %s_channels[%d] both declare the id '%s'",
+				kind, first, kind, i, channelID)
+		}
+
+		if err := channel.validate(); err != nil {
+			return nil, fmt.Errorf("%s_channels[%d] '%s' %w", kind, i, channelID, err)
+		}
+
+		firstSeen[channelID] = i
+	}
+
+	ids := make(map[string]struct{}, len(firstSeen))
+	for channelID := range firstSeen {
+		ids[channelID] = struct{}{}
+	}
+
+	return ids, nil
+}
+
 func validateChannelRefs(cfg *NotificationConfig) error {
-	telegramChannels := make(map[string]bool)
-	for _, channel := range cfg.TelegramChannels {
-		telegramChannels[channel.ID] = true
+	telegramChannels, err := collectChannelIDs("telegram", cfg.TelegramChannels)
+	if err != nil {
+		return err
 	}
 
-	discordChannels := make(map[string]bool)
-	for _, channel := range cfg.DiscordChannels {
-		discordChannels[channel.ID] = true
+	discordChannels, err := collectChannelIDs("discord", cfg.DiscordChannels)
+	if err != nil {
+		return err
 	}
 
-	opsgenieChannels := make(map[string]bool)
-	for _, channel := range cfg.OpsGenieChannels {
-		opsgenieChannels[channel.ID] = true
+	opsgenieChannels, err := collectChannelIDs("opsgenie", cfg.OpsGenieChannels)
+	if err != nil {
+		return err
 	}
 
-	slackChannels := make(map[string]bool)
-	for _, channel := range cfg.SlackChannels {
-		slackChannels[channel.ID] = true
+	slackChannels, err := collectChannelIDs("slack", cfg.SlackChannels)
+	if err != nil {
+		return err
 	}
 
 	for _, consumer := range cfg.Consumers {
@@ -241,10 +335,49 @@ func validateChannelRefs(cfg *NotificationConfig) error {
 	return nil
 }
 
-func validateSeverities(cfg *NotificationConfig) error {
-	validSeverities := make(registry.FindingMapping)
-	for _, severity := range cfg.SeverityLevels {
+func collectGlobalSeverities(cfg *NotificationConfig) (registry.FindingMapping, error) {
+	validSeverities := make(registry.FindingMapping, len(cfg.SeverityLevels))
+
+	for i, severity := range cfg.SeverityLevels {
+		if severity.ID == "" {
+			return nil, fmt.Errorf("severity_levels[%d] has an empty id", i)
+		}
+
+		if !registry.CanonicalSeverities[databus.Severity(severity.ID)] {
+			return nil, fmt.Errorf("severity_levels[%d] declares an unknown severity '%s', expected one of: %s",
+				i, severity.ID, registry.CanonicalSeverityList())
+		}
+
+		if validSeverities[databus.Severity(severity.ID)] {
+			return nil, fmt.Errorf("severity_levels[%d] duplicates severity '%s'", i, severity.ID)
+		}
+
 		validSeverities[databus.Severity(severity.ID)] = true
+	}
+
+	return validSeverities, nil
+}
+
+// validateChannelSeverities rejects severities the channel cannot actually deliver.
+func validateChannelSeverities(consumer *Consumer) error {
+	if consumer.Type != registry.OpsGenie {
+		return nil
+	}
+
+	for _, severity := range consumer.Severities {
+		if notifiler.OpsGeniePriority(databus.Severity(severity)) == "" {
+			return fmt.Errorf("consumer '%s' cannot deliver severity '%s' to OpsGenie, supported: %s",
+				consumer.ConsumerName, severity, notifiler.OpsGenieSeverityList())
+		}
+	}
+
+	return nil
+}
+
+func validateSeverities(cfg *NotificationConfig) error {
+	validSeverities, err := collectGlobalSeverities(cfg)
+	if err != nil {
+		return err
 	}
 
 	for _, consumer := range cfg.Consumers {
@@ -262,6 +395,10 @@ func validateSeverities(cfg *NotificationConfig) error {
 				return fmt.Errorf("consumer '%s' references an unknown severity level '%s'", consumer.ConsumerName, severity)
 			}
 			severitySet[databus.Severity(severity)] = true
+		}
+
+		if err := validateChannelSeverities(consumer); err != nil {
+			return err
 		}
 
 		for _, alertID := range consumer.Filter {

@@ -10,6 +10,7 @@ import (
 	"github.com/lidofinance/onchain-mon/generated/databus"
 	"github.com/lidofinance/onchain-mon/internal/connectors/metrics"
 	"github.com/lidofinance/onchain-mon/internal/pkg/notifiler"
+	"github.com/lidofinance/onchain-mon/internal/utils/registry"
 )
 
 func newTestMetrics(t *testing.T) *metrics.Store {
@@ -18,6 +19,9 @@ func newTestMetrics(t *testing.T) *metrics.Store {
 	return metrics.New(reg, "test", "test", "test")
 }
 
+// OpsGenie pages only on High and Critical. ValidateConfig already rejects an
+// OpsGenie consumer that lists any other severity, so nothing else should reach
+// this branch — it stays silent rather than failing a send nobody asked for.
 func TestSendFinding_SkipsLowSeverity(t *testing.T) {
 	m := newTestMetrics(t)
 	og := notifiler.NewOpsgenie("key", nil, m, "local", "etherscan.io", "test")
@@ -38,6 +42,27 @@ func TestSendFinding_SkipsLowSeverity(t *testing.T) {
 		if err != nil {
 			t.Fatalf("SendFinding(%s) unexpected error: %v", sev, err)
 		}
+	}
+}
+
+func TestOpsGeniePriority_CoversOnlyPageableSeverities(t *testing.T) {
+	want := map[databus.Severity]string{
+		databus.SeverityCritical: "P1",
+		databus.SeverityHigh:     "P2",
+		databus.SeverityMedium:   "",
+		databus.SeverityLow:      "",
+		databus.SeverityInfo:     "",
+		databus.SeverityUnknown:  "",
+	}
+
+	for severity := range registry.CanonicalSeverities {
+		if got := notifiler.OpsGeniePriority(severity); got != want[severity] {
+			t.Errorf("OpsGeniePriority(%s) = %q, want %q", severity, got, want[severity])
+		}
+	}
+
+	if got := notifiler.OpsGenieSeverityList(); got != "Critical, High" {
+		t.Errorf("OpsGenieSeverityList() = %q, want %q", got, "Critical, High")
 	}
 }
 
