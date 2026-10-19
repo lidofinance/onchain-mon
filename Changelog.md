@@ -1,3 +1,12 @@
+## 11.09.2026
+
+### Fixed
+1. Config: `severity_levels` must use severities the finding schema defines; empty and repeated ids are rejected — a typo like `Critcal` passed, and the consumer then ignored every real `Critical` finding
+2. Config: an OpsGenie consumer can only list `High` and `Critical` — other severities were accepted, and the finding was then dropped silently at send time
+3. Config: duplicate or empty channel `id`s are rejected — the last duplicate won, so alerts could go to the wrong chat or webhook
+4. Config: a channel with an empty bot token, chat id, webhook url or api key is rejected at startup instead of failing on the first send
+5. Config: a subject must be exactly `findings.<team>.<bot>`, no wildcards — `finding.protocol.steth` or an extra part passed and built a consumer that listens where no bot publishes
+
 ## 13.08.2026
 
 ### Fixed
