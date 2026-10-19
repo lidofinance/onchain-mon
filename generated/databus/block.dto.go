@@ -31,6 +31,9 @@ type BlockDtoJsonReceiptsElem struct {
 	// Logs corresponds to the JSON schema field "logs".
 	Logs []BlockDtoJsonReceiptsElemLogsElem `json:"logs" yaml:"logs" mapstructure:"logs"`
 
+	// Status corresponds to the JSON schema field "status".
+	Status int `json:"status" yaml:"status" mapstructure:"status"`
+
 	// To corresponds to the JSON schema field "to".
 	To *string `json:"to,omitempty" yaml:"to,omitempty" mapstructure:"to,omitempty"`
 
@@ -120,6 +123,9 @@ func (j *BlockDtoJsonReceiptsElem) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["logs"]; raw != nil && !ok {
 		return fmt.Errorf("field logs in BlockDtoJsonReceiptsElem: required")
+	}
+	if _, ok := raw["status"]; raw != nil && !ok {
+		return fmt.Errorf("field status in BlockDtoJsonReceiptsElem: required")
 	}
 	if _, ok := raw["transactionHash"]; raw != nil && !ok {
 		return fmt.Errorf("field transactionHash in BlockDtoJsonReceiptsElem: required")

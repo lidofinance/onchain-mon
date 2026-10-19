@@ -31,6 +31,9 @@
           "transactionHash": {
             "type": "string"
           },
+          "status": {
+            "type": "integer"
+          },
           "logs": {
             "title": "Logs",
             "type": "array",
@@ -84,7 +87,7 @@
             }
           }
         },
-        "required": ["logs", "from", "transactionHash"]
+        "required": ["logs", "from", "transactionHash", "status"]
       }
     }
   },
