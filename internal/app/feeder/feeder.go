@@ -352,10 +352,13 @@ func buildBlockDto(block *entity.EthBlock, blockReceipts []entity.BlockReceipt) 
 			})
 		}
 
+		status, _ := strconv.ParseInt(receipt.Status, 0, 64)
+
 		receipts = append(receipts, databus.BlockDtoJsonReceiptsElem{
 			Logs:            logs,
 			To:              &receipt.To,
 			From:            receipt.From,
+			Status:          int(status),
 			TransactionHash: receipt.TransactionHash,
 		})
 	}
