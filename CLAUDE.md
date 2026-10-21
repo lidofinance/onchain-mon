@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Note: the repo was renamed from `finding-forwarder` to `onchain-mon`; the README and some docs still use the old name and a stale `./cmd/service` build path. The real entrypoints are `cmd/feeder` and `cmd/forwarder`.
 
-Go toolchain: `go 1.26.6` (per `go.mod`).
+Go toolchain: `go 1.27.3` (per `go.mod`). A toolchain bump touches `go.mod`, the `Dockerfile` `FROM golang:<ver>-alpine` line, and — on a new minor Go release — the golangci-lint pin in **both** `Makefile` (`tools`) and `.github/workflows/checks.yml` (`GOLANGCI_LINT_VERSION`). CI builds golangci-lint from source with the new toolchain, but an old release still fails `typecheck` with `export data version N is greater than maximum supported version` because its vendored `golang.org/x/tools` cannot read the new stdlib. After switching locally, re-run `make tools`: `bin/golangci-lint` and `bin/govulncheck` keep the stdlib they were built with.
 
 ## Commands
 
@@ -46,7 +46,7 @@ go build -o ./bin/feeder    ./cmd/feeder
 go build -o ./bin/forwarder ./cmd/forwarder
 ```
 
-Run the local stack (Redis + NATS + both services): `docker-compose up -d`. To develop one service locally, comment it out of `docker-compose.yml` and point its env at the dockerized NATS/Redis.
+To develop one service locally, comment it out of `docker-compose.yml` and point its env at the dockerized NATS/Redis.
 
 ### Tests
 
@@ -100,7 +100,7 @@ infra/                  # local stack config; runtime state next to it is gitign
 
 1. **Feeder** polls `eth_getBlockByNumber` + `eth_getBlockReceipts`, builds `databus.BlockDtoJson`, zstd-compresses it, and `PublishAsync`es to `BLOCK_TOPIC` (e.g. `blocks.mainnet.l1`) with `WithMsgID(blockHash)` for idempotency. It tracks `prevBlockNumber` and self-heals: on >2min without the next block it calls `recoverMissedBlocks` to batch-fetch and publish the gap; the timer is re-armed relative to the block timestamp (`EtaNextBlock` 12s) rather than a fixed tick.
 2. **Bots** (external repo `lidofinance/testing-forta-bots`) consume block data and publish `databus.FindingDtoJson` to `findings.<team>.<bot>`.
-3. **Forwarder** creates/updates a single JetStream stream `NatsStream` (`InterestPolicy`, `MaxAge` 10min, 4MB max msg) whose subjects come from `CollectNatsSubjects(notificationConfig)`, then one durable consumer per subject per configured notification consumer.
+3. **Forwarder** creates/updates a single JetStream stream `NatsStream` (`InterestPolicy`, `MaxAge` 10min, `MaxMsgSize` = `nats.MaxMsgSize`, 8MB) whose subjects come from `CollectNatsSubjects(notificationConfig)`, then one durable consumer per subject per configured notification consumer.
 
 ### Quorum model (the part that needs care)
 

@@ -7,7 +7,7 @@ generate-docker:
 .PHONY: tools
 tools:
 	@echo "Installing dev tools into ./bin ..."
-	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 	GOBIN=$(PWD)/bin go install github.com/vektra/mockery/v3@v3.7.3
 	GOBIN=$(PWD)/bin go install golang.org/x/tools/cmd/goimports@v0.48.0
 	GOBIN=$(PWD)/bin go install github.com/atombender/go-jsonschema@v0.24.1
