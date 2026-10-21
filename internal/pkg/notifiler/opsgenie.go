@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,16 +53,33 @@ func NewOpsgenie(opsGenieKey string,
 const OpsGenieLabel = `opsgenie`
 const OpsGenieRetryAfter = 5 * time.Second
 
-func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
-	opsGeniePriority := ""
-	switch alert.Severity {
+// OpsGeniePriority maps finding severity to OpsGenie priority
+func OpsGeniePriority(severity databus.Severity) string {
+	switch severity {
 	case databus.SeverityCritical:
-		opsGeniePriority = "P1"
+		return "P1"
 	case databus.SeverityHigh:
-		opsGeniePriority = "P2"
+		return "P2"
 	}
 
-	// Send only P1 or P2 alerts
+	return ""
+}
+
+func OpsGenieSeverityList() string {
+	out := make([]string, 0, len(registry.CanonicalSeverities))
+	for severity := range registry.CanonicalSeverities {
+		if OpsGeniePriority(severity) != "" {
+			out = append(out, string(severity))
+		}
+	}
+	slices.Sort(out)
+
+	return strings.Join(out, ", ")
+}
+
+func (o *OpsGenie) SendFinding(ctx context.Context, alert *databus.FindingDtoJson) error {
+	// Send only P1 or P2 alerts. ValidateConfig rejects an OpsGenie consumer that lists any other severity.
+	opsGeniePriority := OpsGeniePriority(alert.Severity)
 	if opsGeniePriority == "" {
 		return nil
 	}

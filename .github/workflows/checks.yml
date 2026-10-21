@@ -10,7 +10,7 @@ on:
       - develop
 
 env:
-  GOLANGCI_LINT_VERSION: v2.12.2
+  GOLANGCI_LINT_VERSION: v2.15.0
   GOVULNCHECK_VERSION: v1.6.0
 
 jobs:

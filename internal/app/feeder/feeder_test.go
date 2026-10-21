@@ -190,7 +190,7 @@ func (c *failSecondChunkChain) FetchBlocksInRange(ctx context.Context, from, to 
 
 func Test_recover_keeps_progress_when_a_later_chunk_fails(t *testing.T) {
 	// 120 blocks => three chunks; the second one dies mid-recovery.
-	spy := &failSecondChunkChain{chunkSpyChain: chunkSpyChain{latest: 220}}
+	spy := &failSecondChunkChain{latest: 220}
 
 	f := newTestFeeder(spy)
 	f.js = &noopJetStream{}
